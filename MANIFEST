@@ -1,10 +1,12 @@
+Build.PL
 Changes
 Makefile.PL
 MANIFEST
 README
-examples/InsideOutClass.pm
-examples/InstanceCountingClass.pm
-examples/Perl6Attribute.pm
+META.yml
+examples/InsideOutClass.pod
+examples/InstanceCountingClass.pod
+examples/Perl6Attribute.pod
 lib/Class/MOP.pm
 lib/Class/MOP/Attribute.pm
 lib/Class/MOP/Class.pm
