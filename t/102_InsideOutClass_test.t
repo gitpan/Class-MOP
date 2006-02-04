@@ -14,22 +14,22 @@ BEGIN {
 {
     package Foo;
     
-    sub meta { InsideOutClass->initialize($_[0]) }
+    sub meta { 
+        InsideOutClass->initialize($_[0] => (
+          ':attribute_metaclass' => 'InsideOutClass::Attribute'
+        )) 
+    }
     
-    Foo->meta->add_attribute(
-        InsideOutClass::Attribute->new('foo' => (
-            accessor  => 'foo',
-            predicate => 'has_foo',
-        ))
-    );
+    Foo->meta->add_attribute('foo' => (
+        accessor  => 'foo',
+        predicate => 'has_foo',
+    ));
     
-    Foo->meta->add_attribute(
-        InsideOutClass::Attribute->new('bar' => (
-            reader  => 'get_bar',
-            writer  => 'set_bar',
-            default => 'FOO is BAR'            
-        ))
-    );    
+    Foo->meta->add_attribute('bar' => (
+        reader  => 'get_bar',
+        writer  => 'set_bar',
+        default => 'FOO is BAR'            
+    ));
     
     sub new  {
         my $class = shift;

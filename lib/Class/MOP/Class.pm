@@ -9,7 +9,7 @@ use Scalar::Util 'blessed', 'reftype';
 use Sub::Name    'subname';
 use B            'svref_2object';
 
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 
 # Self-introspection
 
@@ -24,11 +24,12 @@ sub meta { $_[0]->initialize($_[0]) }
     # After all, do package definitions even get reaped?
     my %METAS;
     sub initialize {
-        my ($class, $package_name) = @_;
+        my $class        = shift;
+        my $package_name = shift;
         (defined $package_name && $package_name)
             || confess "You must pass a package name";        
         return $METAS{$package_name} if exists $METAS{$package_name};
-        $METAS{$package_name} = $class->construct_class_instance($package_name);
+        $METAS{$package_name} = $class->construct_class_instance($package_name, @_);
     }
     
     # NOTE: (meta-circularity) 
@@ -38,18 +39,21 @@ sub meta { $_[0]->initialize($_[0]) }
     # class. All other classes will use the more 
     # normal &construct_instance.
     sub construct_class_instance {
-        my ($class, $package_name) = @_;
+        my $class        = shift;
+        my $package_name = shift;
         (defined $package_name && $package_name)
             || confess "You must pass a package name";    
         $class = blessed($class) || $class;
         if ($class =~ /^Class::MOP::/) {    
             bless { 
-                '$:pkg'   => $package_name, 
-                '%:attrs' => {} 
+                '$:package'             => $package_name, 
+                '%:attributes'          => {},
+                '$:attribute_metaclass' => 'Class::MOP::Attribute',
+                '$:method_metaclass'    => 'Class::MOP::Method',                
             } => $class;
         }
         else {
-            bless $class->meta->construct_instance(':pkg' => $package_name) => $class
+            bless $class->meta->construct_instance(':package' => $package_name, @_) => $class
         }
     }
 }
@@ -107,7 +111,7 @@ sub construct_instance {
 
 # Informational 
 
-sub name { $_[0]->{'$:pkg'} }
+sub name { $_[0]->{'$:package'} }
 
 sub version {  
     my $self = shift;
@@ -145,6 +149,9 @@ sub class_precedence_list {
 }
 
 ## Methods
+
+# un-used right now ...
+sub method_metaclass { $_[0]->{'$:method_metaclass'} }
 
 sub add_method {
     my ($self, $method_name, $method) = @_;
@@ -266,10 +273,16 @@ sub find_all_methods_by_name {
 
 ## Attributes
 
+sub attribute_metaclass { $_[0]->{'$:attribute_metaclass'} }
+
 sub add_attribute {
-    my ($self,$attribute) = @_;
-    (blessed($attribute) && $attribute->isa('Class::MOP::Attribute'))
-        || confess "Your attribute must be an instance of Class::MOP::Attribute (or a subclass)";
+    my $self      = shift;
+    # either we have an attribute object already
+    # or we need to create one from the args provided
+    my $attribute = blessed($_[0]) ? $_[0] : $self->attribute_metaclass->new(@_);
+    # make sure it is derived from the correct type though
+    ($attribute->isa('Class::MOP::Attribute'))
+        || confess "Your attribute must be an instance of Class::MOP::Attribute (or a subclass)";    
     $attribute->attach_to_class($self);
     $attribute->install_accessors();        
     $self->{'%:attrs'}->{$attribute->name} = $attribute;
@@ -558,6 +571,8 @@ what B<Class::ISA::super_path> does, but we don't remove duplicate names.
 
 =over 4
 
+=item B<method_metaclass>
+
 =item B<add_method ($method_name, $method)>
 
 This will take a C<$method_name> and CODE reference to that 
@@ -643,6 +658,8 @@ the information given, and can not easily discover information on
 their own. See L<Class::MOP::Attribute> for more details.
 
 =over 4
+
+=item B<attribute_metaclass>
 
 =item B<add_attribute ($attribute_name, $attribute_meta_object)>
 
