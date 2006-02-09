@@ -5,19 +5,17 @@ package # hide the package from PAUSE
 use strict;
 use warnings;
 
-use Class::MOP 'meta';
-
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 
 use base 'Class::MOP::Class';
 
 sub construct_instance {
     my ($class, %params) = @_;
     my $instance = {};
-    foreach my $attr (map { $_->{attribute} } $class->compute_all_applicable_attributes()) {
+    foreach my $attr ($class->compute_all_applicable_attributes()) {
         # if the attr has an init_arg, use that, otherwise,
         # use the attributes name itself as the init_arg
-        my $init_arg = $attr->has_init_arg() ? $attr->init_arg() : $attr->name;
+        my $init_arg = $attr->init_arg();
         # try to fetch the init arg from the %params ...
         my $val;        
         $val = $params{$init_arg} if exists $params{$init_arg};
@@ -34,9 +32,7 @@ package # hide the package from PAUSE
 use strict;
 use warnings;
 
-use Class::MOP 'meta';
-
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 
 use base 'Class::MOP::Attribute';
 
@@ -81,11 +77,9 @@ LazyClass - An example metaclass with lazy initialization
 
   package BinaryTree;
   
-  sub meta {
-      LazyClass->initialize($_[0] => (
-          ':attribute_metaclass' => 'LazyClass::Attribute'
-      ));
-  }
+  use metaclass 'LazyClass' => (
+      ':attribute_metaclass' => 'LazyClass::Attribute'
+  );
   
   BinaryTree->meta->add_attribute('$:node' => (
       accessor => 'node',
@@ -102,9 +96,9 @@ LazyClass - An example metaclass with lazy initialization
       default => sub { BinaryTree->new() }    
   ));    
   
-  sub new {
+  sub new  {
       my $class = shift;
-      bless $class->meta->construct_instance(@_) => $class;
+      $class->meta->new_object(@_);
   }
   
   # ... later in code

@@ -1,5 +1,46 @@
 Revision history for Perl extension Class-MOP.
 
+0.06 Thurs Feb. 9, 2006
+    * metaclass
+      - adding new metaclass pragma to make setting up the 
+        metaclass a little more straightforward
+        
+    * Class::MOP
+      - clean up bootstrapping to include more complete 
+        attribute definitions for Class::MOP::Class and 
+        Class::MOP::Attribute (accessors, readers, writers, 
+        etc.) ... it is redundant, but is useful meta-info
+        to have around.
+
+    * Class::MOP::Class
+      - fixing minor meta-circularity issue with &meta, it 
+        is now more useful for subclasses
+      - added &get_attribute_map as an accessor for the 
+        hash of attribute meta objects
+      - &compute_all_applicable_attributes now just returns
+        the attribute meta-object, rather than the HASH ref
+        since all the same info can be gotten from the 
+        attribute meta-object itself
+          - updated docs & tests to reflect
+      - added &clone_instance method which does a deep clone
+        of the instance structure created by &construct_instance
+          - added docs & tests for this
+          - added Clone as a dependency
+      - added &new_object and &clone_object convience methods to
+        return blessed new or cloned instances
+          - they handle Class::MOP::Class singletons correctly too
+          - added docs & tests for this
+      - cleaned up the &constuct_class_instance so that it behaves
+        more like &construct_instance (and managed the singletons too)
+      - added the &check_metaclass_compatibility method to make sure
+        that metaclasses are upward and downward compatible.
+          - added tests and docs for this
+          
+    * examples/
+      - adjusting code to use the &Class::MOP::Class::meta
+        fix detailed above
+      - adjusting code to use the metaclass pragma
+      
 0.05 Sat Feb. 4, 2006
     * Class::MOP::Class
       - added the &attribute_metaclass and &method_metaclass

@@ -14,7 +14,7 @@ BEGIN {
 {
     package Foo;
     
-    use Class::MOP 'meta';
+    use metaclass;
     
     Foo->meta->add_attribute(Perl6Attribute->new('$.foo'));
     Foo->meta->add_attribute(Perl6Attribute->new('@.bar'));    
@@ -22,8 +22,8 @@ BEGIN {
     
     sub new  {
         my $class = shift;
-        bless $class->meta->construct_instance(@_) => $class;
-    }        
+        $class->meta->new_object(@_);
+    }      
 }
 
 my $foo = Foo->new();

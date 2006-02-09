@@ -7,8 +7,9 @@ WriteMakefile
           'PREREQ_PM' => {
                            'B' => '0',
                            'Carp' => '0.01',
+                           'Clone' => '0.18',
                            'File::Spec' => '0',
-                           'Scalar::Util' => '1.17',
+                           'Scalar::Util' => '1.18',
                            'Sub::Name' => '0.02',
                            'Test::Exception' => '0.21',
                            'Test::More' => '0.47'

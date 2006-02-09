@@ -11,7 +11,7 @@ use Class::MOP::Class;
 use Class::MOP::Attribute;
 use Class::MOP::Method;
 
-our $VERSION = '0.05';
+our $VERSION = '0.06';
 
 sub import {
     shift;
@@ -49,12 +49,14 @@ sub import {
 
 Class::MOP::Class->meta->add_attribute(
     Class::MOP::Attribute->new('$:package' => (
-        init_arg => ':package'
+        reader   => 'name',
+        init_arg => ':package',
     ))
 );
 
 Class::MOP::Class->meta->add_attribute(
     Class::MOP::Attribute->new('%:attributes' => (
+        reader   => 'get_attribute_map',
         init_arg => ':attributes',
         default  => sub { {} }
     ))
@@ -62,6 +64,7 @@ Class::MOP::Class->meta->add_attribute(
 
 Class::MOP::Class->meta->add_attribute(
     Class::MOP::Attribute->new('$:attribute_metaclass' => (
+        reader   => 'attribute_metaclass',
         init_arg => ':attribute_metaclass',
         default  => 'Class::MOP::Attribute',
     ))
@@ -69,6 +72,7 @@ Class::MOP::Class->meta->add_attribute(
 
 Class::MOP::Class->meta->add_attribute(
     Class::MOP::Attribute->new('$:method_metaclass' => (
+        reader   => 'method_metaclass',
         init_arg => ':method_metaclass',
         default  => 'Class::MOP::Method',        
     ))
@@ -76,13 +80,60 @@ Class::MOP::Class->meta->add_attribute(
 
 ## Class::MOP::Attribute
 
-Class::MOP::Attribute->meta->add_attribute(Class::MOP::Attribute->new('name'));
-Class::MOP::Attribute->meta->add_attribute(Class::MOP::Attribute->new('accessor'));
-Class::MOP::Attribute->meta->add_attribute(Class::MOP::Attribute->new('reader'));
-Class::MOP::Attribute->meta->add_attribute(Class::MOP::Attribute->new('writer'));
-Class::MOP::Attribute->meta->add_attribute(Class::MOP::Attribute->new('predicate'));
-Class::MOP::Attribute->meta->add_attribute(Class::MOP::Attribute->new('init_arg'));
-Class::MOP::Attribute->meta->add_attribute(Class::MOP::Attribute->new('default'));
+Class::MOP::Attribute->meta->add_attribute(
+    Class::MOP::Attribute->new('name' => (
+        reader => 'name'
+    ))
+);
+
+Class::MOP::Attribute->meta->add_attribute(
+    Class::MOP::Attribute->new('associated_class' => (
+        reader => 'associated_class'
+    ))
+);
+
+Class::MOP::Attribute->meta->add_attribute(
+    Class::MOP::Attribute->new('accessor' => (
+        reader    => 'accessor',
+        predicate => 'has_accessor',
+    ))
+);
+
+Class::MOP::Attribute->meta->add_attribute(
+    Class::MOP::Attribute->new('reader' => (
+        reader    => 'reader',
+        predicate => 'has_reader',
+    ))
+);
+
+Class::MOP::Attribute->meta->add_attribute(
+    Class::MOP::Attribute->new('writer' => (
+        reader    => 'writer',
+        predicate => 'has_writer',
+    ))
+);
+
+Class::MOP::Attribute->meta->add_attribute(
+    Class::MOP::Attribute->new('predicate' => (
+        reader    => 'predicate',
+        predicate => 'has_predicate',
+    ))
+);
+
+Class::MOP::Attribute->meta->add_attribute(
+    Class::MOP::Attribute->new('init_arg' => (
+        reader    => 'init_arg',
+        predicate => 'has_init_arg',
+    ))
+);
+
+Class::MOP::Attribute->meta->add_attribute(
+    Class::MOP::Attribute->new('default' => (
+        # default has a custom 'reader' method ...
+        predicate => 'has_default',
+    ))
+);
+
 
 # NOTE: (meta-circularity)
 # This should be one of the last things done
@@ -96,11 +147,23 @@ Class::MOP::Attribute->meta->add_method('new' => sub {
         
     (defined $name && $name)
         || confess "You must provide a name for the attribute";
-    (!exists $options{reader} && !exists $options{writer})
-        || confess "You cannot declare an accessor and reader and/or writer functions"
-            if exists $options{accessor};
-            
-    bless $class->meta->construct_instance(name => $name, %options) => $class;
+    $options{init_arg} = $name 
+        if not exists $options{init_arg};
+
+    # return the new object
+    $class->meta->new_object(name => $name, %options);
+});
+
+Class::MOP::Attribute->meta->add_method('clone' => sub {
+    my $self  = shift;
+    my $class = $self->associated_class;
+    $self->detach_from_class() if defined $class;
+    my $clone = $self->meta->clone_object($self, @_);  
+    if (defined $class) {
+        $self->attach_to_class($class);
+        $clone->attach_to_class($class);
+    }
+    return $clone;  
 });
 
 1;
@@ -197,6 +260,41 @@ B<any> drain at all upon your code's performance. In fact, by itself
 it does nothing to affect your existing code. So you only pay for 
 what you actually use.
 
+=head2 About Metaclass compatibility
+
+This module makes sure that all metaclasses created are both upwards 
+and downwards compatible. The topic of metaclass compatibility is 
+highly esoteric and is something only encountered when doing deep and 
+involved metaclass hacking. There are two basic kinds of metaclass 
+incompatibility; upwards and downwards. 
+
+Upwards metaclass compatibility means that the metaclass of a 
+given class is either the same as (or a subclass of) all of the 
+class's ancestors.
+
+Downward metaclass compatibility means that the metaclasses of a 
+given class's anscestors are all either the same as (or a subclass 
+of) that metaclass.
+
+Here is a diagram showing a set of two classes (C<A> and C<B>) and 
+two metaclasses (C<Meta::A> and C<Meta::B>) which have correct  
+metaclass compatibility both upwards and downwards.
+
+    +---------+     +---------+
+    | Meta::A |<----| Meta::B |      <....... (instance of  )
+    +---------+     +---------+      <------- (inherits from)  
+         ^               ^
+         :               :
+    +---------+     +---------+
+    |    A    |<----|    B    |
+    +---------+     +---------+
+
+As I said this is a highly esoteric topic and one you will only run 
+into if you do a lot of subclassing of B<Class::MOP::Class>. If you 
+are interested in why this is an issue see the paper 
+I<Uniform and safe metaclass composition> linked to in the 
+L<SEE ALSO> section of this document.
+
 =head1 PROTOCOLS
 
 The protocol is divided into 3 main sub-protocols:
@@ -253,6 +351,29 @@ email me and let me know, I would love to hear about them.
 
 =back
 
+=head2 Papers
+
+=over 4
+
+=item Uniform and safe metaclass composition
+
+An excellent paper by the people who brought us the original Traits paper. 
+This paper is on how Traits can be used to do safe metaclass composition, 
+and offers an excellent introduction section which delves into the topic of 
+metaclass compatibility.
+
+L<http://www.iam.unibe.ch/~scg/Archive/Papers/Duca05ySafeMetaclassTrait.pdf>
+
+=item Safe Metaclass Programming
+
+This paper seems to precede the above paper, and propose a mix-in based 
+approach as opposed to the Traits based approach. Both papers have similar 
+information on the metaclass compatibility problem space. 
+
+L<http://citeseer.ist.psu.edu/37617.html>
+
+=back
+
 =head2 Prior Art
 
 =over 4
@@ -275,30 +396,8 @@ As I have said above, this module is a class-builder-builder, so it is
 not the same thing as modules like L<Class::Accessor> and 
 L<Class::MethodMaker>. That being said there are very few modules on CPAN 
 with similar goals to this module. The one I have found which is most 
-like this module is L<Class::Meta>, although it's philosophy is very 
-different from this module. 
-
-To start with, it provides wrappers around common Perl data types, and even 
-extends those types with more specific subtypes. This module does not 
-go into that area at all. 
-
-L<Class::Meta> also seems to create it's own custom meta-object protocol, 
-which is both more restrictive and more featureful than the vanilla 
-Perl 5 one. This module attempts to model the existing Perl 5 MOP as it is.
-
-It's introspection capabilities also seem to be heavily rooted in this 
-custom MOP, so that you can only introspect classes which are already 
-created with L<Class::Meta>. This module does not make such restictions.
-
-Now, all this said, L<Class::Meta> is much more featureful than B<Class::MOP> 
-would ever try to be. But B<Class::MOP> has some features which L<Class::Meta>
-could not easily implement. It would be very possible to completely re-implement 
-L<Class::Meta> using B<Class::MOP> and bring some of these features to 
-L<Class::Meta> though. 
-
-But in the end, this module's admitedly ambitious goals have no direct equal 
-on CPAN since surely no one has been crazy enough to try something as silly 
-as this ;) until now.
+like this module is L<Class::Meta>, although it's philosophy and the MOP it 
+creates are very different from this modules. 
 
 =head1 BUGS
 

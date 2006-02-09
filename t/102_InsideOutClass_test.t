@@ -14,11 +14,9 @@ BEGIN {
 {
     package Foo;
     
-    sub meta { 
-        InsideOutClass->initialize($_[0] => (
-          ':attribute_metaclass' => 'InsideOutClass::Attribute'
-        )) 
-    }
+    use metaclass 'InsideOutClass' => (
+        ':attribute_metaclass' => 'InsideOutClass::Attribute'
+    );
     
     Foo->meta->add_attribute('foo' => (
         accessor  => 'foo',
@@ -33,7 +31,7 @@ BEGIN {
     
     sub new  {
         my $class = shift;
-        bless $class->meta->construct_instance(@_) => $class;
+        $class->meta->new_object(@_);
     }
 }
 

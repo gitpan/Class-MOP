@@ -5,9 +5,7 @@ package # hide the package from PAUSE
 use strict;
 use warnings;
 
-use Class::MOP 'meta';
-
-our $VERSION = '0.02';
+our $VERSION = '0.03';
 
 use base 'Class::MOP::Class';
 
@@ -29,7 +27,7 @@ sub construct_instance {
             my $attr = $meta->get_attribute($attr_name);
             # if the attr has an init_arg, use that, otherwise,
             # use the attributes name itself as the init_arg
-            my $init_arg = $attr->has_init_arg() ? $attr->init_arg() : $attr->name;
+            my $init_arg = $attr->init_arg();
             # try to fetch the init arg from the %params ...
             my $val;        
             $val = $params{$current_class}->{$init_arg} 
@@ -51,9 +49,7 @@ package # hide the package from PAUSE
 use strict;
 use warnings;
 
-use Class::MOP 'meta';
-
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 
 use base 'Class::MOP::Attribute';
 
@@ -106,7 +102,7 @@ ClassEncapsulatedAttributes - A set of example metaclasses with class encapsulat
 
   package Foo;
   
-  sub meta { ClassEncapsulatedAttributes->initialize($_[0]) }
+  use metaclass 'ClassEncapsulatedAttributes';
   
   Foo->meta->add_attribute('foo' => (
       accessor  => 'Foo_foo',
@@ -115,7 +111,7 @@ ClassEncapsulatedAttributes - A set of example metaclasses with class encapsulat
   
   sub new  {
       my $class = shift;
-      bless $class->meta->construct_instance(@_) => $class;
+      $class->meta->new_object(@_);
   }
   
   package Bar;

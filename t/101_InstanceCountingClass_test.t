@@ -23,10 +23,11 @@ a simple demonstration of how to make a metaclass.
 {
     package Foo;
     
-    sub meta { InstanceCountingClass->initialize($_[0]) }
+    use metaclass 'InstanceCountingClass';
+    
     sub new  {
         my $class = shift;
-        bless $class->meta->construct_instance(@_) => $class;
+        $class->meta->new_object(@_);
     }
     
     package Bar;

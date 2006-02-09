@@ -14,7 +14,7 @@ BEGIN {
 {
     package Foo;
     
-    sub meta { ClassEncapsulatedAttributes->initialize($_[0]) }
+    use metaclass 'ClassEncapsulatedAttributes';
     
     Foo->meta->add_attribute('foo' => (
         accessor  => 'foo',
@@ -30,7 +30,7 @@ BEGIN {
     
     sub new  {
         my $class = shift;
-        bless $class->meta->construct_instance(@_) => $class;
+        $class->meta->new_object(@_);
     }
     
     package Bar;

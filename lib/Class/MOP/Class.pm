@@ -8,12 +8,13 @@ use Carp         'confess';
 use Scalar::Util 'blessed', 'reftype';
 use Sub::Name    'subname';
 use B            'svref_2object';
+use Clone         ();
 
-our $VERSION = '0.02';
+our $VERSION = '0.03';
 
 # Self-introspection
 
-sub meta { $_[0]->initialize($_[0]) }
+sub meta { Class::MOP::Class->initialize($_[0]) }
 
 # Creation
 
@@ -22,14 +23,16 @@ sub meta { $_[0]->initialize($_[0]) }
     # there is no need to worry about destruction though
     # because they should die only when the program dies.
     # After all, do package definitions even get reaped?
-    my %METAS;
+    my %METAS;    
+    
     sub initialize {
         my $class        = shift;
         my $package_name = shift;
         (defined $package_name && $package_name)
-            || confess "You must pass a package name";        
-        return $METAS{$package_name} if exists $METAS{$package_name};
-        $METAS{$package_name} = $class->construct_class_instance($package_name, @_);
+            || confess "You must pass a package name";    
+        # make sure the package name is not blessed
+        $package_name = blessed($package_name) || $package_name;
+        $class->construct_class_instance(':package' => $package_name, @_);
     }
     
     # NOTE: (meta-circularity) 
@@ -40,21 +43,51 @@ sub meta { $_[0]->initialize($_[0]) }
     # normal &construct_instance.
     sub construct_class_instance {
         my $class        = shift;
-        my $package_name = shift;
+        my %options      = @_;
+        my $package_name = $options{':package'};
         (defined $package_name && $package_name)
-            || confess "You must pass a package name";    
+            || confess "You must pass a package name";  
+        return $METAS{$package_name} if exists $METAS{$package_name};              
         $class = blessed($class) || $class;
+        # now create the metaclass
+        my $meta;
         if ($class =~ /^Class::MOP::/) {    
-            bless { 
+            $meta = bless { 
                 '$:package'             => $package_name, 
                 '%:attributes'          => {},
-                '$:attribute_metaclass' => 'Class::MOP::Attribute',
-                '$:method_metaclass'    => 'Class::MOP::Method',                
+                '$:attribute_metaclass' => $options{':attribute_metaclass'} || 'Class::MOP::Attribute',
+                '$:method_metaclass'    => $options{':method_metaclass'}    || 'Class::MOP::Method',                
             } => $class;
         }
         else {
-            bless $class->meta->construct_instance(':package' => $package_name, @_) => $class
+            # NOTE:
+            # it is safe to use meta here because
+            # class will always be a subclass of 
+            # Class::MOP::Class, which defines meta
+            $meta = bless $class->meta->construct_instance(%options) => $class
         }
+        # and check the metaclass compatibility
+        $meta->check_metaclass_compatability();
+        $METAS{$package_name} = $meta;
+    }
+    
+    sub check_metaclass_compatability {
+        my $self = shift;
+
+        # this is always okay ...
+        return if blessed($self) eq 'Class::MOP::Class';
+
+        my @class_list = $self->class_precedence_list;
+        shift @class_list; # shift off $self->name
+
+        foreach my $class_name (@class_list) { 
+            next unless $METAS{$class_name};
+            my $meta = $METAS{$class_name};
+            ($self->isa(blessed($meta)))
+                || confess $self->name . "->meta => (" . (blessed($self)) . ")" . 
+                           " is not compatible with the " . 
+                           $class_name . "->meta => (" . (blessed($meta)) . ")";
+        }        
     }
 }
 
@@ -88,30 +121,84 @@ sub create {
     return $meta;
 }
 
-# Instance Construction
+## Attribute readers
+
+# NOTE:
+# all these attribute readers will be bootstrapped 
+# away in the Class::MOP bootstrap section
+
+sub name                { $_[0]->{'$:package'}             }
+sub get_attribute_map   { $_[0]->{'%:attributes'}          }
+sub attribute_metaclass { $_[0]->{'$:attribute_metaclass'} }
+sub method_metaclass    { $_[0]->{'$:method_metaclass'}    }
+
+# Instance Construction & Cloning
+
+sub new_object {
+    my $class = shift;
+    # NOTE:
+    # we need to protect the integrity of the 
+    # Class::MOP::Class singletons here, so we
+    # delegate this to &construct_class_instance
+    # which will deal with the singletons
+    return $class->construct_class_instance(@_)
+        if $class->name->isa('Class::MOP::Class');
+    bless $class->construct_instance(@_) => $class->name;
+}
 
 sub construct_instance {
     my ($class, %params) = @_;
     my $instance = {};
-    foreach my $attr (map { $_->{attribute} } $class->compute_all_applicable_attributes()) {
-        # if the attr has an init_arg, use that, otherwise,
-        # use the attributes name itself as the init_arg
-        my $init_arg = $attr->has_init_arg() ? $attr->init_arg() : $attr->name;
+    foreach my $attr ($class->compute_all_applicable_attributes()) {
+        my $init_arg = $attr->init_arg();
         # try to fetch the init arg from the %params ...
         my $val;        
         $val = $params{$init_arg} if exists $params{$init_arg};
         # if nothing was in the %params, we can use the 
         # attribute's default value (if it has one)
-        $val ||= $attr->default($instance) if $attr->has_default();
-        # now add this to the instance structure
+        $val ||= $attr->default($instance) if $attr->has_default();            
         $instance->{$attr->name} = $val;
     }
     return $instance;
 }
 
+sub clone_object {
+    my $class    = shift;
+    my $instance = shift; 
+    (blessed($instance) && $instance->isa($class->name))
+        || confess "You must pass an instance ($instance) of the metaclass (" . $class->name . ")";
+    # NOTE:
+    # we need to protect the integrity of the 
+    # Class::MOP::Class singletons here, they 
+    # should not be cloned.
+    return $instance if $instance->isa('Class::MOP::Class');   
+    bless $class->clone_instance($instance, @_) => blessed($instance);
+}
+
+sub clone_instance {
+    my ($class, $instance, %params) = @_;
+    (blessed($instance))
+        || confess "You can only clone instances, \$self is not a blessed instance";
+    # NOTE:
+    # This will deep clone, which might
+    # not be what you always want. So 
+    # the best thing is to write a more
+    # controled &clone method locally 
+    # in the class (see Class::MOP)
+    my $clone = Clone::clone($instance); 
+    foreach my $attr ($class->compute_all_applicable_attributes()) {
+        my $init_arg = $attr->init_arg();
+        # try to fetch the init arg from the %params ...        
+        $clone->{$attr->name} = $params{$init_arg} 
+            if exists $params{$init_arg};
+    }
+    return $clone;    
+}
+
 # Informational 
 
-sub name { $_[0]->{'$:package'} }
+# &name should be here too, but it is above
+# because it gets bootstrapped away
 
 sub version {  
     my $self = shift;
@@ -149,9 +236,6 @@ sub class_precedence_list {
 }
 
 ## Methods
-
-# un-used right now ...
-sub method_metaclass { $_[0]->{'$:method_metaclass'} }
 
 sub add_method {
     my ($self, $method_name, $method) = @_;
@@ -273,8 +357,6 @@ sub find_all_methods_by_name {
 
 ## Attributes
 
-sub attribute_metaclass { $_[0]->{'$:attribute_metaclass'} }
-
 sub add_attribute {
     my $self      = shift;
     # either we have an attribute object already
@@ -285,21 +367,21 @@ sub add_attribute {
         || confess "Your attribute must be an instance of Class::MOP::Attribute (or a subclass)";    
     $attribute->attach_to_class($self);
     $attribute->install_accessors();        
-    $self->{'%:attrs'}->{$attribute->name} = $attribute;
+    $self->get_attribute_map->{$attribute->name} = $attribute;
 }
 
 sub has_attribute {
     my ($self, $attribute_name) = @_;
     (defined $attribute_name && $attribute_name)
         || confess "You must define an attribute name";
-    exists $self->{'%:attrs'}->{$attribute_name} ? 1 : 0;    
+    exists $self->get_attribute_map->{$attribute_name} ? 1 : 0;    
 } 
 
 sub get_attribute {
     my ($self, $attribute_name) = @_;
     (defined $attribute_name && $attribute_name)
         || confess "You must define an attribute name";
-    return $self->{'%:attrs'}->{$attribute_name} 
+    return $self->get_attribute_map->{$attribute_name} 
         if $self->has_attribute($attribute_name);    
 } 
 
@@ -307,8 +389,8 @@ sub remove_attribute {
     my ($self, $attribute_name) = @_;
     (defined $attribute_name && $attribute_name)
         || confess "You must define an attribute name";
-    my $removed_attribute = $self->{'%:attrs'}->{$attribute_name};    
-    delete $self->{'%:attrs'}->{$attribute_name} 
+    my $removed_attribute = $self->get_attribute_map->{$attribute_name};    
+    delete $self->get_attribute_map->{$attribute_name} 
         if defined $removed_attribute;        
     $removed_attribute->remove_accessors();        
     $removed_attribute->detach_from_class();    
@@ -317,7 +399,7 @@ sub remove_attribute {
 
 sub get_attribute_list {
     my $self = shift;
-    keys %{$self->{'%:attrs'}};
+    keys %{$self->get_attribute_map};
 } 
 
 sub compute_all_applicable_attributes {
@@ -336,11 +418,7 @@ sub compute_all_applicable_attributes {
         foreach my $attr_name ($meta->get_attribute_list()) { 
             next if exists $seen_attr{$attr_name};
             $seen_attr{$attr_name}++;
-            push @attrs => {
-                name      => $attr_name, 
-                class     => $class,
-                attribute => $meta->get_attribute($attr_name)
-            };
+            push @attrs => $meta->get_attribute($attr_name);
         }
     }
     return @attrs;    
@@ -494,7 +572,7 @@ to it.
 This initializes and returns returns a B<Class::MOP::Class> object 
 for a given a C<$package_name>.
 
-=item B<construct_class_instance ($package_name)>
+=item B<construct_class_instance (%options)>
 
 This will construct an instance of B<Class::MOP::Class>, it is 
 here so that we can actually "tie the knot" for B<Class::MOP::Class> 
@@ -502,20 +580,42 @@ to use C<construct_instance> once all the bootstrapping is done. This
 method is used internally by C<initialize> and should never be called
 from outside of that method really.
 
+=item B<check_metaclass_compatability>
+
+This method is called as the very last thing in the 
+C<construct_class_instance> method. This will check that the 
+metaclass you are creating is compatible with the metaclasses of all 
+your ancestors. For more inforamtion about metaclass compatibility 
+see the C<About Metaclass compatibility> section in L<Class::MOP>.
+
 =back
 
-=head2 Object instance construction
+=head2 Object instance construction and cloning
 
-This method is used to construct an instace structure suitable for 
-C<bless>-ing into your package of choice. It works in conjunction 
-with the Attribute protocol to collect all applicable attributes. 
-
-This method is B<entirely optional>, it is up to you whether you want 
-to use it or not.
+These methods are B<entirely optional>, it is up to you whether you want 
+to use them or not.
 
 =over 4
 
+=item B<new_object (%params)>
+
+This is a convience method for creating a new object of the class, and 
+blessing it into the appropriate package as well. Ideally your class 
+would call a C<new> this method like so:
+
+  sub MyClass::new { 
+      my ($class, %param) = @_;
+      $class->meta->new_object(%params);
+  }
+
+Of course the ideal place for this would actually be in C<UNIVERSAL::> 
+but that is considered bad style, so we do not do that.
+
 =item B<construct_instance (%params)>
+
+This method is used to construct an instace structure suitable for 
+C<bless>-ing into your package of choice. It works in conjunction 
+with the Attribute protocol to collect all applicable attributes.
 
 This will construct and instance using a HASH ref as storage 
 (currently only HASH references are supported). This will collect all 
@@ -523,6 +623,32 @@ the applicable attributes and layout out the fields in the HASH ref,
 it will then initialize them using either use the corresponding key 
 in C<%params> or any default value or initializer found in the 
 attribute meta-object.
+
+=item B<clone_object ($instance, %params)>
+
+This is a convience method for cloning an object instance, then  
+blessing it into the appropriate package. Ideally your class 
+would call a C<clone> this method like so:
+
+  sub MyClass::clone {
+      my ($self, %param) = @_;
+      $self->meta->clone_object($self, %params);
+  }
+
+Of course the ideal place for this would actually be in C<UNIVERSAL::> 
+but that is considered bad style, so we do not do that.
+
+=item B<clone_instance($instance, %params)>
+
+This method is a compliment of C<construct_instance> (which means if 
+you override C<construct_instance>, you need to override this one too).
+
+This method will clone the C<$instance> structure created by the 
+C<construct_instance> method, and apply any C<%params> passed to it 
+to change the attribute values. The structure returned is (like with 
+C<construct_instance>) an unC<bless>ed HASH reference, it is your 
+responsibility to then bless this cloned structure into the right 
+class.
 
 =back
 
@@ -661,6 +787,8 @@ their own. See L<Class::MOP::Attribute> for more details.
 
 =item B<attribute_metaclass>
 
+=item B<get_attribute_map>
+
 =item B<add_attribute ($attribute_name, $attribute_meta_object)>
 
 This stores a C<$attribute_meta_object> in the B<Class::MOP::Class> 
@@ -711,11 +839,11 @@ use the C<compute_all_applicable_attributes> method.
 
 =item B<compute_all_applicable_attributes>
 
-This will traverse the inheritance heirachy and return a list of HASH 
-references for all the applicable attributes for this class. The HASH 
-references will contain the following information; the attribute name, 
-the class which the attribute is associated with and the actual 
-attribute meta-object.
+This will traverse the inheritance heirachy and return a list of all 
+the applicable attributes for this class. It does not construct a 
+HASH reference like C<compute_all_applicable_methods> because all 
+that same information is discoverable through the attribute 
+meta-object itself.
 
 =back
 
