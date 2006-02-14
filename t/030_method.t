@@ -11,6 +11,11 @@ BEGIN {
     use_ok('Class::MOP::Method');
 }
 
+{
+    my $method = Class::MOP::Method->wrap(sub { 1 });
+    is($method->meta, Class::MOP::Method->meta, '... instance and class both lead to the same meta');
+}
+
 my $meta = Class::MOP::Method->meta;
 isa_ok($meta, 'Class::MOP::Class');
 
@@ -20,7 +25,6 @@ isa_ok($meta, 'Class::MOP::Class');
     isa_ok($meta, 'Class::MOP::Class');
     
     foreach my $method_name (qw(
-        meta 
         wrap
         )) {
         ok($meta->has_method($method_name), '... Class::MOP::Method->has_method(' . $method_name . ')');

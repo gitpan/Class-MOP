@@ -10,11 +10,11 @@ use Sub::Name    'subname';
 use B            'svref_2object';
 use Clone         ();
 
-our $VERSION = '0.03';
+our $VERSION = '0.04';
 
-# Self-introspection
+# Self-introspection 
 
-sub meta { Class::MOP::Class->initialize($_[0]) }
+sub meta { Class::MOP::Class->initialize(blessed($_[0]) || $_[0]) }
 
 # Creation
 
@@ -28,10 +28,8 @@ sub meta { Class::MOP::Class->initialize($_[0]) }
     sub initialize {
         my $class        = shift;
         my $package_name = shift;
-        (defined $package_name && $package_name)
-            || confess "You must pass a package name";    
-        # make sure the package name is not blessed
-        $package_name = blessed($package_name) || $package_name;
+        (defined $package_name && $package_name && !blessed($package_name))
+            || confess "You must pass a package name and it cannot be blessed";    
         $class->construct_class_instance(':package' => $package_name, @_);
     }
     
@@ -81,7 +79,6 @@ sub meta { Class::MOP::Class->initialize($_[0]) }
         shift @class_list; # shift off $self->name
 
         foreach my $class_name (@class_list) { 
-            next unless $METAS{$class_name};
             my $meta = $METAS{$class_name};
             ($self->isa(blessed($meta)))
                 || confess $self->name . "->meta => (" . (blessed($self)) . ")" . 
@@ -101,6 +98,11 @@ sub create {
     eval $code;
     confess "creation of $package_name failed : $@" if $@;    
     my $meta = $class->initialize($package_name);
+    
+    $meta->add_method('meta' => sub { 
+        Class::MOP::Class->initialize(blessed($_[0]) || $_[0]);
+    });
+    
     $meta->superclasses(@{$options{superclasses}})
         if exists $options{superclasses};
     # NOTE:
@@ -251,6 +253,20 @@ sub add_method {
     *{$full_method_name} = subname $full_method_name => $method;
 }
 
+sub alias_method {
+    my ($self, $method_name, $method) = @_;
+    (defined $method_name && $method_name)
+        || confess "You must define a method name";
+    # use reftype here to allow for blessed subs ...
+    (reftype($method) && reftype($method) eq 'CODE')
+        || confess "Your code block must be a CODE reference";
+    my $full_method_name = ($self->name . '::' . $method_name);    
+        
+    no strict 'refs';
+    no warnings 'redefine';
+    *{$full_method_name} = $method;
+}
+
 {
 
     ## private utility functions for has_method
@@ -344,7 +360,7 @@ sub find_all_methods_by_name {
         next if $seen_class{$class};
         $seen_class{$class}++;
         # fetch the meta-class ...
-        my $meta = $self->initialize($class);
+        my $meta = $self->initialize($class);;
         push @methods => {
             name  => $method_name, 
             class => $class,
@@ -382,7 +398,8 @@ sub get_attribute {
     (defined $attribute_name && $attribute_name)
         || confess "You must define an attribute name";
     return $self->get_attribute_map->{$attribute_name} 
-        if $self->has_attribute($attribute_name);    
+        if $self->has_attribute($attribute_name);   
+    return; 
 } 
 
 sub remove_attribute {
@@ -390,8 +407,8 @@ sub remove_attribute {
     (defined $attribute_name && $attribute_name)
         || confess "You must define an attribute name";
     my $removed_attribute = $self->get_attribute_map->{$attribute_name};    
-    delete $self->get_attribute_map->{$attribute_name} 
-        if defined $removed_attribute;        
+    return unless defined $removed_attribute;
+    delete $self->get_attribute_map->{$attribute_name};        
     $removed_attribute->remove_accessors();        
     $removed_attribute->detach_from_class();    
     return $removed_attribute;
@@ -488,11 +505,6 @@ Class::MOP::Class - Class Meta Object
 =head1 SYNOPSIS
 
   # use this for introspection ...
-  
-  package Foo;
-  sub meta { Class::MOP::Class->initialize(__PACKAGE__) }
-  
-  # elsewhere in the code ...
   
   # add a method to Foo ...
   Foo->meta->add_method('bar' => sub { ... })
@@ -709,6 +721,16 @@ This does absolutely nothing special to C<$method>
 other than use B<Sub::Name> to make sure it is tagged with the 
 correct name, and therefore show up correctly in stack traces and 
 such.
+
+=item B<alias_method ($method_name, $method)>
+
+This will take a C<$method_name> and CODE reference to that 
+C<$method> and alias the method into the class's package. 
+
+B<NOTE>: 
+Unlike C<add_method>, this will B<not> try to name the 
+C<$method> using B<Sub::Name>, it only aliases the method in 
+the class's package. 
 
 =item B<has_method ($method_name)>
 

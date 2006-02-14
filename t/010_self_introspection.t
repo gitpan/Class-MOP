@@ -3,12 +3,17 @@
 use strict;
 use warnings;
 
-use Test::More tests => 115;
+use Test::More tests => 118;
 use Test::Exception;
 
 BEGIN {
     use_ok('Class::MOP');
     use_ok('Class::MOP::Class');        
+}
+
+{
+    my $class = Class::MOP::Class->initialize('Foo');
+    is($class->meta, Class::MOP::Class->meta, '... instance and class both lead to the same meta');
 }
 
 my $meta = Class::MOP::Class->meta();
@@ -29,7 +34,7 @@ my @methods = qw(
     
     superclasses class_precedence_list
     
-    has_method get_method add_method remove_method 
+    has_method get_method add_method remove_method alias_method
     get_method_list compute_all_applicable_methods find_all_methods_by_name
     
     has_attribute get_attribute add_attribute remove_attribute

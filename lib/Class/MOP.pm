@@ -4,31 +4,23 @@ package Class::MOP;
 use strict;
 use warnings;
 
-use Scalar::Util 'blessed';
 use Carp         'confess';
+use Scalar::Util ();
 
 use Class::MOP::Class;
 use Class::MOP::Attribute;
 use Class::MOP::Method;
 
-our $VERSION = '0.06';
+our $VERSION = '0.10';
 
-sub import {
-    shift;
-    return unless @_;
-    if ($_[0] eq ':universal') {
-        *UNIVERSAL::meta = sub { 
-            Class::MOP::Class->initialize(blessed($_[0]) || $_[0]) 
-        };
-    }
-    else {
-        my $pkg = caller();
-        no strict 'refs';
-        *{$pkg . '::' . $_[0]} = sub { 
-            Class::MOP::Class->initialize(blessed($_[0]) || $_[0]) 
-        };        
-    }
-}
+## ----------------------------------------------------------------------------
+## Setting up our environment ...
+## ----------------------------------------------------------------------------
+## Class::MOP needs to have a few things in the global perl environment so 
+## that it can operate effectively. Those things are done here.
+## ----------------------------------------------------------------------------
+
+# ... nothing yet actually ;)
 
 ## ----------------------------------------------------------------------------
 ## Bootstrapping 
@@ -295,6 +287,14 @@ are interested in why this is an issue see the paper
 I<Uniform and safe metaclass composition> linked to in the 
 L<SEE ALSO> section of this document.
 
+=head2 Using custom metaclasses
+
+Always use the metaclass pragma when using a custom metaclass, this 
+will ensure the proper initialization order and not accidentely 
+create an incorrect type of metaclass for you. This is a very rare 
+problem, and one which can only occur if you are doing deep metaclass 
+programming. So in other words, don't worry about it.
+
 =head1 PROTOCOLS
 
 The protocol is divided into 3 main sub-protocols:
@@ -404,6 +404,23 @@ creates are very different from this modules.
 All complex software has bugs lurking in it, and this module is no 
 exception. If you find a bug please either email me, or add the bug
 to cpan-RT.
+
+=head1 CODE COVERAGE
+
+I use L<Devel::Cover> to test the code coverage of my tests, below is the 
+L<Devel::Cover> report on this module's test suite.
+
+ ---------------------------- ------ ------ ------ ------ ------ ------ ------
+ File                           stmt   bran   cond    sub    pod   time  total
+ ---------------------------- ------ ------ ------ ------ ------ ------ ------
+ Class/MOP.pm                  100.0  100.0  100.0  100.0    n/a   21.4  100.0
+ Class/MOP/Attribute.pm        100.0  100.0   88.9  100.0  100.0   27.1   99.3
+ Class/MOP/Class.pm            100.0  100.0   93.7  100.0  100.0   44.8   99.1
+ Class/MOP/Method.pm           100.0  100.0   83.3  100.0  100.0    4.8   97.1
+ metaclass.pm                  100.0  100.0   80.0  100.0    n/a    1.9   97.3
+ ---------------------------- ------ ------ ------ ------ ------ ------ ------
+ Total                         100.0  100.0   92.2  100.0  100.0  100.0   99.0
+ ---------------------------- ------ ------ ------ ------ ------ ------ ------
 
 =head1 ACKNOWLEDGEMENTS
 

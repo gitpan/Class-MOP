@@ -3,7 +3,7 @@
 use strict;
 use warnings;
 
-use Test::More tests => 38;
+use Test::More tests => 39;
 use Test::Exception;
 
 BEGIN {
@@ -11,11 +11,16 @@ BEGIN {
 }
 
 {
+    my $attr = Class::MOP::Attribute->new('$test');
+    is($attr->meta, Class::MOP::Attribute->meta, '... instance and class both lead to the same meta');
+}
+
+{
     my $meta = Class::MOP::Attribute->meta();
     isa_ok($meta, 'Class::MOP::Class');
     
     my @methods = qw(
-        meta 
+        meta
         new clone
         name
         has_accessor  accessor

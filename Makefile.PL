@@ -5,7 +5,7 @@ WriteMakefile
           'NAME' => 'Class::MOP',
           'VERSION_FROM' => 'lib/Class/MOP.pm',
           'PREREQ_PM' => {
-                           'B' => '0',
+                           'B' => '1.09',
                            'Carp' => '0.01',
                            'Clone' => '0.18',
                            'File::Spec' => '0',
