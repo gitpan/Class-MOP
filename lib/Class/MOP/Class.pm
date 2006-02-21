@@ -10,7 +10,7 @@ use Sub::Name    'subname';
 use B            'svref_2object';
 use Clone         ();
 
-our $VERSION = '0.04';
+our $VERSION = '0.05';
 
 # Self-introspection 
 
@@ -181,19 +181,7 @@ sub clone_instance {
     my ($class, $instance, %params) = @_;
     (blessed($instance))
         || confess "You can only clone instances, \$self is not a blessed instance";
-    # NOTE:
-    # This will deep clone, which might
-    # not be what you always want. So 
-    # the best thing is to write a more
-    # controled &clone method locally 
-    # in the class (see Class::MOP)
-    my $clone = Clone::clone($instance); 
-    foreach my $attr ($class->compute_all_applicable_attributes()) {
-        my $init_arg = $attr->init_arg();
-        # try to fetch the init arg from the %params ...        
-        $clone->{$attr->name} = $params{$init_arg} 
-            if exists $params{$init_arg};
-    }
+    my $clone = { %$instance, %params }; 
     return $clone;    
 }
 
@@ -639,8 +627,10 @@ attribute meta-object.
 =item B<clone_object ($instance, %params)>
 
 This is a convience method for cloning an object instance, then  
-blessing it into the appropriate package. Ideally your class 
-would call a C<clone> this method like so:
+blessing it into the appropriate package. This method will call 
+C<clone_instance>, which performs a shallow copy of the object, 
+see that methods documentation for more details. Ideally your 
+class would call a C<clone> this method like so:
 
   sub MyClass::clone {
       my ($self, %param) = @_;
@@ -653,14 +643,20 @@ but that is considered bad style, so we do not do that.
 =item B<clone_instance($instance, %params)>
 
 This method is a compliment of C<construct_instance> (which means if 
-you override C<construct_instance>, you need to override this one too).
+you override C<construct_instance>, you need to override this one too), 
+and clones the instance shallowly.
 
-This method will clone the C<$instance> structure created by the 
-C<construct_instance> method, and apply any C<%params> passed to it 
-to change the attribute values. The structure returned is (like with 
-C<construct_instance>) an unC<bless>ed HASH reference, it is your 
-responsibility to then bless this cloned structure into the right 
-class.
+The cloned structure returned is (like with C<construct_instance>) an 
+unC<bless>ed HASH reference, it is your responsibility to then bless 
+this cloned structure into the right class (which C<clone_object> will
+do for you).
+
+As of 0.11, this method will clone the C<$instance> structure shallowly, 
+as opposed to the deep cloning implemented in prior versions. After much 
+thought, research and discussion, I have decided that anything but basic 
+shallow cloning is outside the scope of the meta-object protocol. I 
+think Yuval "nothingmuch" Kogman put it best when he said that cloning 
+is too I<context-specific> to be part of the MOP.
 
 =back
 
