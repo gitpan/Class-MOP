@@ -1,4 +1,4 @@
-Class::MOP version 0.20
+Class::MOP version 0.21
 ===========================
 
 See the individual module documentation for more information
@@ -15,8 +15,11 @@ To install this module type the following:
 DEPENDENCIES
 
 This module requires these other modules and libraries:
-
-	None
+    
+    Scalar::Util
+    Sub::Name
+    Carp
+    B   
 
 COPYRIGHT AND LICENCE
 
