@@ -5,7 +5,7 @@ package # hide the package from PAUSE
 use strict;
 use warnings;
 
-our $VERSION = '0.03';
+our $VERSION = '0.04';
 
 use Scalar::Util 'refaddr';
 
@@ -25,7 +25,9 @@ sub construct_instance {
         $val = $params{$init_arg} if exists $params{$init_arg};
         # if nothing was in the %params, we can use the 
         # attribute's default value (if it has one)
-        $val ||= $attr->default($instance) if $attr->has_default();
+        if (!defined $val && $attr->has_default) {
+            $val = $attr->default($instance); 
+        }
         # now add this to the instance structure
         $class->get_package_variable('%' . $attr->name)->{ refaddr($instance) } = $val;
     }    
@@ -40,6 +42,7 @@ use warnings;
 
 our $VERSION = '0.04';
 
+use Carp         'confess';
 use Scalar::Util 'refaddr';
 
 use base 'Class::MOP::Attribute';
@@ -56,6 +59,7 @@ sub generate_accessor_method {
 sub generate_reader_method {
     my ($self, $attr_name) = @_;     
     eval 'sub {
+        confess "Cannot assign a value to a read-only accessor" if @_ > 1;
         $' . ($self->associated_class->name . '::' . $attr_name) . '{ refaddr($_[0]) };
     }';   
 }
