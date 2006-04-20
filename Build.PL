@@ -11,8 +11,7 @@ my $build = Module::Build->new(
         'Carp'         => '0.01',
         'B'            => '0',
     },
-    optional => {
-    },
+    optional => {},
     build_requires => {
         'Test::More'      => '0.47',
         'Test::Exception' => '0.21',
