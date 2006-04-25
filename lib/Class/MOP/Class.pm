@@ -9,7 +9,7 @@ use Scalar::Util 'blessed', 'reftype';
 use Sub::Name    'subname';
 use B            'svref_2object';
 
-our $VERSION = '0.12';
+our $VERSION = '0.13';
 
 # Self-introspection 
 
@@ -17,7 +17,7 @@ sub meta { Class::MOP::Class->initialize(blessed($_[0]) || $_[0]) }
 
 # Creation
 
-{
+#{
     # Metaclasses are singletons, so we cache them here.
     # there is no need to worry about destruction though
     # because they should die only when the program dies.
@@ -97,7 +97,7 @@ sub meta { Class::MOP::Class->initialize(blessed($_[0]) || $_[0]) }
                            $class_name . "->meta => (" . (blessed($meta)) . ")";
         }        
     }
-}
+#}
 
 sub create {
     my ($class, $package_name, $package_version, %options) = @_;
@@ -217,11 +217,12 @@ sub version {
 
 sub superclasses {
     my $self = shift;
+    no strict 'refs';
     if (@_) {
         my @supers = @_;
-        @{$self->get_package_variable('@ISA')} = @supers;
+        @{$self->name . '::ISA'} = @supers;
     }
-    @{$self->get_package_variable('@ISA')};        
+    @{$self->name . '::ISA'};
 }
 
 sub class_precedence_list {
@@ -231,12 +232,16 @@ sub class_precedence_list {
     # This will do nothing if all is well, and blow
     # up otherwise. Yes, it's an ugly hack, better 
     # suggestions are welcome.
-    { $self->name->isa('This is a test for circular inheritance') }
+    { ($self->name || return)->isa('This is a test for circular inheritance') }
     # ... and now back to our regularly scheduled program
     (
         $self->name, 
         map { 
-            $self->initialize($_)->class_precedence_list()
+            # OPTIMIZATION NOTE:
+            # we grab the metaclass from the %METAS 
+            # hash here to save the initialize() call
+            # if we can, but it is not always possible            
+            ($METAS{$_} || $self->initialize($_))->class_precedence_list()
         } $self->superclasses()
     );   
 }
@@ -488,8 +493,12 @@ sub get_attribute {
     my ($self, $attribute_name) = @_;
     (defined $attribute_name && $attribute_name)
         || confess "You must define an attribute name";
-    return $self->get_attribute_map->{$attribute_name} 
-        if $self->has_attribute($attribute_name);   
+    # OPTIMIZATION NOTE:
+    # we used to say `if $self->has_attribute($attribute_name)` 
+    # here, but since get_attribute is called so often, we 
+    # eliminate the function call here
+    return $self->{'%:attributes'}->{$attribute_name} 
+        if exists $self->{'%:attributes'}->{$attribute_name};   
     return; 
 } 
 
@@ -507,7 +516,12 @@ sub remove_attribute {
 
 sub get_attribute_list {
     my $self = shift;
-    keys %{$self->get_attribute_map};
+    # OPTIMIZATION NOTE:
+    # We don't use get_attribute_map here because 
+    # we ask for the attribute list quite often 
+    # in compute_all_applicable_attributes, so 
+    # eliminating the function call helps 
+    keys %{$self->{'%:attributes'}};
 } 
 
 sub compute_all_applicable_attributes {
@@ -522,7 +536,10 @@ sub compute_all_applicable_attributes {
         next if $seen_class{$class};
         $seen_class{$class}++;
         # fetch the meta-class ...
-        my $meta = $self->initialize($class);
+        # OPTIMIZATION NOTE:
+        # we grab the metaclass from the %METAS 
+        # hash here to save the initialize() call
+        my $meta = $METAS{$class};
         foreach my $attr_name ($meta->get_attribute_list()) { 
             next if exists $seen_attr{$attr_name};
             $seen_attr{$attr_name}++;
@@ -530,6 +547,24 @@ sub compute_all_applicable_attributes {
         }
     }
     return @attrs;    
+}
+
+sub find_attribute_by_name {
+    my ($self, $attr_name) = @_;
+    # keep a record of what we have seen
+    # here, this will handle all the 
+    # inheritence issues because we are 
+    # using the &class_precedence_list
+    my %seen_class;
+    foreach my $class ($self->class_precedence_list()) {
+        next if $seen_class{$class};
+        $seen_class{$class}++;
+        # fetch the meta-class ...
+        my $meta = $self->initialize($class);
+        return $meta->get_attribute($attr_name)
+            if $meta->has_attribute($attr_name);
+    }
+    return;
 }
 
 # Class attributes
@@ -1109,6 +1144,12 @@ the applicable attributes for this class. It does not construct a
 HASH reference like C<compute_all_applicable_methods> because all 
 that same information is discoverable through the attribute 
 meta-object itself.
+
+=item B<find_attribute_by_name ($attr_name)>
+
+This method will traverse the inheritance heirachy and find the 
+first attribute whose name matches C<$attr_name>, then return it. 
+It will return undef if nothing is found.
 
 =back
 

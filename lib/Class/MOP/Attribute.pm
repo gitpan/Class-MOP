@@ -7,7 +7,7 @@ use warnings;
 use Carp         'confess';
 use Scalar::Util 'blessed', 'reftype', 'weaken';
 
-our $VERSION = '0.06';
+our $VERSION = '0.07';
 
 sub meta { 
     require Class::MOP::Class;
@@ -62,13 +62,13 @@ sub clone {
 
 sub initialize_instance_slot {
     my ($self, $class, $instance, $params) = @_;
-    my $init_arg = $self->init_arg();
+    my $init_arg = $self->{init_arg};
     # try to fetch the init arg from the %params ...
     my $val;        
     $val = $params->{$init_arg} if exists $params->{$init_arg};
     # if nothing was in the %params, we can use the 
     # attribute's default value (if it has one)
-    if (!defined $val && $self->has_default) {
+    if (!defined $val && defined $self->{default}) {
         $val = $self->default($instance); 
     }            
     $instance->{$self->name} = $val;    
