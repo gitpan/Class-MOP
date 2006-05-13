@@ -7,7 +7,7 @@ use warnings;
 use Carp         'confess';
 use Scalar::Util 'blessed', 'reftype', 'weaken';
 
-our $VERSION = '0.07';
+our $VERSION = '0.08';
 
 sub meta { 
     require Class::MOP::Class;
@@ -61,7 +61,7 @@ sub clone {
 }
 
 sub initialize_instance_slot {
-    my ($self, $class, $instance, $params) = @_;
+    my ($self, $meta_instance, $instance, $params) = @_;
     my $init_arg = $self->{init_arg};
     # try to fetch the init arg from the %params ...
     my $val;        
@@ -69,9 +69,9 @@ sub initialize_instance_slot {
     # if nothing was in the %params, we can use the 
     # attribute's default value (if it has one)
     if (!defined $val && defined $self->{default}) {
-        $val = $self->default($instance); 
-    }            
-    $instance->{$self->name} = $val;    
+        $val = $self->default($instance);
+    }
+    $meta_instance->set_slot_value($instance, $self->name, $val);
 }
 
 # NOTE:
@@ -110,6 +110,10 @@ sub default {
     $self->{default};
 }
 
+# slots
+
+sub slots { (shift)->name }
+
 # class association 
 
 sub attach_to_class {
@@ -127,29 +131,44 @@ sub detach_from_class {
 ## Method generation helpers
 
 sub generate_accessor_method {
-    my ($self, $attr_name) = @_;
-    sub {
-        $_[0]->{$attr_name} = $_[1] if scalar(@_) == 2;
-        $_[0]->{$attr_name};
+    my $self = shift; 
+    my $attr_name  = $self->name;
+    return sub {
+        my $meta_instance = Class::MOP::Class->initialize(Scalar::Util::blessed($_[0]))->get_meta_instance;
+        $meta_instance->set_slot_value($_[0], $attr_name, $_[1]) if scalar(@_) == 2;
+        $meta_instance->get_slot_value($_[0], $attr_name);
     };
 }
 
 sub generate_reader_method {
-    my ($self, $attr_name) = @_; 
-    sub { 
+    my $self = shift;
+    my $attr_name  = $self->name;
+    return sub { 
         confess "Cannot assign a value to a read-only accessor" if @_ > 1;
-        $_[0]->{$attr_name}; 
+        Class::MOP::Class->initialize(Scalar::Util::blessed($_[0]))
+                         ->get_meta_instance
+                         ->get_slot_value($_[0], $attr_name); 
     };   
 }
 
 sub generate_writer_method {
-    my ($self, $attr_name) = @_; 
-    sub { $_[0]->{$attr_name} = $_[1] };
+    my $self = shift;
+    my $attr_name  = $self->name;
+    return sub { 
+        Class::MOP::Class->initialize(Scalar::Util::blessed($_[0]))
+                         ->get_meta_instance
+                         ->set_slot_value($_[0], $attr_name, $_[1]);
+    };
 }
 
 sub generate_predicate_method {
-    my ($self, $attr_name) = @_; 
-    sub { defined $_[0]->{$attr_name} ? 1 : 0 };
+    my $self = shift;
+    my $attr_name  = $self->name;
+    return sub { 
+        defined Class::MOP::Class->initialize(Scalar::Util::blessed($_[0]))
+                                 ->get_meta_instance
+                                 ->get_slot_value($_[0], $attr_name) ? 1 : 0;
+    };
 }
 
 sub process_accessors {
@@ -418,6 +437,11 @@ As noted in the documentation for C<new> above, if the I<default>
 value is a CODE reference, this accessor will pass a single additional
 argument C<$instance> into it and return the value.
 
+=item B<slots>
+
+Returns a list of slots required by the attribute. This is usually 
+just one, which is the name of the attribute.
+
 =back
 
 =head2 Informational predicates
@@ -450,6 +474,12 @@ These are all basic predicate methods for the values passed into C<new>.
 
 =item B<detach_from_class>
 
+=item B<slot_name>
+
+=item B<allocate_slots>
+
+=item B<deallocate_slots>
+
 =back
 
 =head2 Attribute Accessor generation
@@ -475,13 +505,13 @@ use the custom method passed through the constructor.
 
 =over 4
 
-=item B<generate_accessor_method ($attr_name)>
+=item B<generate_accessor_method>
 
-=item B<generate_predicate_method ($attr_name)>
+=item B<generate_predicate_method>
 
-=item B<generate_reader_method ($attr_name)>
+=item B<generate_reader_method>
 
-=item B<generate_writer_method ($attr_name)>
+=item B<generate_writer_method>
 
 =back
 

@@ -1,0 +1,112 @@
+  
+package # hide the package from PAUSE
+    ArrayBasedStorage::Instance;
+
+use strict;
+use warnings;
+
+use Carp 'confess';
+
+our $VERSION = '0.01';
+
+use base 'Class::MOP::Instance';
+
+sub new {
+    my ($class, $meta, @attrs) = @_;
+    my $self = $class->SUPER::new($meta, @attrs);
+    my $index = 0;
+    $self->{slot_index_map} = { map { $_ => $index++ } $self->get_all_slots };
+    return $self;
+}
+
+sub create_instance {
+    my $self = shift;
+    $self->bless_instance_structure([]);
+}
+
+sub clone_instance {
+    my ($self, $instance) = shift;
+    $self->bless_instance_structure([ @$instance ]);
+}
+
+# operations on meta instance
+
+sub get_slot_index_map { (shift)->{slot_index_map} }
+
+sub get_all_slots {
+    my $self = shift;
+    return sort $self->SUPER::get_all_slots;
+}
+
+sub get_slot_value {
+    my ($self, $instance, $slot_name) = @_;
+    return $instance->[ $self->{slot_index_map}->{$slot_name} ];
+}
+
+sub set_slot_value {
+    my ($self, $instance, $slot_name, $value) = @_;
+    $instance->[ $self->{slot_index_map}->{$slot_name} ] = $value;
+}
+
+sub is_slot_initialized {
+    # NOTE:
+    # maybe use CLOS's *special-unbound-value*
+    # for this ?
+    confess "Cannot really tell this for sure";
+}
+
+1;
+
+__END__
+
+=pod
+
+=head1 NAME
+
+ArrayBasedStorage - An example of an Array based instance storage 
+
+=head1 SYNOPSIS
+
+  package Foo;
+  
+  use metaclass (
+    ':instance_metaclass'  => 'ArrayBasedStorage::Instance'
+  );
+  
+  __PACKAGE__->meta->add_attribute('foo' => (
+      reader => 'get_foo',
+      writer => 'set_foo'
+  ));    
+  
+  sub new  {
+      my $class = shift;
+      $class->meta->new_object(@_);
+  } 
+  
+  # now you can just use the class as normal
+
+=head1 DESCRIPTION
+
+This is a proof of concept using the Instance sub-protocol 
+which uses ARRAY refs to store the instance data. 
+
+This is very similar now to the InsideOutClass example, and 
+in fact, they both share the exact same test suite, with 
+the only difference being the Instance metaclass they use.
+
+=head1 AUTHOR
+
+Stevan Little E<lt>stevan@iinteractive.comE<gt>
+
+=head1 SEE ALSO
+
+=head1 COPYRIGHT AND LICENSE
+
+Copyright 2006 by Infinity Interactive, Inc.
+
+L<http://www.iinteractive.com>
+
+This library is free software; you can redistribute it and/or modify
+it under the same terms as Perl itself. 
+
+=cut

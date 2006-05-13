@@ -3,7 +3,7 @@
 use strict;
 use warnings;
 
-use Test::More tests => 136;
+use Test::More tests => 146;
 use Test::Exception;
 
 BEGIN {
@@ -24,8 +24,9 @@ my @methods = qw(
     
     get_all_metaclasses get_all_metaclass_names get_all_metaclass_instances 
     
-    initialize create create_anon_class
+    initialize reinitialize create create_anon_class
     
+    instance_metaclass get_meta_instance
     new_object clone_object
     construct_instance construct_class_instance clone_instance
     check_metaclass_compatability
@@ -46,6 +47,8 @@ my @methods = qw(
     get_attribute_list get_attribute_map compute_all_applicable_attributes find_attribute_by_name
     
     add_package_variable get_package_variable has_package_variable remove_package_variable
+    
+    DESTROY
     );
     
 is_deeply([ sort @methods ], [ sort $meta->get_method_list ], '... got the correct method list');
@@ -73,7 +76,13 @@ foreach my $non_method_name (qw(
 
 # check for the right attributes
 
-my @attributes = ('$:package', '%:attributes', '$:attribute_metaclass', '$:method_metaclass');
+my @attributes = (
+    '$:package', 
+    '%:attributes', 
+    '$:attribute_metaclass', 
+    '$:method_metaclass', 
+    '$:instance_metaclass'
+);
 
 is_deeply(
     [ sort @attributes ],
@@ -93,14 +102,14 @@ foreach my $attribute_name (@attributes) {
 ## check the attributes themselves
 
 ok($meta->get_attribute('$:package')->has_reader, '... Class::MOP::Class $:package has a reader');
-is($meta->get_attribute('$:package')->reader, 'name', '... Class::MOP::Class $:package\'s a reader is &name');
+is(ref($meta->get_attribute('$:package')->reader), 'HASH', '... Class::MOP::Class $:package\'s a reader is { name => sub { ... } }');
 
 ok($meta->get_attribute('$:package')->has_init_arg, '... Class::MOP::Class $:package has a init_arg');
 is($meta->get_attribute('$:package')->init_arg, ':package', '... Class::MOP::Class $:package\'s a init_arg is :package');
 
 ok($meta->get_attribute('%:attributes')->has_reader, '... Class::MOP::Class %:attributes has a reader');
-is($meta->get_attribute('%:attributes')->reader, 
-   'get_attribute_map', 
+is(ref($meta->get_attribute('%:attributes')->reader), 
+   'HASH', 
    '... Class::MOP::Class %:attributes\'s a reader is &get_attribute_map');
    
 ok($meta->get_attribute('%:attributes')->has_init_arg, '... Class::MOP::Class %:attributes has a init_arg');

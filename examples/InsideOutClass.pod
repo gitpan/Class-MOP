@@ -1,12 +1,11 @@
 
-
 package # hide the package from PAUSE
     InsideOutClass::Attribute;
 
 use strict;
 use warnings;
 
-our $VERSION = '0.05';
+our $VERSION = '0.01';
 
 use Carp         'confess';
 use Scalar::Util 'refaddr';
@@ -14,54 +13,105 @@ use Scalar::Util 'refaddr';
 use base 'Class::MOP::Attribute';
 
 sub initialize_instance_slot {
-    my ($self, $class, $instance, $params) = @_;
-    # if the attr has an init_arg, use that, otherwise,
-    # use the attributes name itself as the init_arg
-    my $init_arg = $self->init_arg();
+    my ($self, $meta_instance, $instance, $params) = @_;
+    my $init_arg = $self->{init_arg};
     # try to fetch the init arg from the %params ...
     my $val;        
     $val = $params->{$init_arg} if exists $params->{$init_arg};
     # if nothing was in the %params, we can use the 
     # attribute's default value (if it has one)
-    if (!defined $val && $self->has_default) {
-        $val = $self->default($instance); 
+    if (!defined $val && defined $self->{default}) {
+        $val = $self->default($instance);
     }
-    # now add this to the instance structure
-    $class->get_package_variable('%' . $self->name)->{ refaddr($instance) } = $val;    
+    $self->associated_class
+         ->get_meta_instance
+         ->set_slot_value($instance, $self->name, $val);
 }
 
+## Method generation helpers
+
 sub generate_accessor_method {
-    my ($self, $attr_name) = @_;
-    $attr_name = ($self->associated_class->name . '::' . $attr_name);
-    eval 'sub {
-        $' . $attr_name . '{ refaddr($_[0]) } = $_[1] if scalar(@_) == 2;
-        $' . $attr_name . '{ refaddr($_[0]) };
-    }';
+    my $self = shift;
+    my $meta_class = $self->associated_class;  
+    my $attr_name  = $self->name;
+    return sub {
+        my $meta_instance = $meta_class->get_meta_instance;
+        $meta_instance->set_slot_value($_[0], $attr_name, $_[1]) if scalar(@_) == 2;
+        $meta_instance->get_slot_value($_[0], $attr_name);
+    };
 }
 
 sub generate_reader_method {
-    my ($self, $attr_name) = @_;     
-    eval 'sub {
+    my $self = shift;
+    my $meta_class = $self->associated_class;    
+    my $attr_name  = $self->name;
+    return sub { 
         confess "Cannot assign a value to a read-only accessor" if @_ > 1;
-        $' . ($self->associated_class->name . '::' . $attr_name) . '{ refaddr($_[0]) };
-    }';   
+        $meta_class->get_meta_instance
+                   ->get_slot_value($_[0], $attr_name); 
+    }; 
 }
 
 sub generate_writer_method {
-    my ($self, $attr_name) = @_; 
-    eval 'sub {
-        $' . ($self->associated_class->name . '::' . $attr_name) . '{ refaddr($_[0]) } = $_[1];
-    }';
+    my $self = shift;
+    my $meta_class = $self->associated_class;    
+    my $attr_name  = $self->name;
+    return sub { 
+        $meta_class->get_meta_instance
+                   ->set_slot_value($_[0], $attr_name, $_[1]);
+    };
 }
 
 sub generate_predicate_method {
-    my ($self, $attr_name) = @_; 
-    eval 'sub {
-        defined($' . ($self->associated_class->name . '::' . $attr_name) . '{ refaddr($_[0]) }) ? 1 : 0;
-    }';
+    my $self = shift;
+    my $meta_class = $self->associated_class;   
+    my $attr_name  = $self->name;
+    return sub { 
+        defined $meta_class->get_meta_instance
+                           ->get_slot_value($_[0], $attr_name) ? 1 : 0;
+    };   
 }
 
-## &remove_attribute is left as an exercise for the reader :)
+package # hide the package from PAUSE
+    InsideOutClass::Instance;
+
+use strict;
+use warnings;
+
+our $VERSION = '0.01';
+
+use Carp         'confess';
+use Scalar::Util 'refaddr';
+
+use base 'Class::MOP::Instance';
+
+sub create_instance {
+	my ($self, $class) = @_;
+    $self->bless_instance_structure(\(my $instance));
+}
+
+sub get_slot_value {
+	my ($self, $instance, $slot_name) = @_;
+	$self->{meta}->get_package_variable('%' . $slot_name)->{refaddr $instance};
+}
+
+sub set_slot_value {
+	my ($self, $instance, $slot_name, $value) = @_;
+	$self->{meta}->get_package_variable('%' . $slot_name)->{refaddr $instance} = $value;
+}
+
+sub initialize_slot {
+    my ($self, $instance, $slot_name) = @_;
+    $self->{meta}->add_package_variable(('%' . $slot_name) => {})
+        unless $self->{meta}->has_package_variable('%' . $slot_name); 
+    $self->{meta}->get_package_variable('%' . $slot_name)->{refaddr $instance} = undef;
+}
+
+sub is_slot_initialized {
+	my ($self, $instance, $slot_name) = @_;
+	return 0 unless $self->{meta}->has_package_variable('%' . $slot_name);
+	return exists $self->{meta}->get_package_variable('%' . $slot_name)->{refaddr $instance} ? 1 : 0;
+}
 
 1;
 
@@ -77,11 +127,9 @@ InsideOutClass - A set of example metaclasses which implement the Inside-Out tec
 
   package Foo;
   
-  use metaclass 'Class::MOP::Class' => (
-     # tell our metaclass to use the 
-     # InsideOut attribute metclass 
-     # to construct all it's attributes
-    ':attribute_metaclass' => 'InsideOutClass::Attribute'
+  use metaclass (
+    ':attribute_metaclass' => 'InsideOutClass::Attribute',
+    ':instance_metaclass'  => 'InsideOutClass::Instance'
   );
   
   __PACKAGE__->meta->add_attribute('foo' => (
@@ -102,21 +150,23 @@ This is a set of example metaclasses which implement the Inside-Out
 class technique. What follows is a brief explaination of the code 
 found in this module.
 
-We must create a subclass of B<Class::MOP::Attribute> and override 
-the instance initialization and method generation code. This requires 
-overloading C<initialize_instance_slot>, C<generate_accessor_method>, 
-C<generate_reader_method>, C<generate_writer_method> and 
-C<generate_predicate_method>. All other aspects are taken care of with 
-the existing B<Class::MOP::Attribute> infastructure.
+We must create a subclass of B<Class::MOP::Instance> and override 
+the slot operations. This requires 
+overloading C<get_slot_value>, C<set_slot_value>, C<slot_initialized>, and
+C<initialize_slot>, as well as their inline counterparts. Additionally we
+overload C<add_slot> in order to initialize the global hash containing the
+actual slot values.
 
 And that is pretty much all. Of course I am ignoring need for 
 inside-out objects to be C<DESTROY>-ed, and some other details as 
-well, but this is an example. A real implementation is left as an 
-exercise to the reader.
+well (threading, etc), but this is an example. A real implementation is left as
+an exercise to the reader.
 
 =head1 AUTHOR
 
 Stevan Little E<lt>stevan@iinteractive.comE<gt>
+
+Yuval Kogman E<lt>nothingmuch@woobling.comE<gt>
 
 =head1 COPYRIGHT AND LICENSE
 

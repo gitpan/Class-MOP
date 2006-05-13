@@ -5,11 +5,13 @@ use strict;
 use warnings;
 
 use Carp         'confess';
-use Scalar::Util 'blessed', 'reftype';
+use Scalar::Util 'blessed', 'reftype', 'weaken';
 use Sub::Name    'subname';
 use B            'svref_2object';
 
-our $VERSION = '0.13';
+our $VERSION = '0.14';
+
+use Class::MOP::Instance;
 
 # Self-introspection 
 
@@ -17,7 +19,7 @@ sub meta { Class::MOP::Class->initialize(blessed($_[0]) || $_[0]) }
 
 # Creation
 
-#{
+{
     # Metaclasses are singletons, so we cache them here.
     # there is no need to worry about destruction though
     # because they should die only when the program dies.
@@ -38,6 +40,34 @@ sub meta { Class::MOP::Class->initialize(blessed($_[0]) || $_[0]) }
         $class->construct_class_instance(':package' => $package_name, @_);
     }
     
+    sub reinitialize {
+        my $class        = shift;
+        my $package_name = shift;
+        (defined $package_name && $package_name && !blessed($package_name))
+            || confess "You must pass a package name and it cannot be blessed";    
+        $METAS{$package_name} = undef;
+        $class->construct_class_instance(':package' => $package_name, @_);
+    }   
+    
+    # NOTE:
+    # we need a sufficiently annoying prefix
+    # this should suffice for now
+    my $ANON_CLASS_PREFIX = 'Class::MOP::Class::__ANON__::SERIAL::';
+    
+    {
+        # NOTE:
+        # this should be sufficient, if you have a 
+        # use case where it is not, write a test and 
+        # I will change it.
+        my $ANON_CLASS_SERIAL = 0;
+
+        sub create_anon_class {
+            my ($class, %options) = @_;   
+            my $package_name = $ANON_CLASS_PREFIX . ++$ANON_CLASS_SERIAL;
+            return $class->create($package_name, '0.00', %options);
+        }
+    }     
+    
     # NOTE: (meta-circularity) 
     # this is a special form of &construct_instance 
     # (see below), which is used to construct class
@@ -50,13 +80,13 @@ sub meta { Class::MOP::Class->initialize(blessed($_[0]) || $_[0]) }
         my $package_name = $options{':package'};
         (defined $package_name && $package_name)
             || confess "You must pass a package name";  
-		# NOTE:
-		# return the metaclass if we have it cached, 
-		# and it is still defined (it has not been 
-		# reaped by DESTROY yet, which can happen 
-		# annoyingly enough during global destruction)
+        # NOTE:
+        # return the metaclass if we have it cached, 
+        # and it is still defined (it has not been 
+        # reaped by DESTROY yet, which can happen 
+        # annoyingly enough during global destruction)
         return $METAS{$package_name} 
-			if exists $METAS{$package_name} && defined $METAS{$package_name};  
+            if exists $METAS{$package_name} && defined $METAS{$package_name};  
         $class = blessed($class) || $class;
         # now create the metaclass
         my $meta;
@@ -65,7 +95,8 @@ sub meta { Class::MOP::Class->initialize(blessed($_[0]) || $_[0]) }
                 '$:package'             => $package_name, 
                 '%:attributes'          => {},
                 '$:attribute_metaclass' => $options{':attribute_metaclass'} || 'Class::MOP::Attribute',
-                '$:method_metaclass'    => $options{':method_metaclass'}    || 'Class::MOP::Method',                
+                '$:method_metaclass'    => $options{':method_metaclass'}    || 'Class::MOP::Method',
+                '$:instance_metaclass'  => $options{':instance_metaclass'}  || 'Class::MOP::Instance',    
             } => $class;
         }
         else {
@@ -73,18 +104,42 @@ sub meta { Class::MOP::Class->initialize(blessed($_[0]) || $_[0]) }
             # it is safe to use meta here because
             # class will always be a subclass of 
             # Class::MOP::Class, which defines meta
-            $meta = bless $class->meta->construct_instance(%options) => $class
+            $meta = $class->meta->construct_instance(%options)
         }
         # and check the metaclass compatibility
         $meta->check_metaclass_compatability();
         $METAS{$package_name} = $meta;
+        # NOTE:
+        # we need to weaken any anon classes
+        # so that they can call DESTROY properly
+        weaken($METAS{$package_name})
+            if $package_name =~ /^$ANON_CLASS_PREFIX/;
+        $meta;        
+    } 
+    
+    # NOTE:
+    # this will only get called for 
+    # anon-classes, all other calls 
+    # are assumed to occur during 
+    # global destruction and so don't
+    # really need to be handled explicitly
+    sub DESTROY {
+        my $self = shift;
+        return unless $self->name =~ /^$ANON_CLASS_PREFIX/;
+        my ($serial_id) = ($self->name =~ /^$ANON_CLASS_PREFIX(\d+)/);
+        no strict 'refs';     
+        foreach my $key (keys %{$ANON_CLASS_PREFIX . $serial_id}) {
+            delete ${$ANON_CLASS_PREFIX . $serial_id}{$key};
+        }
+        delete ${'main::' . $ANON_CLASS_PREFIX}{$serial_id . '::'};        
     }
     
     sub check_metaclass_compatability {
         my $self = shift;
 
         # this is always okay ...
-        return if blessed($self) eq 'Class::MOP::Class';
+        return if blessed($self)            eq 'Class::MOP::Class'   && 
+                  $self->instance_metaclass eq 'Class::MOP::Instance';
 
         my @class_list = $self->class_precedence_list;
         shift @class_list; # shift off $self->name
@@ -95,9 +150,16 @@ sub meta { Class::MOP::Class->initialize(blessed($_[0]) || $_[0]) }
                 || confess $self->name . "->meta => (" . (blessed($self)) . ")" . 
                            " is not compatible with the " . 
                            $class_name . "->meta => (" . (blessed($meta)) . ")";
+            # NOTE:
+            # we also need to check that instance metaclasses
+            # are compatabile in the same the class.
+            ($self->instance_metaclass->isa($meta->instance_metaclass))
+                || confess $self->name . "->meta => (" . ($self->instance_metaclass) . ")" . 
+                           " is not compatible with the " . 
+                           $class_name . "->meta => (" . ($meta->instance_metaclass) . ")";                           
         }        
-    }
-#}
+    } 
+}
 
 sub create {
     my ($class, $package_name, $package_version, %options) = @_;
@@ -134,20 +196,6 @@ sub create {
     return $meta;
 }
 
-{
-    # NOTE:
-    # this should be sufficient, if you have a 
-    # use case where it is not, write a test and 
-    # I will change it.
-    my $ANON_CLASS_SERIAL = 0;
-    
-    sub create_anon_class {
-        my ($class, %options) = @_;   
-        my $package_name = 'Class::MOP::Class::__ANON__::SERIAL::' . ++$ANON_CLASS_SERIAL;
-        return $class->create($package_name, '0.00', %options);
-    }
-}
-
 ## Attribute readers
 
 # NOTE:
@@ -158,6 +206,7 @@ sub name                { $_[0]->{'$:package'}             }
 sub get_attribute_map   { $_[0]->{'%:attributes'}          }
 sub attribute_metaclass { $_[0]->{'$:attribute_metaclass'} }
 sub method_metaclass    { $_[0]->{'$:method_metaclass'}    }
+sub instance_metaclass  { $_[0]->{'$:instance_metaclass'}  }
 
 # Instance Construction & Cloning
 
@@ -170,16 +219,25 @@ sub new_object {
     # which will deal with the singletons
     return $class->construct_class_instance(@_)
         if $class->name->isa('Class::MOP::Class');
-    bless $class->construct_instance(@_) => $class->name;
+    return $class->construct_instance(@_);
 }
 
 sub construct_instance {
     my ($class, %params) = @_;
-    my $instance = {};
+    my $meta_instance = $class->get_meta_instance();
+    my $instance = $meta_instance->create_instance();
     foreach my $attr ($class->compute_all_applicable_attributes()) {
-        $attr->initialize_instance_slot($class, $instance, \%params);
+        $attr->initialize_instance_slot($meta_instance, $instance, \%params);
     }
     return $instance;
+}
+
+sub get_meta_instance {
+    my $class = shift;
+    return $class->instance_metaclass->new(
+        $class, 
+        $class->compute_all_applicable_attributes()
+    );
 }
 
 sub clone_object {
@@ -192,14 +250,19 @@ sub clone_object {
     # Class::MOP::Class singletons here, they 
     # should not be cloned.
     return $instance if $instance->isa('Class::MOP::Class');   
-    bless $class->clone_instance($instance, @_) => blessed($instance);
+    $class->clone_instance($instance, @_);
 }
 
 sub clone_instance {
     my ($class, $instance, %params) = @_;
     (blessed($instance))
         || confess "You can only clone instances, \$self is not a blessed instance";
-    my $clone = { %$instance, %params }; 
+    my $meta_instance = $class->get_meta_instance();
+    my $clone = $meta_instance->clone_instance($instance);        
+    foreach my $key (%params) {
+        next unless $meta_instance->is_valid_slot($key);
+        $meta_instance->set_slot_value($clone, $key, $params{$key});
+    }
     return $clone;    
 }
 
@@ -221,6 +284,13 @@ sub superclasses {
     if (@_) {
         my @supers = @_;
         @{$self->name . '::ISA'} = @supers;
+        # NOTE:
+        # we need to check the metaclass 
+        # compatability here so that we can 
+        # be sure that the superclass is 
+        # not potentially creating an issues 
+        # we don't know about
+        $self->check_metaclass_compatability();
     }
     @{$self->name . '::ISA'};
 }
@@ -237,11 +307,7 @@ sub class_precedence_list {
     (
         $self->name, 
         map { 
-            # OPTIMIZATION NOTE:
-            # we grab the metaclass from the %METAS 
-            # hash here to save the initialize() call
-            # if we can, but it is not always possible            
-            ($METAS{$_} || $self->initialize($_))->class_precedence_list()
+            $self->initialize($_)->class_precedence_list()
         } $self->superclasses()
     );   
 }
@@ -257,63 +323,62 @@ sub add_method {
         || confess "Your code block must be a CODE reference";
     my $full_method_name = ($self->name . '::' . $method_name);    
 
-	$method = $self->method_metaclass->wrap($method) unless blessed($method);
-	
+    $method = $self->method_metaclass->wrap($method) unless blessed($method);
+    
     no strict 'refs';
     no warnings 'redefine';
     *{$full_method_name} = subname $full_method_name => $method;
 }
 
 {
-	my $fetch_and_prepare_method = sub {
-		my ($self, $method_name) = @_;
-		# fetch it locally
-		my $method = $self->get_method($method_name);
-		# if we dont have local ...
-		unless ($method) {
-			# make sure this method even exists ...
-			($self->find_next_method_by_name($method_name))
-				|| confess "The method '$method_name' is not found in the inherience hierarchy for this class";
-			# if so, then create a local which just 
-			# calls the next applicable method ...				
-			$self->add_method($method_name => sub {
-				$self->find_next_method_by_name($method_name)->(@_);
-			});
-			$method = $self->get_method($method_name);
-		}
-		
-		# now make sure we wrap it properly 
-		# (if it isnt already)
-		unless ($method->isa('Class::MOP::Method::Wrapped')) {
-			$method = Class::MOP::Method::Wrapped->wrap($method);
-			$self->add_method($method_name => $method);	
-		}		
-		return $method;
-	};
+    my $fetch_and_prepare_method = sub {
+        my ($self, $method_name) = @_;
+        # fetch it locally
+        my $method = $self->get_method($method_name);
+        # if we dont have local ...
+        unless ($method) {
+            # try to find the next method
+            $method = $self->find_next_method_by_name($method_name);
+            # die if it does not exist
+            (defined $method)
+                || confess "The method '$method_name' is not found in the inherience hierarchy for this class";
+            # and now make sure to wrap it 
+            # even if it is already wrapped
+            # because we need a new sub ref
+            $method = Class::MOP::Method::Wrapped->wrap($method);
+        }
+        else {
+            # now make sure we wrap it properly 
+            $method = Class::MOP::Method::Wrapped->wrap($method)
+                unless $method->isa('Class::MOP::Method::Wrapped');  
+        }    
+        $self->add_method($method_name => $method);        
+        return $method;
+    };
 
-	sub add_before_method_modifier {
-		my ($self, $method_name, $method_modifier) = @_;
-	    (defined $method_name && $method_name)
-	        || confess "You must pass in a method name";	
-		my $method = $fetch_and_prepare_method->($self, $method_name);
-		$method->add_before_modifier(subname ':before' => $method_modifier);
-	}
+    sub add_before_method_modifier {
+        my ($self, $method_name, $method_modifier) = @_;
+        (defined $method_name && $method_name)
+            || confess "You must pass in a method name";    
+        my $method = $fetch_and_prepare_method->($self, $method_name);
+        $method->add_before_modifier(subname ':before' => $method_modifier);
+    }
 
-	sub add_after_method_modifier {
-		my ($self, $method_name, $method_modifier) = @_;
-	    (defined $method_name && $method_name)
-	        || confess "You must pass in a method name";	
-		my $method = $fetch_and_prepare_method->($self, $method_name);
-		$method->add_after_modifier(subname ':after' => $method_modifier);
-	}
-	
-	sub add_around_method_modifier {
-		my ($self, $method_name, $method_modifier) = @_;
-	    (defined $method_name && $method_name)
-	        || confess "You must pass in a method name";
-		my $method = $fetch_and_prepare_method->($self, $method_name);
-		$method->add_around_modifier(subname ':around' => $method_modifier);
-	}	
+    sub add_after_method_modifier {
+        my ($self, $method_name, $method_modifier) = @_;
+        (defined $method_name && $method_name)
+            || confess "You must pass in a method name";    
+        my $method = $fetch_and_prepare_method->($self, $method_name);
+        $method->add_after_modifier(subname ':after' => $method_modifier);
+    }
+    
+    sub add_around_method_modifier {
+        my ($self, $method_name, $method_modifier) = @_;
+        (defined $method_name && $method_name)
+            || confess "You must pass in a method name";
+        my $method = $fetch_and_prepare_method->($self, $method_name);
+        $method->add_around_modifier(subname ':around' => $method_modifier);
+    }   
 
     # NOTE: 
     # the methods above used to be named like this:
@@ -338,7 +403,7 @@ sub alias_method {
         || confess "Your code block must be a CODE reference";
     my $full_method_name = ($self->name . '::' . $method_name);
 
-	$method = $self->method_metaclass->wrap($method) unless blessed($method);    
+    $method = $self->method_metaclass->wrap($method) unless blessed($method);    
         
     no strict 'refs';
     no warnings 'redefine';
@@ -354,13 +419,13 @@ sub has_method {
     
     no strict 'refs';
     return 0 if !defined(&{$sub_name});        
-	my $method = \&{$sub_name};
+    my $method = \&{$sub_name};
     return 0 if (svref_2object($method)->GV->STASH->NAME || '') ne $self->name &&
-                (svref_2object($method)->GV->NAME || '')        ne '__ANON__';		
-	
-	# at this point we are relatively sure 
-	# it is our method, so we bless/wrap it 
-	$self->method_metaclass->wrap($method) unless blessed($method);
+                (svref_2object($method)->GV->NAME || '')        ne '__ANON__';      
+    
+    # at this point we are relatively sure 
+    # it is our method, so we bless/wrap it 
+    $self->method_metaclass->wrap($method) unless blessed($method);
     return 1;
 }
 
@@ -369,7 +434,7 @@ sub get_method {
     (defined $method_name && $method_name)
         || confess "You must define a method name";
 
-	return unless $self->has_method($method_name);
+    return unless $self->has_method($method_name);
 
     no strict 'refs';    
     return \&{$self->name . '::' . $method_name};
@@ -392,7 +457,7 @@ sub remove_method {
 sub get_method_list {
     my $self = shift;
     no strict 'refs';
-    grep { $self->has_method($_) } %{$self->name . '::'};
+    grep { $self->has_method($_) } keys %{$self->name . '::'};
 }
 
 sub compute_all_applicable_methods {
@@ -448,23 +513,23 @@ sub find_all_methods_by_name {
 sub find_next_method_by_name {
     my ($self, $method_name) = @_;
     (defined $method_name && $method_name)
-        || confess "You must define a method name to find";	
+        || confess "You must define a method name to find"; 
     # keep a record of what we have seen
     # here, this will handle all the 
     # inheritence issues because we are 
     # using the &class_precedence_list
     my %seen_class;
-	my @cpl = $self->class_precedence_list();
-	shift @cpl; # discard ourselves
+    my @cpl = $self->class_precedence_list();
+    shift @cpl; # discard ourselves
     foreach my $class (@cpl) {
         next if $seen_class{$class};
         $seen_class{$class}++;
         # fetch the meta-class ...
         my $meta = $self->initialize($class);
-		return $meta->get_method($method_name) 
-			if $meta->has_method($method_name);
+        return $meta->get_method($method_name) 
+            if $meta->has_method($method_name);
     }
-	return;
+    return;
 }
 
 ## Attributes
@@ -478,8 +543,11 @@ sub add_attribute {
     ($attribute->isa('Class::MOP::Attribute'))
         || confess "Your attribute must be an instance of Class::MOP::Attribute (or a subclass)";    
     $attribute->attach_to_class($self);
-    $attribute->install_accessors();        
+    $attribute->install_accessors();
     $self->get_attribute_map->{$attribute->name} = $attribute;
+
+	# FIXME
+	# in theory we have to tell everyone the slot structure may have changed
 }
 
 sub has_attribute {
@@ -493,12 +561,8 @@ sub get_attribute {
     my ($self, $attribute_name) = @_;
     (defined $attribute_name && $attribute_name)
         || confess "You must define an attribute name";
-    # OPTIMIZATION NOTE:
-    # we used to say `if $self->has_attribute($attribute_name)` 
-    # here, but since get_attribute is called so often, we 
-    # eliminate the function call here
-    return $self->{'%:attributes'}->{$attribute_name} 
-        if exists $self->{'%:attributes'}->{$attribute_name};   
+    return $self->get_attribute_map->{$attribute_name} 
+        if $self->has_attribute($attribute_name);   
     return; 
 } 
 
@@ -509,19 +573,14 @@ sub remove_attribute {
     my $removed_attribute = $self->get_attribute_map->{$attribute_name};    
     return unless defined $removed_attribute;
     delete $self->get_attribute_map->{$attribute_name};        
-    $removed_attribute->remove_accessors();        
-    $removed_attribute->detach_from_class();    
+    $removed_attribute->remove_accessors(); 
+    $removed_attribute->detach_from_class();
     return $removed_attribute;
 } 
 
 sub get_attribute_list {
     my $self = shift;
-    # OPTIMIZATION NOTE:
-    # We don't use get_attribute_map here because 
-    # we ask for the attribute list quite often 
-    # in compute_all_applicable_attributes, so 
-    # eliminating the function call helps 
-    keys %{$self->{'%:attributes'}};
+    keys %{$self->get_attribute_map};
 } 
 
 sub compute_all_applicable_attributes {
@@ -536,10 +595,7 @@ sub compute_all_applicable_attributes {
         next if $seen_class{$class};
         $seen_class{$class}++;
         # fetch the meta-class ...
-        # OPTIMIZATION NOTE:
-        # we grab the metaclass from the %METAS 
-        # hash here to save the initialize() call
-        my $meta = $METAS{$class};
+        my $meta = $self->initialize($class);
         foreach my $attr_name ($meta->get_attribute_list()) { 
             next if exists $seen_attr{$attr_name};
             $seen_attr{$attr_name}++;
@@ -620,7 +676,7 @@ sub get_package_variable {
     }
     confess "Could not get the package variable ($variable) because : $e" if $e;    
     # if we didn't die, then we can return it
-	return $ref;
+    return $ref;
 }
 
 sub remove_package_variable {
@@ -745,10 +801,16 @@ This will create an anonymous class, it works much like C<create> but
 it does not need a C<$package_name>. Instead it will create a suitably 
 unique package name for you to stash things into.
 
-=item B<initialize ($package_name)>
+=item B<initialize ($package_name, %options)>
 
 This initializes and returns returns a B<Class::MOP::Class> object 
 for a given a C<$package_name>.
+
+=item B<reinitialize ($package_name, %options)>
+
+This removes the old metaclass, and creates a new one in it's place.
+Do B<not> use this unless you really know what you are doing, it could 
+very easily make a very large mess of your program. 
 
 =item B<construct_class_instance (%options)>
 
@@ -774,6 +836,10 @@ These methods are B<entirely optional>, it is up to you whether you want
 to use them or not.
 
 =over 4
+
+=item B<instance_metaclass>
+
+=item B<get_meta_instance>
 
 =item B<new_object (%params)>
 

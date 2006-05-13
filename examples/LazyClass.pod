@@ -7,51 +7,75 @@ use warnings;
 
 use Carp 'confess';
 
-our $VERSION = '0.03';
+our $VERSION = '0.04';
 
 use base 'Class::MOP::Attribute';
 
 sub initialize_instance_slot {
-    my ($self, $class, $instance, $params) = @_;
+    my ($self, $meta_instance, $instance, $params) = @_;
+
     # if the attr has an init_arg, use that, otherwise,
     # use the attributes name itself as the init_arg
     my $init_arg = $self->init_arg();
-    # try to fetch the init arg from the %params ...
-    my $val;        
-    $val = $params->{$init_arg} if exists $params->{$init_arg};
-    # now add this to the instance structure
-    # only if we have found a value at all
-    $instance->{$self->name} = $val if defined $val;    
+
+	if ( exists $params->{$init_arg} ) {
+		my $val = $params->{$init_arg};
+		$meta_instance->set_slot_value($instance, $self->name, $val);
+	}
 }
 
-
 sub generate_accessor_method {
-    my ($self, $attr_name) = @_;
+    my $attr = shift;
+
+	my $attr_name = $attr->name;
+	my $meta_instance = $attr->associated_class->get_meta_instance;
+
     sub {
         if (scalar(@_) == 2) {
-            $_[0]->{$attr_name} = $_[1];
+			$meta_instance->set_slot_value($_[0], $attr_name, $_[1]);
         }
         else {
-            if (!exists $_[0]->{$attr_name}) {
-                my $attr = $self->associated_class->get_attribute($attr_name);
-                $_[0]->{$attr_name} = $attr->has_default ? $attr->default($_[0]) : undef;           
-            }            
-            $_[0]->{$attr_name};            
+			unless ( $meta_instance->is_slot_initialized($_[0], $attr_name) ) {
+				my $value = $attr->has_default ? $attr->default($_[0]) : undef;
+				$meta_instance->set_slot_value($_[0], $attr_name, $value);
+            }
+
+            $meta_instance->get_slot_value($_[0], $attr_name);
         }
     };
 }
 
 sub generate_reader_method {
-    my ($self, $attr_name) = @_; 
+	my $attr = shift;
+
+	my $attr_name = $attr->name;
+	my $meta_instance = $attr->associated_class->get_meta_instance;
+
     sub {
         confess "Cannot assign a value to a read-only accessor" if @_ > 1;        
-        if (!exists $_[0]->{$attr_name}) {
-            my $attr = $self->associated_class->get_attribute($attr_name);
-            $_[0]->{$attr_name} = $attr->has_default ? $attr->default($_[0]) : undef;           
-        }
-        $_[0]->{$attr_name};
+
+		unless ( $meta_instance->is_slot_initialized($_[0], $attr_name) ) {
+			my $value = $attr->has_default ? $attr->default($_[0]) : undef;
+			$meta_instance->set_slot_value($_[0], $attr_name, $value);
+		}
+
+		$meta_instance->get_slot_value($_[0], $attr_name);
     };   
 }
+
+
+
+package # hide the package from PAUSE
+    LazyClass::Instance;
+
+use strict;
+use warnings;
+
+our $VERSION = '0.01';
+
+use base 'Class::MOP::Instance';
+
+sub initialize_all_slots {}
 
 1;
 
@@ -67,8 +91,9 @@ LazyClass - An example metaclass with lazy initialization
 
   package BinaryTree;
   
-  use metaclass 'Class::MOP::Class' => (
-      ':attribute_metaclass' => 'LazyClass::Attribute'
+  use metaclass (
+      ':attribute_metaclass' => 'LazyClass::Attribute',
+      ':instance_metaclass'  => 'LazyClass::Instance',      
   );
   
   BinaryTree->meta->add_attribute('$:node' => (
