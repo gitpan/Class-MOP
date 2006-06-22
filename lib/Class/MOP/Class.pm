@@ -9,7 +9,7 @@ use Scalar::Util 'blessed', 'reftype', 'weaken';
 use Sub::Name    'subname';
 use B            'svref_2object';
 
-our $VERSION = '0.14';
+our $VERSION = '0.15';
 
 use Class::MOP::Instance;
 
@@ -173,7 +173,7 @@ sub create {
     my $meta = $class->initialize($package_name);
     
     $meta->add_method('meta' => sub { 
-        Class::MOP::Class->initialize(blessed($_[0]) || $_[0]);
+        $class->initialize(blessed($_[0]) || $_[0]);
     });
     
     $meta->superclasses(@{$options{superclasses}})
@@ -259,7 +259,7 @@ sub clone_instance {
         || confess "You can only clone instances, \$self is not a blessed instance";
     my $meta_instance = $class->get_meta_instance();
     my $clone = $meta_instance->clone_instance($instance);        
-    foreach my $key (%params) {
+    foreach my $key (keys %params) {
         next unless $meta_instance->is_valid_slot($key);
         $meta_instance->set_slot_value($clone, $key, $params{$key});
     }
