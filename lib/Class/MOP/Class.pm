@@ -11,11 +11,22 @@ use B            'svref_2object';
 
 our $VERSION = '0.15';
 
+use base 'Class::MOP::Module';
+
 use Class::MOP::Instance;
 
 # Self-introspection 
 
 sub meta { Class::MOP::Class->initialize(blessed($_[0]) || $_[0]) }
+
+# Class globals ...
+
+# NOTE:
+# we need a sufficiently annoying prefix
+# this should suffice for now, this is 
+# used in a couple of places below, so 
+# need to put it up here for now.
+my $ANON_CLASS_PREFIX = 'Class::MOP::Class::__ANON__::SERIAL::';
 
 # Creation
 
@@ -47,26 +58,7 @@ sub meta { Class::MOP::Class->initialize(blessed($_[0]) || $_[0]) }
             || confess "You must pass a package name and it cannot be blessed";    
         $METAS{$package_name} = undef;
         $class->construct_class_instance(':package' => $package_name, @_);
-    }   
-    
-    # NOTE:
-    # we need a sufficiently annoying prefix
-    # this should suffice for now
-    my $ANON_CLASS_PREFIX = 'Class::MOP::Class::__ANON__::SERIAL::';
-    
-    {
-        # NOTE:
-        # this should be sufficient, if you have a 
-        # use case where it is not, write a test and 
-        # I will change it.
-        my $ANON_CLASS_SERIAL = 0;
-
-        sub create_anon_class {
-            my ($class, %options) = @_;   
-            my $package_name = $ANON_CLASS_PREFIX . ++$ANON_CLASS_SERIAL;
-            return $class->create($package_name, '0.00', %options);
-        }
-    }     
+    }       
     
     # NOTE: (meta-circularity) 
     # this is a special form of &construct_instance 
@@ -87,6 +79,17 @@ sub meta { Class::MOP::Class->initialize(blessed($_[0]) || $_[0]) }
         # annoyingly enough during global destruction)
         return $METAS{$package_name} 
             if exists $METAS{$package_name} && defined $METAS{$package_name};  
+
+        # NOTE:
+        # we need to deal with the possibility 
+        # of class immutability here, and then 
+        # get the name of the class appropriately
+        $class = (blessed($class)
+                        ? ($class->is_immutable
+                            ? $class->get_mutable_metaclass_name()
+                            : blessed($class))
+                        : $class);
+
         $class = blessed($class) || $class;
         # now create the metaclass
         my $meta;
@@ -96,7 +99,7 @@ sub meta { Class::MOP::Class->initialize(blessed($_[0]) || $_[0]) }
                 '%:attributes'          => {},
                 '$:attribute_metaclass' => $options{':attribute_metaclass'} || 'Class::MOP::Attribute',
                 '$:method_metaclass'    => $options{':method_metaclass'}    || 'Class::MOP::Method',
-                '$:instance_metaclass'  => $options{':instance_metaclass'}  || 'Class::MOP::Instance',    
+                '$:instance_metaclass'  => $options{':instance_metaclass'}  || 'Class::MOP::Instance',
             } => $class;
         }
         else {
@@ -117,23 +120,6 @@ sub meta { Class::MOP::Class->initialize(blessed($_[0]) || $_[0]) }
         $meta;        
     } 
     
-    # NOTE:
-    # this will only get called for 
-    # anon-classes, all other calls 
-    # are assumed to occur during 
-    # global destruction and so don't
-    # really need to be handled explicitly
-    sub DESTROY {
-        my $self = shift;
-        return unless $self->name =~ /^$ANON_CLASS_PREFIX/;
-        my ($serial_id) = ($self->name =~ /^$ANON_CLASS_PREFIX(\d+)/);
-        no strict 'refs';     
-        foreach my $key (keys %{$ANON_CLASS_PREFIX . $serial_id}) {
-            delete ${$ANON_CLASS_PREFIX . $serial_id}{$key};
-        }
-        delete ${'main::' . $ANON_CLASS_PREFIX}{$serial_id . '::'};        
-    }
-    
     sub check_metaclass_compatability {
         my $self = shift;
 
@@ -146,10 +132,19 @@ sub meta { Class::MOP::Class->initialize(blessed($_[0]) || $_[0]) }
 
         foreach my $class_name (@class_list) { 
             my $meta = $METAS{$class_name} || next;
-            ($self->isa(blessed($meta)))
+            
+            # NOTE:
+            # we need to deal with the possibility 
+            # of class immutability here, and then 
+            # get the name of the class appropriately            
+            my $meta_type = ($meta->is_immutable
+                                ? $meta->get_mutable_metaclass_name()
+                                : blessed($meta));                
+                                
+            ($self->isa($meta_type))
                 || confess $self->name . "->meta => (" . (blessed($self)) . ")" . 
                            " is not compatible with the " . 
-                           $class_name . "->meta => (" . (blessed($meta)) . ")";
+                           $class_name . "->meta => (" . ($meta_type)     . ")";
             # NOTE:
             # we also need to check that instance metaclasses
             # are compatabile in the same the class.
@@ -160,6 +155,41 @@ sub meta { Class::MOP::Class->initialize(blessed($_[0]) || $_[0]) }
         }        
     } 
 }
+
+## ANON classes
+
+{
+    # NOTE:
+    # this should be sufficient, if you have a 
+    # use case where it is not, write a test and 
+    # I will change it.
+    my $ANON_CLASS_SERIAL = 0;
+
+    sub create_anon_class {
+        my ($class, %options) = @_;   
+        my $package_name = $ANON_CLASS_PREFIX . ++$ANON_CLASS_SERIAL;
+        return $class->create($package_name, '0.00', %options);
+    }
+}    
+
+# NOTE:
+# this will only get called for 
+# anon-classes, all other calls 
+# are assumed to occur during 
+# global destruction and so don't
+# really need to be handled explicitly
+sub DESTROY {
+    my $self = shift;
+    return unless $self->name =~ /^$ANON_CLASS_PREFIX/;
+    my ($serial_id) = ($self->name =~ /^$ANON_CLASS_PREFIX(\d+)/);
+    no strict 'refs';     
+    foreach my $key (keys %{$ANON_CLASS_PREFIX . $serial_id}) {
+        delete ${$ANON_CLASS_PREFIX . $serial_id}{$key};
+    }
+    delete ${'main::' . $ANON_CLASS_PREFIX}{$serial_id . '::'};        
+}
+
+# creating classes with MOP ...
 
 sub create {
     my ($class, $package_name, $package_version, %options) = @_;
@@ -202,7 +232,6 @@ sub create {
 # all these attribute readers will be bootstrapped 
 # away in the Class::MOP bootstrap section
 
-sub name                { $_[0]->{'$:package'}             }
 sub get_attribute_map   { $_[0]->{'%:attributes'}          }
 sub attribute_metaclass { $_[0]->{'$:attribute_metaclass'} }
 sub method_metaclass    { $_[0]->{'$:method_metaclass'}    }
@@ -264,16 +293,6 @@ sub clone_instance {
         $meta_instance->set_slot_value($clone, $key, $params{$key});
     }
     return $clone;    
-}
-
-# Informational 
-
-# &name should be here too, but it is above
-# because it gets bootstrapped away
-
-sub version {  
-    my $self = shift;
-    ${$self->get_package_variable('$VERSION')};
 }
 
 # Inheritance
@@ -623,69 +642,13 @@ sub find_attribute_by_name {
     return;
 }
 
-# Class attributes
+## Class closing
 
-sub add_package_variable {
-    my ($self, $variable, $initial_value) = @_;
-    (defined $variable && $variable =~ /^[\$\@\%]/)
-        || confess "variable name does not have a sigil";
-    
-    my ($sigil, $name) = ($variable =~ /^(.)(.*)$/); 
-    if (defined $initial_value) {
-        no strict 'refs';
-        *{$self->name . '::' . $name} = $initial_value;
-    }
-    else {
-        my $e;
-        {        
-            # NOTE:
-            # We HAVE to localize $@ or all 
-            # hell breaks loose. It is not 
-            # good, believe me, not good.
-            local $@;
-            eval $sigil . $self->name . '::' . $name;
-            $e = $@ if $@;            
-        }
-        confess "Could not create package variable ($variable) because : $e" if $e;
-    }
-}
+sub is_mutable   { 1 }
+sub is_immutable { 0 }
 
-sub has_package_variable {
-    my ($self, $variable) = @_;
-    (defined $variable && $variable =~ /^[\$\@\%]/)
-        || confess "variable name does not have a sigil";
-    my ($sigil, $name) = ($variable =~ /^(.)(.*)$/); 
-    no strict 'refs';
-    defined ${$self->name . '::'}{$name} ? 1 : 0;
-}
-
-sub get_package_variable {
-    my ($self, $variable) = @_;
-    (defined $variable && $variable =~ /^[\$\@\%]/)
-        || confess "variable name does not have a sigil";
-    my ($sigil, $name) = ($variable =~ /^(.)(.*)$/); 
-    my ($ref, $e);
-    {
-        # NOTE:
-        # We HAVE to localize $@ or all 
-        # hell breaks loose. It is not 
-        # good, believe me, not good.
-        local $@;        
-        $ref = eval '\\' . $sigil . $self->name . '::' . $name;
-        $e = $@ if $@;
-    }
-    confess "Could not get the package variable ($variable) because : $e" if $e;    
-    # if we didn't die, then we can return it
-    return $ref;
-}
-
-sub remove_package_variable {
-    my ($self, $variable) = @_;
-    (defined $variable && $variable =~ /^[\$\@\%]/)
-        || confess "variable name does not have a sigil";
-    my ($sigil, $name) = ($variable =~ /^(.)(.*)$/); 
-    no strict 'refs';
-    delete ${$self->name . '::'}{$name};
+sub make_immutable {
+    return Class::MOP::Class::Immutable->make_metaclass_immutable(@_);
 }
 
 1;
@@ -1228,7 +1191,7 @@ the creation and inspection of package scoped variables.
 
 =over 4
 
-=item B<add_package_variable ($variable_name, ?$initial_value)>
+=item B<add_package_symbol ($variable_name, ?$initial_value)>
 
 Given a C<$variable_name>, which must contain a leading sigil, this 
 method will create that variable within the package which houses the 
@@ -1236,19 +1199,31 @@ class. It also takes an optional C<$initial_value>, which must be a
 reference of the same type as the sigil of the C<$variable_name> 
 implies.
 
-=item B<get_package_variable ($variable_name)>
+=item B<get_package_symbol ($variable_name)>
 
 This will return a reference to the package variable in 
 C<$variable_name>. 
 
-=item B<has_package_variable ($variable_name)>
+=item B<has_package_symbol ($variable_name)>
 
 Returns true (C<1>) if there is a package variable defined for 
 C<$variable_name>, and false (C<0>) otherwise.
 
-=item B<remove_package_variable ($variable_name)>
+=item B<remove_package_symbol ($variable_name)>
 
 This will attempt to remove the package variable at C<$variable_name>.
+
+=back
+
+=head2 Class closing
+
+=over 4
+
+=item B<is_mutable>
+
+=item B<is_immutable>
+
+=item B<make_immutable>
 
 =back
 

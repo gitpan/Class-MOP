@@ -11,7 +11,9 @@ use Class::MOP::Class;
 use Class::MOP::Attribute;
 use Class::MOP::Method;
 
-our $VERSION = '0.29_02';
+use Class::MOP::Class::Immutable;
+
+our $VERSION = '0.30';
 
 ## ----------------------------------------------------------------------------
 ## Setting up our environment ...
@@ -37,9 +39,9 @@ our $VERSION = '0.29_02';
 # any subclass of Class::MOP::* will be able to 
 # inherit them using &construct_instance
 
-## Class::MOP::Class
+## Class::MOP::Package
 
-Class::MOP::Class->meta->add_attribute(
+Class::MOP::Package->meta->add_attribute(
     Class::MOP::Attribute->new('$:package' => (
         reader   => {
             # NOTE: we need to do this in order 
@@ -50,6 +52,8 @@ Class::MOP::Class->meta->add_attribute(
         init_arg => ':package',
     ))
 );
+
+## Class::MOP::Class
 
 Class::MOP::Class->meta->add_attribute(
     Class::MOP::Attribute->new('%:attributes' => (
@@ -183,6 +187,16 @@ Class::MOP::Attribute->meta->add_method('clone' => sub {
     my $self  = shift;
     $self->meta->clone_object($self, @_);  
 });
+
+## Try and close Class::MOP::*
+
+Class::MOP::Package  ->meta->make_immutable(inline_constructor => 0);
+Class::MOP::Module   ->meta->make_immutable(inline_constructor => 0);
+Class::MOP::Class    ->meta->make_immutable(inline_constructor => 0);
+Class::MOP::Attribute->meta->make_immutable(inline_constructor => 0);
+Class::MOP::Method   ->meta->make_immutable(inline_constructor => 0);
+Class::MOP::Instance ->meta->make_immutable(inline_constructor => 0);
+
 
 1;
 
