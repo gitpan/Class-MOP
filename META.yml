@@ -1,8 +1,7 @@
 ---
 name: Class-MOP
-version: 0.30
-author:
-  - 'Stevan Little E<lt>stevan@iinteractive.comE<gt>'
+version: 0.31
+author: ~
 abstract: A Meta Object Protocol for Perl 5
 license: perl
 requires:
@@ -17,16 +16,16 @@ build_requires:
 provides:
   Class::MOP:
     file: lib/Class/MOP.pm
-    version: 0.30
+    version: 0.31
   Class::MOP::Attribute:
     file: lib/Class/MOP/Attribute.pm
-    version: 0.09
+    version: 0.10
   Class::MOP::Attribute::Accessor:
     file: lib/Class/MOP/Attribute.pm
-    version: 0.09
+    version: 0.10
   Class::MOP::Class:
     file: lib/Class/MOP/Class.pm
-    version: 0.15
+    version: 0.16
   Class::MOP::Class::Immutable:
     file: lib/Class/MOP/Class/Immutable.pm
     version: 0.01
