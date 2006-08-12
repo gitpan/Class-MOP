@@ -1,5 +1,43 @@
 Revision history for Perl extension Class-MOP.
 
+0.32 Sat. Aug. 12, 2006
+    + added Class::MOP::Object so that the 
+      metamodel is more complete (and closer
+      to what Perl 6 will probably be).
+
+    * Class::MOP::Package
+      - refactored entire class, this is now 
+        the primary gateway between the metaclass
+        and the Perl 5 symbol table
+        - added many tests for this
+      - this class is now a subclass of 
+        Class::MOP::Object
+        - added some tests to reflect this
+        
+    * Class::MOP::Class
+      - refactored all symbol table access to 
+        use Class::MOP::Package methods instead
+        
+    * Class::MOP::Module
+      - adding the $:version attribute in the bootstrap
+        so that Module has a version as an attribute
+        - see comment in Class::MOP for details
+      - added the $:authority attribute to this module 
+        as well as an &identifier method, to bring us 
+        ever closer to Perl 6 goodness 
+        - I have added $AUTHORITY to all the modules 
+        - added tests for this
+      
+    * Class::MOP::Instance
+      - added &deinitialize_slot for removing slots 
+        from an instance
+        - added tests for this      
+      
+    * Class::MOP::Attribute 
+      - added support for &deinitialize_slot for removing
+        slots from an instance
+        - added tests for this
+
 0.31 Sat. July 15, 2006
 
     * Class::MOP::Class

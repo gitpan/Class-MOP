@@ -3,7 +3,7 @@
 use strict;
 use warnings;
 
-use Test::More tests => 171;
+use Test::More tests => 189;
 use Test::Exception;
 
 BEGIN {
@@ -33,14 +33,18 @@ my @class_mop_package_methods = qw(
     initialize
 
     name
+    namespace
     
-    add_package_symbol get_package_symbol has_package_symbol remove_package_symbol    
+    add_package_symbol get_package_symbol has_package_symbol remove_package_symbol 
+    list_all_package_symbols remove_package_glob
+    
+    _deconstruct_variable_name
 );
 
 my @class_mop_module_methods = qw(
     meta 
 
-    version
+    version authority identifier
 );
 
 my @class_mop_class_methods = qw(
@@ -131,9 +135,11 @@ foreach my $non_method_name (qw(
 
 my @class_mop_package_attributes = (
     '$:package', 
+    '%:namespace',
 );
 
 my @class_mop_module_attributes = (
+    '$:version', '$:authority'
 );
 
 my @class_mop_class_attributes = (
@@ -271,7 +277,8 @@ is_deeply(
     [ qw/
         Class::MOP::Class
         Class::MOP::Module
-        Class::MOP::Package                
+        Class::MOP::Package     
+        Class::MOP::Object           
     / ], 
     '... Class::MOP::Class->class_precedence_list == [ Class::MOP::Class Class::MOP::Module Class::MOP::Package ]');
 
