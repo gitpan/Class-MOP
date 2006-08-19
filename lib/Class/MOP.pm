@@ -5,7 +5,7 @@ use strict;
 use warnings;
 
 use Carp         'confess';
-use Scalar::Util ();
+use Scalar::Util 'weaken';
 
 use Class::MOP::Class;
 use Class::MOP::Attribute;
@@ -13,8 +13,33 @@ use Class::MOP::Method;
 
 use Class::MOP::Class::Immutable;
 
-our $VERSION   = '0.32';
+our $VERSION   = '0.33';
 our $AUTHORITY = 'cpan:STEVAN';
+
+{
+    # Metaclasses are singletons, so we cache them here.
+    # there is no need to worry about destruction though
+    # because they should die only when the program dies.
+    # After all, do package definitions even get reaped?
+    my %METAS;  
+    
+    # means of accessing all the metaclasses that have 
+    # been initialized thus far (for mugwumps obj browser)
+    sub get_all_metaclasses         {        %METAS         }            
+    sub get_all_metaclass_instances { values %METAS         } 
+    sub get_all_metaclass_names     { keys   %METAS         }     
+    sub get_metaclass_by_name       { $METAS{$_[0]}         }
+    sub store_metaclass_by_name     { $METAS{$_[0]} = $_[1] }  
+    sub weaken_metaclass            { weaken($METAS{$_[0]}) }            
+    sub does_metaclass_exist        { exists $METAS{$_[0]} && defined $METAS{$_[0]} }
+    sub remove_metaclass_by_name    { $METAS{$_[0]} = undef }     
+    
+    # NOTE:
+    # We only cache metaclasses, meaning instances of 
+    # Class::MOP::Class. We do not cache instance of 
+    # Class::MOP::Package or Class::MOP::Module. Mostly
+    # because I don't yet see a good reason to do so.        
+}
 
 ## ----------------------------------------------------------------------------
 ## Setting up our environment ...
@@ -58,12 +83,17 @@ Class::MOP::Package->meta->add_attribute(
 Class::MOP::Package->meta->add_attribute(
     Class::MOP::Attribute->new('%:namespace' => (
         reader => {
-            'namespace' => sub { (shift)->{'%:namespace'} }
-        },
-        default => sub {
-            my ($class) = @_;
-            no strict 'refs';
-            return \%{$class->name . '::'};
+            # NOTE:
+            # because of issues with the Perl API 
+            # to the typeglob in some versions, we 
+            # need to just always grab a new 
+            # reference to the hash here. Ideally 
+            # we could just store a ref and it would
+            # Just Work, but oh well :\
+            'namespace' => sub { 
+                no strict 'refs';
+                \%{$_[0]->name . '::'} 
+            }
         },
         # NOTE:
         # protect this from silliness 
@@ -267,6 +297,11 @@ Class::MOP::Attribute->meta->add_method('new' => sub {
         || confess "You must provide a name for the attribute";
     $options{init_arg} = $name 
         if not exists $options{init_arg};
+        
+    (Class::MOP::Attribute::is_default_a_coderef(\%options))
+        || confess("References are not allowed as default values, you must ". 
+                   "wrap then in a CODE reference (ex: sub { [] } and not [])")
+            if exists $options{default} && ref $options{default};        
 
     # return the new object
     $class->meta->new_object(name => $name, %options);
@@ -466,6 +501,42 @@ See L<Class::MOP::Method> for more details.
 
 =back
 
+=head1 FUNCTIONS
+
+Class::MOP holds a cache of metaclasses, the following are functions 
+(B<not methods>) which can be used to access that cache. It is not 
+recommended that you mess with this, bad things could happen. But if 
+you are brave and willing to risk it, go for it.
+
+=over 4
+
+=item B<get_all_metaclasses>
+
+This will return an hash of all the metaclass instances that have 
+been cached by B<Class::MOP::Class> keyed by the package name. 
+
+=item B<get_all_metaclass_instances>
+
+This will return an array of all the metaclass instances that have 
+been cached by B<Class::MOP::Class>.
+
+=item B<get_all_metaclass_names>
+
+This will return an array of all the metaclass names that have 
+been cached by B<Class::MOP::Class>.
+
+=item B<get_metaclass_by_name ($name)>
+
+=item B<store_metaclass_by_name ($name, $meta)>
+
+=item B<weaken_metaclass ($name)>
+
+=item B<does_metaclass_exist ($name)>
+
+=item B<remove_metaclass_by_name ($name)>
+
+=back
+
 =head1 SEE ALSO
 
 =head2 Books
@@ -549,21 +620,25 @@ L<Devel::Cover> report on this module's test suite.
  ---------------------------- ------ ------ ------ ------ ------ ------ ------
  File                           stmt   bran   cond    sub    pod   time  total
  ---------------------------- ------ ------ ------ ------ ------ ------ ------
- Class/MOP.pm                  100.0  100.0  100.0  100.0    n/a   19.8  100.0
- Class/MOP/Attribute.pm        100.0  100.0   91.7   61.2  100.0   14.3   87.9
- Class/MOP/Class.pm             97.6   91.3   77.3   98.4  100.0   56.4   93.2
- Class/MOP/Instance.pm          91.1   75.0   33.3   91.7  100.0    6.8   90.7
- Class/MOP/Method.pm            97.6   60.0   52.9   76.9  100.0    1.6   82.6
- metaclass.pm                  100.0  100.0   83.3  100.0    n/a    1.0   97.7
+ Class/MOP.pm                   78.0   87.5   55.6   71.4  100.0   12.4   76.8
+ Class/MOP/Attribute.pm         83.4   75.6   86.7   94.4  100.0    8.9   85.2
+ Class/MOP/Class.pm             96.9   75.8   43.2   98.0  100.0   55.3   83.6
+ Class/MOP/Class/Immutable.pm   88.5   53.8    n/a   95.8  100.0    1.1   84.7
+ Class/MOP/Instance.pm          87.9   75.0   33.3   89.7  100.0   10.1   89.1
+ Class/MOP/Method.pm            97.6   60.0   57.9   76.9  100.0    1.5   82.8
+ Class/MOP/Module.pm            87.5    n/a   11.1   83.3  100.0    0.3   66.7
+ Class/MOP/Object.pm           100.0    n/a   33.3  100.0  100.0    0.1   89.5
+ Class/MOP/Package.pm           95.1   69.0   33.3  100.0  100.0    9.9   85.5
+ metaclass.pm                  100.0  100.0   83.3  100.0    n/a    0.5   97.7
  ---------------------------- ------ ------ ------ ------ ------ ------ ------
- Total                          97.5   88.5   75.5   82.8  100.0  100.0   91.2
+ Total                          91.5   72.1   48.8   90.7  100.0  100.0   84.2
  ---------------------------- ------ ------ ------ ------ ------ ------ ------
 
 =head1 ACKNOWLEDGEMENTS
 
 =over 4
 
-=item Rob Kinyon E<lt>rob@iinteractive.comE<gt>
+=item Rob Kinyon
 
 Thanks to Rob for actually getting the development of this module kick-started. 
 
