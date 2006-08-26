@@ -2,18 +2,19 @@
 use ExtUtils::MakeMaker;
 WriteMakefile
 (
+          'PL_FILES' => {},
+          'INSTALLDIRS' => 'site',
           'NAME' => 'Class::MOP',
+          'EXE_FILES' => [],
           'VERSION_FROM' => 'lib/Class/MOP.pm',
           'PREREQ_PM' => {
-                           'B' => '0',
-                           'Carp' => '0.01',
-                           'File::Spec' => '0',
+                           'Test::More' => '0.62',
                            'Scalar::Util' => '1.18',
-                           'Sub::Name' => '0.02',
                            'Test::Exception' => '0.21',
-                           'Test::More' => '0.62'
-                         },
-          'INSTALLDIRS' => 'site',
-          'PL_FILES' => {}
+                           'File::Spec' => '0',
+                           'Sub::Name' => '0.02',
+                           'B' => '0',
+                           'Carp' => '0'
+                         }
         )
 ;

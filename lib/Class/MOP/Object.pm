@@ -6,7 +6,7 @@ use warnings;
 
 use Scalar::Util 'blessed';
 
-our $VERSION   = '0.01';
+our $VERSION   = '0.02';
 our $AUTHORITY = 'cpan:STEVAN';
 
 # introspection
@@ -14,6 +14,22 @@ our $AUTHORITY = 'cpan:STEVAN';
 sub meta { 
     require Class::MOP::Class;
     Class::MOP::Class->initialize(blessed($_[0]) || $_[0]);
+}
+
+# RANT:
+# Cmon, how many times have you written 
+# the following code while debugging:
+# 
+#  use Data::Dumper; 
+#  warn Dumper $obj;
+#
+# It can get seriously annoying, so why 
+# not just do this ...
+sub dump { 
+    my $self = shift;
+    require Data::Dumper;
+    $Data::Dumper::Maxdepth = shift || 1;
+    Data::Dumper::Dumper $self;
 }
 
 1;
@@ -50,7 +66,7 @@ and really just exists to make the Class::MOP metamodel complete.
                  
   legend:
     ..(is an instance of)..>
-    --(is a subclass of)-->
+    --(is a subclass of)--->
 
 A deeper discussion of this model is currently beyond the scope of 
 this documenation. 
@@ -60,6 +76,14 @@ this documenation.
 =over 4
 
 =item B<meta>
+
+=item B<dump (?$max_depth)>
+
+This will C<require> the L<Data::Dumper> module and then dump a 
+representation of your object. It passed the C<$max_depth> arg 
+to C<$Data::Dumper::Maxdepth>. The default C<$max_depth> is 1, 
+so it will not go crazy and print a massive bunch of stuff. 
+Adjust this as nessecary.
 
 =back
 

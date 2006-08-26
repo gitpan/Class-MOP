@@ -9,7 +9,7 @@ use Scalar::Util 'blessed', 'reftype', 'weaken';
 use Sub::Name    'subname';
 use B            'svref_2object';
 
-our $VERSION   = '0.18';
+our $VERSION   = '0.19';
 our $AUTHORITY = 'cpan:STEVAN';
 
 use base 'Class::MOP::Module';
@@ -77,12 +77,23 @@ sub construct_class_instance {
         $meta = bless { 
             # inherited from Class::MOP::Package
             '$:package'             => $package_name, 
-            '%:namespace'           => \%{$package_name . '::'},                
+            
+            # NOTE:
+            # since the following attributes will 
+            # actually be loaded from the symbol 
+            # table, and actually bypass the instance
+            # entirely, we can just leave these things
+            # listed here for reference, because they
+            # should not actually have a value associated 
+            # with the slot.
+            '%:namespace'           => \undef,                
             # inherited from Class::MOP::Module
-            '$:version'             => (exists ${$package_name . '::'}{'VERSION'}   ? ${$package_name . '::VERSION'}   : undef),
-            '$:authority'           => (exists ${$package_name . '::'}{'AUTHORITY'} ? ${$package_name . '::AUTHORITY'} : undef),
-            # defined here ...
-            '%:attributes'          => {},
+            '$:version'             => \undef,
+            '$:authority'           => \undef,
+            # defined in Class::MOP::Class
+            '%:methods'             => \undef,
+            
+            '%:attributes'          => {},            
             '$:attribute_metaclass' => $options{':attribute_metaclass'} || 'Class::MOP::Attribute',
             '$:method_metaclass'    => $options{':method_metaclass'}    || 'Class::MOP::Method',
             '$:instance_metaclass'  => $options{':instance_metaclass'}  || 'Class::MOP::Instance',
@@ -168,7 +179,7 @@ sub check_metaclass_compatability {
     sub create_anon_class {
         my ($class, %options) = @_;   
         my $package_name = $ANON_CLASS_PREFIX . ++$ANON_CLASS_SERIAL;
-        return $class->create($package_name, '0.00', %options);
+        return $class->create($package_name, %options);
     } 
 
     # NOTE:
@@ -193,14 +204,27 @@ sub check_metaclass_compatability {
 # creating classes with MOP ...
 
 sub create {
-    my ($class, $package_name, $package_version, %options) = @_;
+    my $class        = shift;
+    my $package_name = shift;
+    
     (defined $package_name && $package_name)
         || confess "You must pass a package name";
+
+    (scalar @_ % 2 == 0)
+        || confess "You much pass all parameters as name => value pairs " . 
+                   "(I found an uneven number of params in \@_)";
+
+    my (%options) = @_;
+    
     my $code = "package $package_name;";
-    $code .= "\$$package_name\:\:VERSION = '$package_version';" 
-        if defined $package_version;
+    $code .= "\$$package_name\:\:VERSION = '" . $options{version} . "';" 
+        if exists $options{version};
+    $code .= "\$$package_name\:\:AUTHORITY = '" . $options{authority} . "';" 
+        if exists $options{authority};  
+              
     eval $code;
     confess "creation of $package_name failed : $@" if $@;    
+    
     my $meta = $class->initialize($package_name);
     
     $meta->add_method('meta' => sub { 
@@ -237,6 +261,20 @@ sub get_attribute_map   { $_[0]->{'%:attributes'}          }
 sub attribute_metaclass { $_[0]->{'$:attribute_metaclass'} }
 sub method_metaclass    { $_[0]->{'$:method_metaclass'}    }
 sub instance_metaclass  { $_[0]->{'$:instance_metaclass'}  }
+
+sub get_method_map {
+    my $self = shift;
+    # FIXME:
+    # there is a faster/better way 
+    # to do this, I am sure :)    
+    return +{ 
+        map {
+            $_ => $self->get_method($_) 
+        } grep { 
+            $self->has_method($_) 
+        } $self->list_all_package_symbols
+    };
+}
 
 # Instance Construction & Cloning
 
@@ -676,7 +714,8 @@ Class::MOP::Class - Class Meta Object
   
   # or use this to actually create classes ...
   
-  Class::MOP::Class->create('Bar' => '0.01' => (
+  Class::MOP::Class->create('Bar' => (
+      version      => '0.01',
       superclasses => [ 'Foo' ],
       attributes => [
           Class::MOP:::Attribute->new('$bar'),
@@ -727,15 +766,17 @@ created any more than nessecary. Basically, they are singletons.
 
 =over 4
 
-=item B<create ($package_name, ?$package_version,
+=item B<create ($package_name, 
+                version      =E<gt> ?$version,                 
+                authority    =E<gt> ?$authority,                                 
                 superclasses =E<gt> ?@superclasses, 
                 methods      =E<gt> ?%methods, 
                 attributes   =E<gt> ?%attributes)>
 
 This returns a B<Class::MOP::Class> object, bringing the specified 
-C<$package_name> into existence and adding any of the 
-C<$package_version>, C<@superclasses>, C<%methods> and C<%attributes> 
-to it.
+C<$package_name> into existence and adding any of the C<$version>, 
+C<$authority>, C<@superclasses>, C<%methods> and C<%attributes> to 
+it.
 
 =item B<create_anon_class (superclasses =E<gt> ?@superclasses, 
                            methods      =E<gt> ?%methods, 
@@ -890,6 +931,8 @@ what B<Class::ISA::super_path> does, but we don't remove duplicate names.
 =head2 Methods
 
 =over 4
+
+=item B<get_method_map>
 
 =item B<method_metaclass>
 
