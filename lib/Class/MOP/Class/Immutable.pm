@@ -7,22 +7,52 @@ use warnings;
 use Carp         'confess';
 use Scalar::Util 'blessed', 'looks_like_number';
 
-our $VERSION   = '0.02';
+our $VERSION   = '0.03';
 our $AUTHORITY = 'cpan:STEVAN';
 
 use base 'Class::MOP::Class';
 
+# enforce the meta-circularity here
+# and hide the Immutable part
+
+sub meta { 
+    my $self = shift;
+    # if it is not blessed, then someone is asking 
+    # for the meta of Class::MOP::Class::Immutable
+    return Class::MOP::Class->initialize($self) unless blessed($self);
+    # otherwise, they are asking for the metaclass 
+    # which has been made immutable, which is itself
+    return $self;
+}
+
 # methods which can *not* be called
+for my $meth (qw(
+    add_method
+    alias_method
+    remove_method
+    add_attribute
+    remove_attribute
+    add_package_symbol
+    remove_package_symbol
+)) {
+    no strict 'refs';
+    *{$meth} = sub {
+        confess "Cannot call method '$meth' on an immutable instance";
+    };
+}
 
-sub add_method            { confess 'Cannot call method "add_method" on an immutable instance'            }
-sub alias_method          { confess 'Cannot call method "alias_method" on an immutable instance'          }
-sub remove_method         { confess 'Cannot call method "remove_method" on an immutable instance'         }
-                                                                                            
-sub add_attribute         { confess 'Cannot call method "add_attribute" on an immutable instance'         }
-sub remove_attribute      { confess 'Cannot call method "remove_attribute" on an immutable instance'      }
-
-sub add_package_symbol    { confess 'Cannot call method "add_package_symbol" on an immutable instance'    }
-sub remove_package_symbol { confess 'Cannot call method "remove_package_symbol" on an immutable instance' }
+sub get_package_symbol {
+    my ($self, $variable) = @_;    
+    my ($name, $sigil, $type) = $self->_deconstruct_variable_name($variable); 
+    return *{$self->namespace->{$name}}{$type}
+        if exists $self->namespace->{$name};
+    # NOTE: 
+    # we have to do this here in order to preserve 
+    # perl's autovivification of variables. However 
+    # we do cut off direct access to add_package_symbol
+    # as shown above.
+    $self->Class::MOP::Package::add_package_symbol($variable);
+}
 
 # NOTE:
 # superclasses is an accessor, so 
@@ -73,6 +103,9 @@ sub make_metaclass_immutable {
             )            
         );
     }
+    
+    # now cache the method map ...
+    $metaclass->{'___method_map'} = $metaclass->get_method_map;
           
     bless $metaclass => $class;
 }
@@ -135,6 +168,7 @@ sub get_meta_instance                 {   (shift)->{'___get_meta_instance'}     
 sub class_precedence_list             { @{(shift)->{'___class_precedence_list'}}             }
 sub compute_all_applicable_attributes { @{(shift)->{'___compute_all_applicable_attributes'}} }
 sub get_mutable_metaclass_name        {   (shift)->{'___original_class'}                     }
+sub get_method_map                    {   (shift)->{'___method_map'}                         }
 
 1;
 
@@ -245,7 +279,20 @@ to this method, which
 
 =item B<remove_package_symbol>
 
+=back
+
+=head2 Methods which work slightly differently.
+
+=over 4
+
 =item B<superclasses>
+
+This method becomes read-only in an immutable class.
+
+=item B<get_package_symbol>
+
+This method must handle package variable autovivification 
+correctly, while still disallowing C<add_package_symbol>.
 
 =back
 
@@ -258,6 +305,8 @@ to this method, which
 =item B<compute_all_applicable_attributes>
 
 =item B<get_meta_instance>
+
+=item B<get_method_map>
 
 =back
 

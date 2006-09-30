@@ -13,7 +13,7 @@ use Class::MOP::Method;
 
 use Class::MOP::Class::Immutable;
 
-our $VERSION   = '0.34';
+our $VERSION   = '0.35';
 our $AUTHORITY = 'cpan:STEVAN';
 
 {
@@ -74,7 +74,10 @@ Class::MOP::Package->meta->add_attribute(
             # NOTE: we need to do this in order 
             # for the instance meta-object to 
             # not fall into meta-circular death
-            'name' => sub { (shift)->{'$:package'} }
+            # 
+            # we just alias the original method
+            # rather than re-produce it here            
+            'name' => \&Class::MOP::Package::name
         },
         init_arg => ':package',
     ))
@@ -84,16 +87,9 @@ Class::MOP::Package->meta->add_attribute(
     Class::MOP::Attribute->new('%:namespace' => (
         reader => {
             # NOTE:
-            # because of issues with the Perl API 
-            # to the typeglob in some versions, we 
-            # need to just always grab a new 
-            # reference to the hash here. Ideally 
-            # we could just store a ref and it would
-            # Just Work, but oh well :\
-            'namespace' => sub { 
-                no strict 'refs';
-                \%{$_[0]->name . '::'} 
-            }
+            # we just alias the original method
+            # rather than re-produce it here
+            'namespace' => \&Class::MOP::Package::namespace
         },
         # NOTE:
         # protect this from silliness 
@@ -127,10 +123,10 @@ Class::MOP::Package->meta->add_method('initialize' => sub {
 Class::MOP::Module->meta->add_attribute(
     Class::MOP::Attribute->new('$:version' => (
         reader => {
-            'version' => sub {  
-                my $self = shift;
-                ${$self->get_package_symbol('$VERSION')};
-            }
+            # NOTE:
+            # we just alias the original method
+            # rather than re-produce it here            
+            'version' => \&Class::MOP::Module::version
         },
         # NOTE:
         # protect this from silliness 
@@ -148,10 +144,10 @@ Class::MOP::Module->meta->add_attribute(
 Class::MOP::Module->meta->add_attribute(
     Class::MOP::Attribute->new('$:authority' => (
         reader => {
-            'authority' => sub {  
-                my $self = shift;
-                ${$self->get_package_symbol('$AUTHORITY')};
-            }
+            # NOTE:
+            # we just alias the original method
+            # rather than re-produce it here            
+            'authority' => \&Class::MOP::Module::authority
         },       
         # NOTE:
         # protect this from silliness 
@@ -168,8 +164,11 @@ Class::MOP::Class->meta->add_attribute(
         reader   => {
             # NOTE: we need to do this in order 
             # for the instance meta-object to 
-            # not fall into meta-circular death            
-            'get_attribute_map' => sub { (shift)->{'%:attributes'} }
+            # not fall into meta-circular death       
+            # 
+            # we just alias the original method
+            # rather than re-produce it here                 
+            'get_attribute_map' => \&Class::MOP::Class::get_attribute_map
         },
         init_arg => ':attributes',
         default  => sub { {} }
@@ -180,32 +179,22 @@ Class::MOP::Class->meta->add_attribute(
     Class::MOP::Attribute->new('%:methods' => (
         reader   => {          
             # NOTE:
-            # as with the $VERSION and $AUTHORITY above
-            # sometimes we don't/can't store directly 
-            # inside the instance, so we need the accessor
-            # to just DWIM
-            'get_method_map' => sub {
-                my $self = shift;
-                # FIXME:
-                # there is a faster/better way 
-                # to do this, I am sure :)
-                return +{ 
-                    map {
-                        $_ => $self->get_method($_) 
-                    } grep { 
-                        $self->has_method($_) 
-                    } $self->list_all_package_symbols
-                };            
-            }
+            # we just alias the original method
+            # rather than re-produce it here            
+            'get_method_map' => \&Class::MOP::Class::get_method_map
         },
-        init_arg => '!............( DO NOT DO THIS )............!',
-        default  => sub { \undef }
+        default => sub { {} }
     ))
 );
 
 Class::MOP::Class->meta->add_attribute(
     Class::MOP::Attribute->new('$:attribute_metaclass' => (
-        reader   => 'attribute_metaclass',
+        reader   => {          
+            # NOTE:
+            # we just alias the original method
+            # rather than re-produce it here            
+            'attribute_metaclass' => \&Class::MOP::Class::attribute_metaclass
+        },        
         init_arg => ':attribute_metaclass',
         default  => 'Class::MOP::Attribute',
     ))
@@ -213,7 +202,12 @@ Class::MOP::Class->meta->add_attribute(
 
 Class::MOP::Class->meta->add_attribute(
     Class::MOP::Attribute->new('$:method_metaclass' => (
-        reader   => 'method_metaclass',
+        reader   => {          
+            # NOTE:
+            # we just alias the original method
+            # rather than re-produce it here            
+            'method_metaclass' => \&Class::MOP::Class::method_metaclass
+        },
         init_arg => ':method_metaclass',
         default  => 'Class::MOP::Method',        
     ))
@@ -224,8 +218,11 @@ Class::MOP::Class->meta->add_attribute(
         reader   => {
             # NOTE: we need to do this in order 
             # for the instance meta-object to 
-            # not fall into meta-circular death            
-            'instance_metaclass' => sub { (shift)->{'$:instance_metaclass'} }
+            # not fall into meta-circular death      
+            # 
+            # we just alias the original method
+            # rather than re-produce it here                  
+            'instance_metaclass' => \&Class::MOP::Class::instance_metaclass
         },
         init_arg => ':instance_metaclass',
         default  => 'Class::MOP::Instance',        
@@ -246,8 +243,11 @@ Class::MOP::Attribute->meta->add_attribute(
         reader => {
             # NOTE: we need to do this in order 
             # for the instance meta-object to 
-            # not fall into meta-circular death            
-            'name' => sub { (shift)->{name} }
+            # not fall into meta-circular death    
+            # 
+            # we just alias the original method
+            # rather than re-produce it here                    
+            'name' => \&Class::MOP::Attribute::name
         }
     ))
 );
@@ -257,58 +257,61 @@ Class::MOP::Attribute->meta->add_attribute(
         reader => {
             # NOTE: we need to do this in order 
             # for the instance meta-object to 
-            # not fall into meta-circular death            
-            'associated_class' => sub { (shift)->{associated_class} }
+            # not fall into meta-circular death       
+            # 
+            # we just alias the original method
+            # rather than re-produce it here                 
+            'associated_class' => \&Class::MOP::Attribute::associated_class
         }
     ))
 );
 
 Class::MOP::Attribute->meta->add_attribute(
     Class::MOP::Attribute->new('accessor' => (
-        reader    => 'accessor',
-        predicate => 'has_accessor',
+        reader    => { 'accessor'     => \&Class::MOP::Attribute::accessor     },
+        predicate => { 'has_accessor' => \&Class::MOP::Attribute::has_accessor },
     ))
 );
 
 Class::MOP::Attribute->meta->add_attribute(
     Class::MOP::Attribute->new('reader' => (
-        reader    => 'reader',
-        predicate => 'has_reader',
+        reader    => { 'reader'     => \&Class::MOP::Attribute::reader     },
+        predicate => { 'has_reader' => \&Class::MOP::Attribute::has_reader },
     ))
 );
 
 Class::MOP::Attribute->meta->add_attribute(
     Class::MOP::Attribute->new('writer' => (
-        reader    => 'writer',
-        predicate => 'has_writer',
+        reader    => { 'writer'     => \&Class::MOP::Attribute::writer     },
+        predicate => { 'has_writer' => \&Class::MOP::Attribute::has_writer },
     ))
 );
 
 Class::MOP::Attribute->meta->add_attribute(
     Class::MOP::Attribute->new('predicate' => (
-        reader    => 'predicate',
-        predicate => 'has_predicate',
+        reader    => { 'predicate'     => \&Class::MOP::Attribute::predicate     },
+        predicate => { 'has_predicate' => \&Class::MOP::Attribute::has_predicate },
     ))
 );
 
 Class::MOP::Attribute->meta->add_attribute(
     Class::MOP::Attribute->new('clearer' => (
-        reader    => 'clearer',
-        predicate => 'has_clearer',
+        reader    => { 'clearer'     => \&Class::MOP::Attribute::clearer     },
+        predicate => { 'has_clearer' => \&Class::MOP::Attribute::has_clearer },
     ))
 );
 
 Class::MOP::Attribute->meta->add_attribute(
     Class::MOP::Attribute->new('init_arg' => (
-        reader    => 'init_arg',
-        predicate => 'has_init_arg',
+        reader    => { 'init_arg'     => \&Class::MOP::Attribute::init_arg     },
+        predicate => { 'has_init_arg' => \&Class::MOP::Attribute::has_init_arg },
     ))
 );
 
 Class::MOP::Attribute->meta->add_attribute(
     Class::MOP::Attribute->new('default' => (
         # default has a custom 'reader' method ...
-        predicate => 'has_default',
+        predicate => { 'has_default' => \&Class::MOP::Attribute::has_default },        
     ))
 );
 
@@ -343,15 +346,68 @@ Class::MOP::Attribute->meta->add_method('clone' => sub {
 });
 
 ## --------------------------------------------------------
+## Class::MOP::Method
+
+Class::MOP::Method->meta->add_attribute(
+    Class::MOP::Attribute->new('body' => (
+        reader => { 'body' => \&Class::MOP::Method::body },
+    ))
+);
+
+## --------------------------------------------------------
+## Class::MOP::Method::Wrapped
+
+# NOTE:
+# the way this item is initialized, this 
+# really does not follow the standard 
+# practices of attributes, but we put 
+# it here for completeness
+Class::MOP::Method::Wrapped->meta->add_attribute(
+    Class::MOP::Attribute->new('modifier_table')
+);
+
+## --------------------------------------------------------
+## Class::MOP::Instance
+
+# NOTE:
+# these don't yet do much of anything, but are just 
+# included for completeness
+
+Class::MOP::Instance->meta->add_attribute(
+    Class::MOP::Attribute->new('meta')
+);
+
+Class::MOP::Instance->meta->add_attribute(
+    Class::MOP::Attribute->new('slots')
+);
+
+## --------------------------------------------------------
 ## Now close all the Class::MOP::* classes
 
-Class::MOP::Package  ->meta->make_immutable(inline_constructor => 0);
-Class::MOP::Module   ->meta->make_immutable(inline_constructor => 0);
-Class::MOP::Class    ->meta->make_immutable(inline_constructor => 0);
-Class::MOP::Attribute->meta->make_immutable(inline_constructor => 0);
-Class::MOP::Method   ->meta->make_immutable(inline_constructor => 0);
-Class::MOP::Instance ->meta->make_immutable(inline_constructor => 0);
-Class::MOP::Object   ->meta->make_immutable(inline_constructor => 0);
+# NOTE:
+# we don't need to inline the 
+# constructors or the accessors 
+# this only lengthens the compile 
+# time of the MOP, and gives us 
+# no actual benefits.
+
+$_->meta->make_immutable(
+    inline_constructor => 0,
+    inline_accessors   => 0,
+) for qw/
+    Class::MOP::Package  
+    Class::MOP::Module   
+    Class::MOP::Class    
+    
+    Class::MOP::Attribute
+    Class::MOP::Method   
+    Class::MOP::Instance 
+    
+    Class::MOP::Object   
+
+    Class::MOP::Attribute::Accessor
+    Class::MOP::Method::Wrapped    
+/;
 
 1;
 
@@ -627,6 +683,16 @@ L<http://citeseer.ist.psu.edu/37617.html>
 
 =back
 
+=head2 Article 
+
+=over 4
+
+=item CPAN Module Review of Class::MOP 
+
+L<http://www.oreillynet.com/onlamp/blog/2006/06/cpan_module_review_classmop.html>
+
+=back
+
 =head1 SIMILAR MODULES
 
 As I have said above, this module is a class-builder-builder, so it is 
@@ -650,18 +716,18 @@ L<Devel::Cover> report on this module's test suite.
  ---------------------------- ------ ------ ------ ------ ------ ------ ------
  File                           stmt   bran   cond    sub    pod   time  total
  ---------------------------- ------ ------ ------ ------ ------ ------ ------
- Class/MOP.pm                   78.0   87.5   55.6   71.4  100.0   12.4   76.8
- Class/MOP/Attribute.pm         83.4   75.6   86.7   94.4  100.0    8.9   85.2
- Class/MOP/Class.pm             96.9   75.8   43.2   98.0  100.0   55.3   83.6
- Class/MOP/Class/Immutable.pm   88.5   53.8    n/a   95.8  100.0    1.1   84.7
- Class/MOP/Instance.pm          87.9   75.0   33.3   89.7  100.0   10.1   89.1
- Class/MOP/Method.pm            97.6   60.0   57.9   76.9  100.0    1.5   82.8
- Class/MOP/Module.pm            87.5    n/a   11.1   83.3  100.0    0.3   66.7
- Class/MOP/Object.pm           100.0    n/a   33.3  100.0  100.0    0.1   89.5
- Class/MOP/Package.pm           95.1   69.0   33.3  100.0  100.0    9.9   85.5
- metaclass.pm                  100.0  100.0   83.3  100.0    n/a    0.5   97.7
+ Class/MOP.pm                   97.7  100.0   88.9   94.7  100.0    3.2   96.6
+ Class/MOP/Attribute.pm         75.5   77.9   82.4   88.3  100.0    4.0   81.5
+ Class/MOP/Class.pm             96.9   88.8   72.1   98.2  100.0   35.8   91.4
+ Class/MOP/Class/Immutable.pm   88.2   60.0    n/a   95.5  100.0    0.5   84.6
+ Class/MOP/Instance.pm          86.4   75.0   33.3   86.2  100.0    1.2   87.5
+ Class/MOP/Method.pm            97.5   75.0   61.5   80.6  100.0   12.7   89.7
+ Class/MOP/Module.pm           100.0    n/a   55.6  100.0  100.0    0.1   90.7
+ Class/MOP/Object.pm            73.3    n/a   20.0   80.0  100.0    0.1   66.7
+ Class/MOP/Package.pm           94.6   71.7   33.3  100.0  100.0   42.2   87.0
+ metaclass.pm                  100.0  100.0   83.3  100.0    n/a    0.2   97.7
  ---------------------------- ------ ------ ------ ------ ------ ------ ------
- Total                          91.5   72.1   48.8   90.7  100.0  100.0   84.2
+ Total                          91.3   80.4   69.8   91.9  100.0  100.0   88.1
  ---------------------------- ------ ------ ------ ------ ------ ------ ------
 
 =head1 ACKNOWLEDGEMENTS

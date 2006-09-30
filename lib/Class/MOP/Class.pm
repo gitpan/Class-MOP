@@ -9,7 +9,7 @@ use Scalar::Util 'blessed', 'reftype', 'weaken';
 use Sub::Name    'subname';
 use B            'svref_2object';
 
-our $VERSION   = '0.19';
+our $VERSION   = '0.20';
 our $AUTHORITY = 'cpan:STEVAN';
 
 use base 'Class::MOP::Module';
@@ -91,8 +91,8 @@ sub construct_class_instance {
             '$:version'             => \undef,
             '$:authority'           => \undef,
             # defined in Class::MOP::Class
-            '%:methods'             => \undef,
             
+            '%:methods'             => {},
             '%:attributes'          => {},            
             '$:attribute_metaclass' => $options{':attribute_metaclass'} || 'Class::MOP::Attribute',
             '$:method_metaclass'    => $options{':method_metaclass'}    || 'Class::MOP::Method',
@@ -262,18 +262,30 @@ sub attribute_metaclass { $_[0]->{'$:attribute_metaclass'} }
 sub method_metaclass    { $_[0]->{'$:method_metaclass'}    }
 sub instance_metaclass  { $_[0]->{'$:instance_metaclass'}  }
 
-sub get_method_map {
+# FIXME:
+# this is a prime canidate for conversion to XS
+sub get_method_map {    
     my $self = shift;
-    # FIXME:
-    # there is a faster/better way 
-    # to do this, I am sure :)    
-    return +{ 
-        map {
-            $_ => $self->get_method($_) 
-        } grep { 
-            $self->has_method($_) 
-        } $self->list_all_package_symbols
-    };
+    my $map  = $self->{'%:methods'}; 
+    
+    my $class_name       = $self->name;
+    my $method_metaclass = $self->method_metaclass;
+    
+    foreach my $symbol ($self->list_all_package_symbols('CODE')) {
+        my $code = $self->get_package_symbol('&' . $symbol);
+        
+        next if exists  $map->{$symbol} && 
+                defined $map->{$symbol} && 
+                        $map->{$symbol}->body == $code;        
+        
+        my $gv = svref_2object($code)->GV;
+        next if ($gv->STASH->NAME || '') ne $class_name &&
+                ($gv->NAME        || '') ne '__ANON__';        
+        
+        $map->{$symbol} = $method_metaclass->wrap($code);
+    }
+    
+    return $map;
 }
 
 # Instance Construction & Cloning
@@ -375,16 +387,21 @@ sub add_method {
     my ($self, $method_name, $method) = @_;
     (defined $method_name && $method_name)
         || confess "You must define a method name";
-    # use reftype here to allow for blessed subs ...
-    ('CODE' eq (reftype($method) || ''))
-        || confess "Your code block must be a CODE reference";
-    my $full_method_name = ($self->name . '::' . $method_name);    
-
-    # FIXME:
-    # dont bless subs, its bad mkay
-    $method = $self->method_metaclass->wrap($method) unless blessed($method);
     
-    $self->add_package_symbol("&${method_name}" => subname $full_method_name => $method);
+    my $body;
+    if (blessed($method)) {
+        $body = $method->body;           
+    }
+    else {        
+        $body = $method;
+        ('CODE' eq (reftype($body) || ''))
+            || confess "Your code block must be a CODE reference";        
+        $method = $self->method_metaclass->wrap($body);        
+    }
+    $self->get_method_map->{$method_name} = $method;
+    
+    my $full_method_name = ($self->name . '::' . $method_name);        
+    $self->add_package_symbol("&${method_name}" => subname $full_method_name => $body);
 }
 
 {
@@ -398,7 +415,7 @@ sub add_method {
             $method = $self->find_next_method_by_name($method_name);
             # die if it does not exist
             (defined $method)
-                || confess "The method '$method_name' is not found in the inherience hierarchy for this class";
+                || confess "The method '$method_name' is not found in the inherience hierarchy for class " . $self->name;
             # and now make sure to wrap it 
             # even if it is already wrapped
             # because we need a new sub ref
@@ -455,20 +472,12 @@ sub alias_method {
     my ($self, $method_name, $method) = @_;
     (defined $method_name && $method_name)
         || confess "You must define a method name";
-    # use reftype here to allow for blessed subs ...
-    ('CODE' eq (reftype($method) || ''))
-        || confess "Your code block must be a CODE reference";
 
-    # FIXME:
-    # dont bless subs, its bad mkay
-    $method = $self->method_metaclass->wrap($method) unless blessed($method);    
+    my $body = (blessed($method) ? $method->body : $method);
+    ('CODE' eq (reftype($body) || ''))
+        || confess "Your code block must be a CODE reference";        
         
-    $self->add_package_symbol("&${method_name}" => $method);
-}
-
-sub find_method_by_name {
-    my ($self, $method_name) = @_;
-    return $self->name->can($method_name);
+    $self->add_package_symbol("&${method_name}" => $body);
 }
 
 sub has_method {
@@ -476,15 +485,7 @@ sub has_method {
     (defined $method_name && $method_name)
         || confess "You must define a method name";    
     
-    return 0 if !$self->has_package_symbol("&${method_name}");        
-    my $method = $self->get_package_symbol("&${method_name}");
-    return 0 if (svref_2object($method)->GV->STASH->NAME || '') ne $self->name &&
-                (svref_2object($method)->GV->NAME || '')        ne '__ANON__';      
-
-    # FIXME:
-    # dont bless subs, its bad mkay
-    $self->method_metaclass->wrap($method) unless blessed($method);
-    
+    return 0 unless exists $self->get_method_map->{$method_name};    
     return 1;
 }
 
@@ -492,10 +493,14 @@ sub get_method {
     my ($self, $method_name) = @_;
     (defined $method_name && $method_name)
         || confess "You must define a method name";
-
-    return unless $self->has_method($method_name);
+     
+    # NOTE:
+    # I don't really need this here, because
+    # if the method_map is missing a key it 
+    # will just return undef for me now
+    # return unless $self->has_method($method_name);
  
-    return $self->get_package_symbol("&${method_name}");
+    return $self->get_method_map->{$method_name};
 }
 
 sub remove_method {
@@ -505,15 +510,38 @@ sub remove_method {
     
     my $removed_method = $self->get_method($method_name);    
     
-    $self->remove_package_symbol("&${method_name}")
-        if defined $removed_method;
+    do { 
+        $self->remove_package_symbol("&${method_name}");
+        delete $self->get_method_map->{$method_name};
+    } if defined $removed_method;
         
     return $removed_method;
 }
 
 sub get_method_list {
     my $self = shift;
-    grep { $self->has_method($_) } $self->list_all_package_symbols;
+    keys %{$self->get_method_map};
+}
+
+sub find_method_by_name {
+    my ($self, $method_name) = @_;
+    (defined $method_name && $method_name)
+        || confess "You must define a method name to find"; 
+    # keep a record of what we have seen
+    # here, this will handle all the 
+    # inheritence issues because we are 
+    # using the &class_precedence_list
+    my %seen_class;
+    my @cpl = $self->class_precedence_list();
+    foreach my $class (@cpl) {
+        next if $seen_class{$class};
+        $seen_class{$class}++;
+        # fetch the meta-class ...
+        my $meta = $self->initialize($class);
+        return $meta->get_method($method_name) 
+            if $meta->has_method($method_name);
+    }
+    return;
 }
 
 sub compute_all_applicable_methods {
@@ -598,7 +626,20 @@ sub add_attribute {
     # make sure it is derived from the correct type though
     ($attribute->isa('Class::MOP::Attribute'))
         || confess "Your attribute must be an instance of Class::MOP::Attribute (or a subclass)";    
+
+    # first we attach our new attribute
+    # because it might need certain information 
+    # about the class which it is attached to
     $attribute->attach_to_class($self);
+    
+    # then we remove attributes of a conflicting 
+    # name here so that we can properly detach 
+    # the old attr object, and remove any 
+    # accessors it would have generated
+    $self->remove_attribute($attribute->name)
+        if $self->has_attribute($attribute->name);
+        
+    # then onto installing the new accessors
     $attribute->install_accessors();
     $self->get_attribute_map->{$attribute->name} = $attribute;
 }
@@ -615,8 +656,10 @@ sub get_attribute {
     (defined $attribute_name && $attribute_name)
         || confess "You must define an attribute name";
     return $self->get_attribute_map->{$attribute_name} 
-        if $self->has_attribute($attribute_name);   
-    return; 
+    # NOTE:
+    # this will return undef anyway, so no need ...
+    #    if $self->has_attribute($attribute_name);   
+    #return; 
 } 
 
 sub remove_attribute {
@@ -983,8 +1026,11 @@ C<$method_name> is actually a method. However, it will DWIM about
 
 =item B<get_method ($method_name)>
 
-This will return a CODE reference of the specified C<$method_name>, 
-or return undef if that method does not exist.
+This will return a Class::MOP::Method instance related to the specified 
+C<$method_name>, or return undef if that method does not exist.
+
+The Class::MOP::Method is codifiable, so you can use it like a normal 
+CODE reference, see L<Class::MOP::Method> for more information.
 
 =item B<find_method_by_name ($method_name>
 
@@ -1161,6 +1207,11 @@ section.
 It should be noted that any accessor, reader/writer or predicate 
 methods which the C<$attribute_meta_object> has will be installed 
 into the class at this time.
+
+B<NOTE>
+If an attribute already exists for C<$attribute_name>, the old one 
+will be removed (as well as removing all it's accessors), and then 
+the new one added.
 
 =item B<has_attribute ($attribute_name)>
 

@@ -10,6 +10,8 @@ use Scalar::Util 'blessed', 'reftype', 'weaken';
 our $VERSION   = '0.12';
 our $AUTHORITY = 'cpan:STEVAN';
 
+use base 'Class::MOP::Object';
+
 sub meta { 
     require Class::MOP::Class;
     Class::MOP::Class->initialize(blessed($_[0]) || $_[0]);
@@ -31,6 +33,7 @@ sub new {
         
     (defined $name && $name)
         || confess "You must provide a name for the attribute";
+        
     $options{init_arg} = $name 
         if not exists $options{init_arg};
             
@@ -349,9 +352,10 @@ use warnings;
 
 use Class::MOP::Method;
 
-our $VERSION = '0.01';
+our $VERSION   = '0.02';
+our $AUTHORITY = 'cpan:STEVAN';
 
-our @ISA = ('Class::MOP::Method');
+use base 'Class::MOP::Method';
 
 1;
 
