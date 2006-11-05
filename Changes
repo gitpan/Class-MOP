@@ -1,5 +1,34 @@
 Revision history for Perl extension Class-MOP.
 
+0.36 Sun. Nov. 5, 2006
+    * Class::MOP::Class
+      - added a few 'no warnings' lines to keep annoying 
+        (and meaningless) warnings from chirping during 
+        global destruction.
+          
+    * Class::MOP
+      - some more bootstrapping is now done on the new 
+        classes
+    
+    * Class::MOP::Class::Immutable
+      *** API CHANGE ***    
+      - constructor generation is now handled by 
+        the Class::MOP::Method::Constructor class
+     
+    * Class::MOP::Method::Constructor
+      - created this to handle constructor generation 
+        in Class::MOP::Class::Immutable
+    
+    * Class::MOP::Attribute
+      *** API CHANGE ***    
+      - attributes now delegate to the 
+        Class::MOP::Method::Accessor to generate 
+        accessors
+    
+    * Class::MOP::Method::Accessor
+      - all accessor generation functions from 
+        Class::MOP::Attribute have been moved here
+
 0.35 Sat. Sept. 30, 2006
 
     * scripts/class_browser.pl

@@ -1,6 +1,6 @@
 ---
 name: Class-MOP
-version: 0.35
+version: 0.36
 author:
   - 'Stevan Little E<lt>stevan@iinteractive.comE<gt>'
   - 'Yuval Kogman E<lt>nothingmuch@woobling.comE<gt>'
@@ -20,27 +20,30 @@ build_requires:
 provides:
   Class::MOP:
     file: lib/Class/MOP.pm
-    version: 0.35
+    version: 0.36
   Class::MOP::Attribute:
     file: lib/Class/MOP/Attribute.pm
-    version: 0.12
-  Class::MOP::Attribute::Accessor:
-    file: lib/Class/MOP/Attribute.pm
-    version: 0.02
+    version: 0.13
   Class::MOP::Class:
     file: lib/Class/MOP/Class.pm
-    version: 0.20
+    version: 0.21
   Class::MOP::Class::Immutable:
     file: lib/Class/MOP/Class/Immutable.pm
-    version: 0.03
+    version: 0.04
   Class::MOP::Instance:
     file: lib/Class/MOP/Instance.pm
     version: 0.03
   Class::MOP::Method:
     file: lib/Class/MOP/Method.pm
-    version: 0.04
+    version: 0.05
+  Class::MOP::Method::Accessor:
+    file: lib/Class/MOP/Method/Accessor.pm
+    version: 0.01
+  Class::MOP::Method::Constructor:
+    file: lib/Class/MOP/Method/Constructor.pm
+    version: 0.01
   Class::MOP::Method::Wrapped:
-    file: lib/Class/MOP/Method.pm
+    file: lib/Class/MOP/Method/Wrapped.pm
     version: 0.02
   Class::MOP::Module:
     file: lib/Class/MOP/Module.pm
