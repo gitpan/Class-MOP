@@ -69,7 +69,7 @@ package for the given instance.
 
 =item B<identifier>
 
-This constructs a string of the name, version and authrity.
+This constructs a string of the name, version and authority.
 
 =back
 
@@ -81,7 +81,7 @@ Yuval Kogman E<lt>nothingmuch@woobling.comE<gt>
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright 2006 by Infinity Interactive, Inc.
+Copyright 2006, 2007 by Infinity Interactive, Inc.
 
 L<http://www.iinteractive.com>
 

@@ -1,5 +1,16 @@
 Revision history for Perl extension Class-MOP.
 
+0.37 Sat. March 10, 2007
+    ~~ Many, many documentation updates ~~
+    
+    * Class::MOP
+      - added &load_class and &is_class_loaded 
+        - added tests and docs for these
+
+    * Class::MOP::Attribute
+      - default now checks the instance with defined to 
+        avoid setting off bool-overloads (found by Carl Franks)
+
 0.37_002
     * /t 
       - bad name in a test, causing meaningless failuress. 

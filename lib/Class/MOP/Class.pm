@@ -975,9 +975,15 @@ These are a few predicate methods for asking information about the class.
 
 =item B<is_anon_class>
 
+This returns true if the class is a C<Class::MOP::Class> created anon class.
+
 =item B<is_mutable>
 
+This returns true if the class is still mutable.
+
 =item B<is_immutable>
+
+This returns true if the class has been made immutable.
 
 =back
 
@@ -1228,13 +1234,13 @@ their own. See L<Class::MOP::Attribute> for more details.
 
 =item B<get_attribute_map>
 
-=item B<add_attribute ($attribute_name, $attribute_meta_object)>
+=item B<add_attribute ($attribute_meta_object | $attribute_name, %attribute_spec)>
 
-This stores a C<$attribute_meta_object> in the B<Class::MOP::Class> 
-instance associated with the given class, and associates it with 
-the C<$attribute_name>. Unlike methods, attributes within the MOP 
-are stored as meta-information only. They will be used later to 
-construct instances from (see C<construct_instance> above).
+This stores the C<$attribute_meta_object> (or creates one from the
+C<$attribute_name> and C<%attribute_spec>) in the B<Class::MOP::Class> 
+instance associated with the given class. Unlike methods, attributes 
+within the MOP are stored as meta-information only. They will be used 
+later to construct instances from (see C<construct_instance> above).
 More details about the attribute meta-objects can be found in the 
 L<Class::MOP::Attribute> or the L<Class::MOP/The Attribute protocol>
 section.
@@ -1297,11 +1303,15 @@ It will return undef if nothing is found.
 
 =back
 
-=head2 Class closing
+=head2 Class Immutability
 
 =over 4
 
-=item B<make_immutable>
+=item B<make_immutable (%options)>
+
+This method will invoke a tranforamtion upon the class which will 
+make it immutable. Details of this transformation can be found in 
+the L<Class::MOP::Immutable> documentation.
 
 =back
 
@@ -1313,7 +1323,7 @@ Yuval Kogman E<lt>nothingmuch@woobling.comE<gt>
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright 2006 by Infinity Interactive, Inc.
+Copyright 2006, 2007 by Infinity Interactive, Inc.
 
 L<http://www.iinteractive.com>
 

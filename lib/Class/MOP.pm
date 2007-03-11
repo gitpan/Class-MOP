@@ -13,7 +13,7 @@ use Class::MOP::Method;
 
 use Class::MOP::Immutable;
 
-our $VERSION   = '0.37_002';
+our $VERSION   = '0.37';
 our $AUTHORITY = 'cpan:STEVAN';
 
 {
@@ -40,6 +40,35 @@ our $AUTHORITY = 'cpan:STEVAN';
     # Class::MOP::Package or Class::MOP::Module. Mostly
     # because I don't yet see a good reason to do so.        
 }
+
+sub load_class {
+    my $class = shift;
+    # see if this is already 
+    # loaded in the symbol table
+    return 1 if is_class_loaded($class);
+    # otherwise require it ...
+    my $file = $class . '.pm';
+    $file =~ s{::}{/}g;
+    eval { CORE::require($file) };
+    confess "Could not load class ($class) because : $@" if $@;
+    unless (does_metaclass_exist($class)) {
+        eval { Class::MOP::Class->initialize($class) };
+        confess "Could not initialize class ($class) because : $@" if $@;        
+    }
+    1; # return true if it worked
+}
+
+sub is_class_loaded {
+	my $class = shift;
+	no strict 'refs';
+	return 1 if defined ${"${class}::VERSION"} || defined @{"${class}::ISA"};
+	foreach (keys %{"${class}::"}) {
+		next if substr($_, -2, 2) eq '::';
+		return 1 if defined &{"${class}::$_"};
+	}
+	return 0;
+}
+
 
 ## ----------------------------------------------------------------------------
 ## Setting up our environment ...
@@ -500,11 +529,6 @@ __END__
 
 Class::MOP - A Meta Object Protocol for Perl 5
 
-=head1 SYNOPSIS
-
-  # ... This will come later, for now see
-  # the other SYNOPSIS for more information
-
 =head1 DESCRIPTON
 
 This module is an attempt to create a meta object protocol for the 
@@ -670,6 +694,28 @@ See L<Class::MOP::Method> for more details.
 
 =head1 FUNCTIONS
 
+=head2 Utility functions
+
+=over 4
+
+=item B<load_class ($class_name)>
+
+This will load a given C<$class_name> and if it does not have an 
+already initialized metaclass, then it will intialize one for it.
+
+=item B<is_class_loaded ($class_name)>
+
+This will return a boolean depending on if the C<$class_name> has 
+been loaded. 
+
+NOTE: This does a basic check of the symbol table to try and 
+determine as best it can if the C<$class_name> is loaded, it
+is probably correct about 99% of the time. 
+
+=back
+
+=head2 Metaclass cache functions
+
 Class::MOP holds a cache of metaclasses, the following are functions 
 (B<not methods>) which can be used to access that cache. It is not 
 recommended that you mess with this, bad things could happen. But if 
@@ -764,7 +810,7 @@ L<http://citeseer.ist.psu.edu/37617.html>
 
 =back
 
-=head2 Article 
+=head2 Articles 
 
 =over 4
 
@@ -829,7 +875,7 @@ Yuval Kogman E<lt>nothingmuch@woobling.comE<gt>
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright 2006 by Infinity Interactive, Inc.
+Copyright 2006, 2007 by Infinity Interactive, Inc.
 
 L<http://www.iinteractive.com>
 

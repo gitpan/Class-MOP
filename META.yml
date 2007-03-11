@@ -1,6 +1,6 @@
 ---
 name: Class-MOP
-version: 0.37_002
+version: 0.37
 author:
   - 'Stevan Little E<lt>stevan@iinteractive.comE<gt>'
   - 'Yuval Kogman E<lt>nothingmuch@woobling.comE<gt>'
@@ -20,7 +20,7 @@ build_requires:
 provides:
   Class::MOP:
     file: lib/Class/MOP.pm
-    version: 0.37_002
+    version: 0.37
   Class::MOP::Attribute:
     file: lib/Class/MOP/Attribute.pm
     version: 0.14
