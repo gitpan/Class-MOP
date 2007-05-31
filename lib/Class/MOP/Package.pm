@@ -7,7 +7,7 @@ use warnings;
 use Scalar::Util 'blessed';
 use Carp         'confess';
 
-our $VERSION   = '0.05';
+our $VERSION   = '0.06';
 our $AUTHORITY = 'cpan:STEVAN';
 
 use base 'Class::MOP::Object';
@@ -195,6 +195,8 @@ sub list_all_package_symbols {
     my $namespace = $self->namespace;
     return grep { 
         defined(*{$namespace->{$_}}{$type_filter}) 
+    } grep {
+        ref(\$namespace->{$_}) eq 'GLOB'   
     } keys %{$namespace};
 }
 
@@ -271,8 +273,6 @@ which match the filter (either SCALAR, ARRAY, HASH or CODE).
 =head1 AUTHORS
 
 Stevan Little E<lt>stevan@iinteractive.comE<gt>
-
-Yuval Kogman E<lt>nothingmuch@woobling.comE<gt>
 
 =head1 COPYRIGHT AND LICENSE
 

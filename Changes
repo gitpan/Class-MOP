@@ -1,5 +1,36 @@
 Revision history for Perl extension Class-MOP.
 
+0.38 Thurs. May 31, 2007
+    ~~ More documentation updates ~~
+    
+    * Class::MOP::Package
+      - we now deal with stub methods properly
+        - added tests for this
+      - fixed some tests failing on 5.9.5 (thanks blblack)
+        
+    * Class::MOP::Attribute
+      - added get_read_method and get_write_method
+        thanks to groditi for this code, tests 
+        and docs.
+        - added tests and POD for this
+    
+    * Class::MOP::Class
+      - fixed RT issue #27329, clone object now 
+        handles undef values correctly.
+        - added tests for this
+      - Corrected anon-class handling so that they 
+        will not get reaped when instances still 
+        exist which need to reference them. This is 
+        the correct behavior, hopefully this is an 
+        obscure enough feature that there are not too 
+        many work arounds out in the wild.
+        - added tests for this by groditi   
+        - updated docs to explain this
+
+    * metaclass
+      - load custom metaclasses automatically (thanks groditi)
+        - added tests for this behavior
+
 0.37 Sat. March 10, 2007
     ~~ Many, many documentation updates ~~
     

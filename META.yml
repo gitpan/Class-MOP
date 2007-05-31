@@ -1,9 +1,8 @@
 ---
 name: Class-MOP
-version: 0.37
+version: 0.38
 author:
   - 'Stevan Little E<lt>stevan@iinteractive.comE<gt>'
-  - 'Yuval Kogman E<lt>nothingmuch@woobling.comE<gt>'
 abstract: A Meta Object Protocol for Perl 5
 license: perl
 resources:
@@ -20,13 +19,13 @@ build_requires:
 provides:
   Class::MOP:
     file: lib/Class/MOP.pm
-    version: 0.37
+    version: 0.38
   Class::MOP::Attribute:
     file: lib/Class/MOP/Attribute.pm
-    version: 0.14
+    version: 0.15
   Class::MOP::Class:
     file: lib/Class/MOP/Class.pm
-    version: 0.21
+    version: 0.22
   Class::MOP::Immutable:
     file: lib/Class/MOP/Immutable.pm
     version: 0.01
@@ -53,10 +52,10 @@ provides:
     version: 0.02
   Class::MOP::Package:
     file: lib/Class/MOP/Package.pm
-    version: 0.05
+    version: 0.06
   metaclass:
     file: lib/metaclass.pm
-    version: 0.03
+    version: 0.04
 generated_by: Module::Build version 0.2805
 meta-spec:
   url: http://module-build.sourceforge.net/META-spec-v1.2.html

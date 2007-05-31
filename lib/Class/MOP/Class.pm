@@ -13,7 +13,7 @@ use Scalar::Util 'blessed', 'reftype', 'weaken';
 use Sub::Name    'subname';
 use B            'svref_2object';
 
-our $VERSION   = '0.21';
+our $VERSION   = '0.22';
 our $AUTHORITY = 'cpan:STEVAN';
 
 use base 'Class::MOP::Module';
@@ -313,6 +313,18 @@ sub construct_instance {
     foreach my $attr ($class->compute_all_applicable_attributes()) {
         $attr->initialize_instance_slot($meta_instance, $instance, \%params);
     }
+    # NOTE: 
+    # this will only work for a HASH instance type
+    if ($class->is_anon_class) {
+        (reftype($instance) eq 'HASH')
+            || confess "Currently only HASH based instances are supported with instance of anon-classes";
+        # NOTE:
+        # At some point we should make this official
+        # as a reserved slot name, but right now I am 
+        # going to keep it here.
+        # my $RESERVED_MOP_SLOT = '__MOP__';
+        $instance->{'__MOP__'} = $class;
+    }
     return $instance;
 }
 
@@ -344,7 +356,7 @@ sub clone_instance {
     my $meta_instance = $class->get_meta_instance();
     my $clone = $meta_instance->clone_instance($instance);     
     foreach my $attr ($class->compute_all_applicable_attributes()) {
-        if ($params{$attr->init_arg}) {
+        if (exists $params{$attr->init_arg}) {
             $meta_instance->set_slot_value($clone, $attr->name, $params{$attr->init_arg});                    
         }
     }       
@@ -420,7 +432,7 @@ sub add_method {
             $method = $self->find_next_method_by_name($method_name);
             # die if it does not exist
             (defined $method)
-                || confess "The method '$method_name' is not found in the inherience hierarchy for class " . $self->name;
+                || confess "The method '$method_name' is not found in the inheritance hierarchy for class " . $self->name;
             # and now make sure to wrap it 
             # even if it is already wrapped
             # because we need a new sub ref
@@ -863,6 +875,16 @@ it.
 This will create an anonymous class, it works much like C<create> but 
 it does not need a C<$package_name>. Instead it will create a suitably 
 unique package name for you to stash things into.
+
+On very important distinction is that anon classes are destroyed once 
+the metaclass they are attached to goes out of scope. In the DESTROY 
+method, the created package will be removed from the symbol table. 
+
+It is also worth noting that any instances created with an anon-class
+will keep a special reference to the anon-meta which will prevent the 
+anon-class from going out of scope until all instances of it have also 
+been destroyed. This however only works for HASH based instance types, 
+as we use a special reserved slot (C<__MOP__>) to store this. 
 
 =item B<initialize ($package_name, %options)>
 
@@ -1318,8 +1340,6 @@ the L<Class::MOP::Immutable> documentation.
 =head1 AUTHORS
 
 Stevan Little E<lt>stevan@iinteractive.comE<gt>
-
-Yuval Kogman E<lt>nothingmuch@woobling.comE<gt>
 
 =head1 COPYRIGHT AND LICENSE
 
