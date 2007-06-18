@@ -1,6 +1,6 @@
 ---
 name: Class-MOP
-version: 0.38
+version: 0.39
 author:
   - 'Stevan Little E<lt>stevan@iinteractive.comE<gt>'
 abstract: A Meta Object Protocol for Perl 5
@@ -19,7 +19,7 @@ build_requires:
 provides:
   Class::MOP:
     file: lib/Class/MOP.pm
-    version: 0.38
+    version: 0.39
   Class::MOP::Attribute:
     file: lib/Class/MOP/Attribute.pm
     version: 0.15
@@ -28,7 +28,7 @@ provides:
     version: 0.22
   Class::MOP::Immutable:
     file: lib/Class/MOP/Immutable.pm
-    version: 0.01
+    version: 0.02
   Class::MOP::Instance:
     file: lib/Class/MOP/Instance.pm
     version: 0.03
