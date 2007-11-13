@@ -9,7 +9,7 @@ use Class::MOP::Method::Accessor;
 use Carp         'confess';
 use Scalar::Util 'blessed', 'reftype', 'weaken';
 
-our $VERSION   = '0.16';
+our $VERSION   = '0.17';
 our $AUTHORITY = 'cpan:STEVAN';
 
 use base 'Class::MOP::Object';
@@ -96,7 +96,7 @@ sub initialize_instance_slot {
         if($builder = $instance->can($builder) ){
             $meta_instance->set_slot_value($instance, $self->name, $instance->$builder);
         } else {
-            confess(blessed($instance)." does not support builder method '$builder' for attribute '" . $self->name . "'");
+            confess(blessed($instance)." does not support builder method '". $self->{'$!builder'} ."' for attribute '" . $self->name . "'");
         }
     }
 }
@@ -568,6 +568,8 @@ These are all basic predicate methods for the values passed into C<new>.
 =item B<has_init_arg>
 
 =item B<has_default>
+
+=item B<has_builder>
 
 =back
 
