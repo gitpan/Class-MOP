@@ -1,29 +1,18 @@
-use Module::Build;
-
 use strict;
 use warnings;
+use inc::Module::Install;
 
-my $build = Module::Build->new(
-    module_name => 'Class::MOP',
-    license => 'perl',
-    requires => {
-        'Scalar::Util' => '1.18',
-        'Sub::Name'    => '0.02',
-        'Carp'         => '0',
-        'B'            => '0',
-    },
-    optional => {},
-    build_requires => {
-        'Test::More'      => '0.62',
-        'Test::Exception' => '0.21',
-        'File::Spec'      => '0',
-    },
-    create_makefile_pl => 'traditional',
-    recursive_test_files => 1,
-    add_to_cleanup => [
-        'META.yml', '*.bak', '*.gz', 'Makefile.PL',
-    ],
-);
+name 'Class-MOP';
+all_from 'lib/Class/MOP.pm';
+license 'perl';
 
-$build->create_build_script;
+requires 'Scalar::Util' => '1.18';
+requires 'Sub::Name'    => '0.02';
+requires 'Carp'         => '0';
+requires 'B'            => '0';
 
+build_requires 'Test::More'      => '0.62';
+build_requires 'Test::Exception' => '0.21';
+build_requires 'File::Spec'      => '0';
+
+WriteAll();
