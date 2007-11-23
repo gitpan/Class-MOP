@@ -13,7 +13,7 @@ use Scalar::Util 'blessed', 'reftype', 'weaken';
 use Sub::Name    'subname';
 use B            'svref_2object';
 
-our $VERSION   = '0.23';
+our $VERSION   = '0.24';
 our $AUTHORITY = 'cpan:STEVAN';
 
 use base 'Class::MOP::Module';
@@ -78,7 +78,7 @@ sub construct_class_instance {
 
     # now create the metaclass
     my $meta;
-    if ($class =~ /^Class::MOP::Class$/) {
+    if ($class eq 'Class::MOP::Class') {
         no strict 'refs';
         $meta = bless {
             # inherited from Class::MOP::Package
@@ -134,7 +134,7 @@ sub check_metaclass_compatability {
     return if blessed($self)            eq 'Class::MOP::Class'   &&
               $self->instance_metaclass eq 'Class::MOP::Instance';
 
-    my @class_list = $self->class_precedence_list;
+    my @class_list = $self->linearized_isa;
     shift @class_list; # shift off $self->name
 
     foreach my $class_name (@class_list) {
@@ -377,7 +377,7 @@ sub superclasses {
         @{$self->get_package_symbol('@ISA')} = @supers;
         # NOTE:
         # we need to check the metaclass
-        # compatability here so that we can
+        # compatibility here so that we can
         # be sure that the superclass is
         # not potentially creating an issues
         # we don't know about
@@ -386,10 +386,15 @@ sub superclasses {
     @{$self->get_package_symbol('@ISA')};
 }
 
+sub linearized_isa {
+    my %seen;
+    grep { !($seen{$_}++) } (shift)->class_precedence_list
+}
+
 sub class_precedence_list {
     my $self = shift;
     # NOTE:
-    # We need to check for ciruclar inheirtance here.
+    # We need to check for circular inheritance here.
     # This will do nothing if all is well, and blow
     # up otherwise. Yes, it's an ugly hack, better
     # suggestions are welcome.
@@ -549,15 +554,7 @@ sub find_method_by_name {
     my ($self, $method_name) = @_;
     (defined $method_name && $method_name)
         || confess "You must define a method name to find";
-    # keep a record of what we have seen
-    # here, this will handle all the
-    # inheritence issues because we are
-    # using the &class_precedence_list
-    my %seen_class;
-    my @cpl = $self->class_precedence_list();
-    foreach my $class (@cpl) {
-        next if $seen_class{$class};
-        $seen_class{$class}++;
+    foreach my $class ($self->linearized_isa) {
         # fetch the meta-class ...
         my $meta = $self->initialize($class);
         return $meta->get_method($method_name)
@@ -568,15 +565,8 @@ sub find_method_by_name {
 
 sub compute_all_applicable_methods {
     my $self = shift;
-    my @methods;
-    # keep a record of what we have seen
-    # here, this will handle all the
-    # inheritence issues because we are
-    # using the &class_precedence_list
-    my (%seen_class, %seen_method);
-    foreach my $class ($self->class_precedence_list()) {
-        next if $seen_class{$class};
-        $seen_class{$class}++;
+    my (@methods, %seen_method);
+    foreach my $class ($self->linearized_isa) {
         # fetch the meta-class ...
         my $meta = $self->initialize($class);
         foreach my $method_name ($meta->get_method_list()) {
@@ -597,14 +587,7 @@ sub find_all_methods_by_name {
     (defined $method_name && $method_name)
         || confess "You must define a method name to find";
     my @methods;
-    # keep a record of what we have seen
-    # here, this will handle all the
-    # inheritence issues because we are
-    # using the &class_precedence_list
-    my %seen_class;
-    foreach my $class ($self->class_precedence_list()) {
-        next if $seen_class{$class};
-        $seen_class{$class}++;
+    foreach my $class ($self->linearized_isa) {
         # fetch the meta-class ...
         my $meta = $self->initialize($class);
         push @methods => {
@@ -620,16 +603,9 @@ sub find_next_method_by_name {
     my ($self, $method_name) = @_;
     (defined $method_name && $method_name)
         || confess "You must define a method name to find";
-    # keep a record of what we have seen
-    # here, this will handle all the
-    # inheritence issues because we are
-    # using the &class_precedence_list
-    my %seen_class;
-    my @cpl = $self->class_precedence_list();
+    my @cpl = $self->linearized_isa;
     shift @cpl; # discard ourselves
     foreach my $class (@cpl) {
-        next if $seen_class{$class};
-        $seen_class{$class}++;
         # fetch the meta-class ...
         my $meta = $self->initialize($class);
         return $meta->get_method($method_name)
@@ -703,15 +679,8 @@ sub get_attribute_list {
 
 sub compute_all_applicable_attributes {
     my $self = shift;
-    my @attrs;
-    # keep a record of what we have seen
-    # here, this will handle all the
-    # inheritence issues because we are
-    # using the &class_precedence_list
-    my (%seen_class, %seen_attr);
-    foreach my $class ($self->class_precedence_list()) {
-        next if $seen_class{$class};
-        $seen_class{$class}++;
+    my (@attrs, %seen_attr);
+    foreach my $class ($self->linearized_isa) {
         # fetch the meta-class ...
         my $meta = $self->initialize($class);
         foreach my $attr_name ($meta->get_attribute_list()) {
@@ -725,14 +694,7 @@ sub compute_all_applicable_attributes {
 
 sub find_attribute_by_name {
     my ($self, $attr_name) = @_;
-    # keep a record of what we have seen
-    # here, this will handle all the
-    # inheritence issues because we are
-    # using the &class_precedence_list
-    my %seen_class;
-    foreach my $class ($self->class_precedence_list()) {
-        next if $seen_class{$class};
-        $seen_class{$class}++;
+    foreach my $class ($self->linearized_isa) {
         # fetch the meta-class ...
         my $meta = $self->initialize($class);
         return $meta->get_attribute($attr_name)
@@ -810,6 +772,7 @@ sub create_immutable_transformer {
        /],
        memoize     => {
            class_precedence_list             => 'ARRAY',
+           linearized_isa                    => 'ARRAY',
            compute_all_applicable_attributes => 'ARRAY',
            get_meta_instance                 => 'SCALAR',
            get_method_map                    => 'SCALAR',
@@ -1074,6 +1037,11 @@ attempt to address this issue.
 This computes the a list of all the class's ancestors in the same order
 in which method dispatch will be done. This is similair to
 what B<Class::ISA::super_path> does, but we don't remove duplicate names.
+
+=item B<linearized_isa>
+
+This returns a list based on C<class_precedence_list> but with all 
+duplicates removed.
 
 =back
 
