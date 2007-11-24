@@ -17,4 +17,4 @@ requires:
   Carp: 0
   Scalar::Util: 1.18
   Sub::Name: 0.02
-version: 0.46
+version: 0.47
