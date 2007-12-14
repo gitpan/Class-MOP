@@ -13,8 +13,18 @@ use Class::MOP::Method;
 
 use Class::MOP::Immutable;
 
-our $VERSION   = '0.48';
-our $AUTHORITY = 'cpan:STEVAN';
+BEGIN {
+    our $VERSION   = '0.49';
+    our $AUTHORITY = 'cpan:STEVAN';    
+    
+    use XSLoader;
+    XSLoader::load( 'Class::MOP', $VERSION );    
+    
+    unless ($] < 5.009_005) {
+        no warnings 'redefine', 'prototype';
+        *check_package_cache_flag = \&mro::get_pkg_gen;
+    }
+}
 
 {
     # Metaclasses are singletons, so we cache them here.
@@ -732,6 +742,10 @@ NOTE: This does a basic check of the symbol table to try and
 determine as best it can if the C<$class_name> is loaded, it
 is probably correct about 99% of the time.
 
+=item B<check_package_cache_flag ($pkg)>
+
+=item B<get_code_info ($code)>
+
 =back
 
 =head2 Metaclass cache functions
@@ -880,6 +894,8 @@ Matt (mst) Trout
 Rob (robkinyon) Kinyon
 
 Yuval (nothingmuch) Kogman
+
+Scott (konobi) McWhirter
 
 =head1 COPYRIGHT AND LICENSE
 

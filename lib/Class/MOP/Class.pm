@@ -11,9 +11,8 @@ use Class::MOP::Method::Wrapped;
 use Carp         'confess';
 use Scalar::Util 'blessed', 'reftype', 'weaken';
 use Sub::Name    'subname';
-use B            'svref_2object';
 
-our $VERSION   = '0.24';
+our $VERSION   = '0.25';
 our $AUTHORITY = 'cpan:STEVAN';
 
 use base 'Class::MOP::Module';
@@ -104,6 +103,14 @@ sub construct_class_instance {
             '$!attribute_metaclass' => $options{'attribute_metaclass'} || 'Class::MOP::Attribute',
             '$!method_metaclass'    => $options{'method_metaclass'}    || 'Class::MOP::Method',
             '$!instance_metaclass'  => $options{'instance_metaclass'}  || 'Class::MOP::Instance',
+            
+            ## uber-private variables
+            # NOTE:
+            # this starts out as undef so that 
+            # we can tell the first time the 
+            # methods are fetched
+            # - SL
+            '$!_package_cache_flag'       => undef,            
         } => $class;
     }
     else {
@@ -115,7 +122,7 @@ sub construct_class_instance {
     }
 
     # and check the metaclass compatibility
-    $meta->check_metaclass_compatability();
+    $meta->check_metaclass_compatability();  
 
     Class::MOP::store_metaclass_by_name($package_name, $meta);
 
@@ -125,6 +132,18 @@ sub construct_class_instance {
     Class::MOP::weaken_metaclass($package_name) if $meta->is_anon_class;
 
     $meta;
+}
+
+sub reset_package_cache_flag  { (shift)->{'$!_package_cache_flag'} = undef } 
+sub update_package_cache_flag {
+    my $self = shift;
+    # NOTE:
+    # we can manually update the cache number 
+    # since we are actually adding the method
+    # to our cache as well. This avoids us 
+    # having to regenerate the method_map.
+    # - SL    
+    $self->{'$!_package_cache_flag'} = Class::MOP::check_package_cache_flag($self->name);    
 }
 
 sub check_metaclass_compatability {
@@ -275,6 +294,12 @@ sub instance_metaclass  { $_[0]->{'$!instance_metaclass'}  }
 # this is a prime canidate for conversion to XS
 sub get_method_map {
     my $self = shift;
+    
+    if (defined $self->{'$!_package_cache_flag'} && 
+                $self->{'$!_package_cache_flag'} == Class::MOP::check_package_cache_flag($self->name)) {
+        return $self->{'%!methods'};
+    }
+    
     my $map  = $self->{'%!methods'};
 
     my $class_name       = $self->name;
@@ -287,9 +312,9 @@ sub get_method_map {
                 defined $map->{$symbol} &&
                         $map->{$symbol}->body == $code;
 
-        my $gv = svref_2object($code)->GV;
-        next if ($gv->STASH->NAME || '') ne $class_name &&
-                ($gv->NAME        || '') ne '__ANON__';
+        my ($pkg, $name) = Class::MOP::get_code_info($code);
+        next if ($pkg  || '') ne $class_name &&
+                ($name || '') ne '__ANON__';
 
         $map->{$symbol} = $method_metaclass->wrap($code);
     }
@@ -386,6 +411,51 @@ sub superclasses {
     @{$self->get_package_symbol('@ISA')};
 }
 
+sub subclasses {
+    my $self = shift;
+
+    my $super_class = $self->name;
+    my @derived_classes;
+    
+    my $find_derived_classes;
+    $find_derived_classes = sub {
+        my ($outer_class) = @_;
+
+        my $symbol_table_hashref = do { no strict 'refs'; \%{"${outer_class}::"} };
+
+      SYMBOL:
+        for my $symbol ( keys %$symbol_table_hashref ) {
+            next SYMBOL if $symbol !~ /\A (\w+):: \z/x;
+            my $inner_class = $1;
+
+            next SYMBOL if $inner_class eq 'SUPER';    # skip '*::SUPER'
+
+            my $class =
+              $outer_class
+              ? "${outer_class}::$inner_class"
+              : $inner_class;
+
+            if ( $class->isa($super_class) and $class ne $super_class ) {
+                push @derived_classes, $class;
+            }
+
+            next SYMBOL if $class eq 'main';           # skip 'main::*'
+
+            $find_derived_classes->($class);
+        }
+    };
+
+    my $root_class = q{};
+    $find_derived_classes->($root_class);
+
+    undef $find_derived_classes;
+
+    @derived_classes = sort { $a->isa($b) ? 1 : $b->isa($a) ? -1 : 0 } @derived_classes;
+
+    return @derived_classes;
+}
+
+
 sub linearized_isa {
     my %seen;
     grep { !($seen{$_}++) } (shift)->class_precedence_list
@@ -429,6 +499,7 @@ sub add_method {
 
     my $full_method_name = ($self->name . '::' . $method_name);
     $self->add_package_symbol("&${method_name}" => subname $full_method_name => $body);
+    $self->update_package_cache_flag;    
 }
 
 {
@@ -505,6 +576,7 @@ sub alias_method {
         || confess "Your code block must be a CODE reference";
 
     $self->add_package_symbol("&${method_name}" => $body);
+    $self->update_package_cache_flag;     
 }
 
 sub has_method {
@@ -535,12 +607,11 @@ sub remove_method {
     (defined $method_name && $method_name)
         || confess "You must define a method name";
 
-    my $removed_method = $self->get_method($method_name);
-
-    do {
-        $self->remove_package_symbol("&${method_name}");
-        delete $self->get_method_map->{$method_name};
-    } if defined $removed_method;
+    my $removed_method = delete $self->get_method_map->{$method_name};
+    
+    $self->remove_package_symbol("&${method_name}");
+    
+    $self->update_package_cache_flag;        
 
     return $removed_method;
 }
@@ -919,6 +990,17 @@ metaclass you are creating is compatible with the metaclasses of all
 your ancestors. For more inforamtion about metaclass compatibility
 see the C<About Metaclass compatibility> section in L<Class::MOP>.
 
+=item B<update_package_cache_flag>
+
+This will reset the package cache flag for this particular metaclass
+it is basically the value of the C<Class::MOP::get_package_cache_flag> 
+function. This is very rarely needed from outside of C<Class::MOP::Class>
+but in some cases you might want to use it, so it is here.
+
+=item B<reset_package_cache_flag>
+
+Clear this flag, used in Moose.
+
 =back
 
 =head2 Object instance construction and cloning
@@ -1042,6 +1124,10 @@ what B<Class::ISA::super_path> does, but we don't remove duplicate names.
 
 This returns a list based on C<class_precedence_list> but with all 
 duplicates removed.
+
+=item B<subclasses>
+
+This returns a list of subclasses for this class.
 
 =back
 

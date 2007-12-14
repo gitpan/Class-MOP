@@ -30,6 +30,8 @@ lib/Class/MOP/Module.pm
 lib/Class/MOP/Object.pm
 lib/Class/MOP/Package.pm
 lib/metaclass.pm
+MOP.xs
+ppport.h
 Makefile.PL
 MANIFEST
 META.yml
@@ -92,4 +94,3 @@ t/lib/MyMetaClass/Instance.pm
 t/lib/MyMetaClass/Method.pm
 t/pod.t
 t/pod_coverage.t
-TODO

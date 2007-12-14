@@ -3,7 +3,7 @@
 use strict;
 use warnings;
 
-use Test::More tests => 197;
+use Test::More tests => 203;
 use Test::Exception;
 
 BEGIN {
@@ -51,6 +51,9 @@ my @class_mop_class_methods = qw(
     meta
 
     initialize reinitialize create
+    
+    update_package_cache_flag
+    reset_package_cache_flag
 
     create_anon_class is_anon_class
 
@@ -61,7 +64,7 @@ my @class_mop_class_methods = qw(
 
     attribute_metaclass method_metaclass
 
-    superclasses class_precedence_list linearized_isa
+    superclasses subclasses class_precedence_list linearized_isa
 
     has_method get_method add_method remove_method alias_method
     get_method_list get_method_map compute_all_applicable_methods
