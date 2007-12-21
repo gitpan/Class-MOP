@@ -20,16 +20,16 @@ no_index:
 provides: 
   Class::MOP: 
     file: lib/Class/MOP.pm
-    version: 0.49
+    version: 0.50
   Class::MOP::Attribute: 
     file: lib/Class/MOP/Attribute.pm
-    version: 0.20
+    version: 0.21
   Class::MOP::Class: 
     file: lib/Class/MOP/Class.pm
     version: 0.25
   Class::MOP::Immutable: 
     file: lib/Class/MOP/Immutable.pm
-    version: 0.02
+    version: 0.03
   Class::MOP::Instance: 
     file: lib/Class/MOP/Instance.pm
     version: 0.03
@@ -64,4 +64,4 @@ requires:
   Carp: 0
   Scalar::Util: 1.18
   Sub::Name: 0.02
-version: 0.49
+version: 0.50
