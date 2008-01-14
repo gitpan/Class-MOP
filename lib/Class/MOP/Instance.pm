@@ -108,13 +108,18 @@ sub is_slot_initialized {
 }
 
 sub weaken_slot_value {
-        my ($self, $instance, $slot_name) = @_;
-        weaken $instance->{$slot_name};
+    my ($self, $instance, $slot_name) = @_;
+    weaken $instance->{$slot_name};
 }
 
 sub strengthen_slot_value {
-        my ($self, $instance, $slot_name) = @_;
-        $self->set_slot_value($instance, $slot_name, $self->get_slot_value($instance, $slot_name));
+    my ($self, $instance, $slot_name) = @_;
+    $self->set_slot_value($instance, $slot_name, $self->get_slot_value($instance, $slot_name));
+}
+
+sub rebless_instance_structure {
+    my ($self, $instance, $metaclass) = @_;
+    bless $instance, $metaclass->name;
 }
 
 # inlinable operation snippets
@@ -283,6 +288,8 @@ require that the C<$instance_structure> is passed into them.
 
 =item B<strengthen_slot_value ($instance_structure, $slot_name)>
 
+=item B<rebless_instance_structure ($instance_structure, $new_metaclass)>
+
 =back
 
 =head2 Inlineable Instance Operations
@@ -329,7 +336,7 @@ Stevan Little E<lt>stevan@iinteractive.comE<gt>
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright 2006, 2007 by Infinity Interactive, Inc.
+Copyright 2006-2008 by Infinity Interactive, Inc.
 
 L<http://www.iinteractive.com>
 

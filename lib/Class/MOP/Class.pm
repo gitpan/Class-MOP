@@ -12,7 +12,7 @@ use Carp         'confess';
 use Scalar::Util 'blessed', 'reftype', 'weaken';
 use Sub::Name    'subname';
 
-our $VERSION   = '0.25';
+our $VERSION   = '0.26';
 our $AUTHORITY = 'cpan:STEVAN';
 
 use base 'Class::MOP::Module';
@@ -393,6 +393,27 @@ sub clone_instance {
     return $clone;
 }
 
+sub rebless_instance {
+    my ($self, $instance) = @_;
+    my $old_metaclass = $instance->meta();
+    my $meta_instance = $self->get_meta_instance();
+
+    $self->name->isa($old_metaclass->name)
+        || confess "You may rebless only into a subclass of (". $old_metaclass->name ."), of which (". $self->name .") isn't.";
+
+    # rebless!
+    $meta_instance->rebless_instance_structure($instance, $self);
+
+    # check and upgrade all attributes
+    my %params = map { $_->name => $meta_instance->get_slot_value($instance, $_->name) }
+                 grep { $meta_instance->is_slot_initialized($instance, $_->name) }
+                 $self->compute_all_applicable_attributes;
+
+    foreach my $attr ($self->compute_all_applicable_attributes) {
+        $attr->initialize_instance_slot($meta_instance, $instance, \%params);
+    }
+}
+
 # Inheritance
 
 sub superclasses {
@@ -423,7 +444,7 @@ sub subclasses {
 
         my $symbol_table_hashref = do { no strict 'refs'; \%{"${outer_class}::"} };
 
-      SYMBOL:
+        SYMBOL:
         for my $symbol ( keys %$symbol_table_hashref ) {
             next SYMBOL if $symbol !~ /\A (\w+):: \z/x;
             my $inner_class = $1;
@@ -457,18 +478,28 @@ sub subclasses {
 
 
 sub linearized_isa {
-    my %seen;
-    grep { !($seen{$_}++) } (shift)->class_precedence_list
+    if (Class::MOP::IS_RUNNING_ON_5_10()) {
+        return @{ mro::get_linear_isa( (shift)->name ) };
+    }
+    else {
+        my %seen;
+        return grep { !($seen{$_}++) } (shift)->class_precedence_list;
+    }
 }
 
 sub class_precedence_list {
     my $self = shift;
-    # NOTE:
-    # We need to check for circular inheritance here.
-    # This will do nothing if all is well, and blow
-    # up otherwise. Yes, it's an ugly hack, better
-    # suggestions are welcome.
-    { ($self->name || return)->isa('This is a test for circular inheritance') }
+
+    unless (Class::MOP::IS_RUNNING_ON_5_10()) { 
+        # NOTE:
+        # We need to check for circular inheritance here
+        # if we are are not on 5.10, cause 5.8 detects it 
+        # late. This will do nothing if all is well, and 
+        # blow up otherwise. Yes, it's an ugly hack, better
+        # suggestions are welcome.        
+        # - SL
+        ($self->name || return)->isa('This is a test for circular inheritance') 
+    }
 
     (
         $self->name,
@@ -1075,6 +1106,15 @@ shallow cloning is outside the scope of the meta-object protocol. I
 think Yuval "nothingmuch" Kogman put it best when he said that cloning
 is too I<context-specific> to be part of the MOP.
 
+=item B<rebless_instance($instance)>
+
+This will change the class of C<$instance> to the class of the invoking
+C<Class::MOP::Class>. You may only rebless the instance to a subclass of
+itself. This limitation may be relaxed in the future.
+
+This can be useful in a number of situations, such as when you are writing
+a program that doesn't know everything at object construction time.
+
 =back
 
 =head2 Informational
@@ -1449,7 +1489,7 @@ Stevan Little E<lt>stevan@iinteractive.comE<gt>
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright 2006, 2007 by Infinity Interactive, Inc.
+Copyright 2006-2008 by Infinity Interactive, Inc.
 
 L<http://www.iinteractive.com>
 

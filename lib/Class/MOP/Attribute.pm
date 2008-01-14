@@ -9,7 +9,7 @@ use Class::MOP::Method::Accessor;
 use Carp         'confess';
 use Scalar::Util 'blessed', 'reftype', 'weaken';
 
-our $VERSION   = '0.21';
+our $VERSION   = '0.22';
 our $AUTHORITY = 'cpan:STEVAN';
 
 use base 'Class::MOP::Object';
@@ -495,9 +495,19 @@ C<undef> value to the attribute.
 
 =item I<predicate>
 
-This is a basic test to see if the value of the attribute is not
-C<undef>. It will return true (C<1>) if the attribute's value is
-defined, and false (C<0>) otherwise.
+This is a basic test to see if any value has been set for the 
+attribute. It will return true (C<1>) if the attribute has been set 
+to any value (even C<undef>), and false (C<0>) otherwise.
+
+B<NOTE:>
+The predicate will return true even when you set an attribute's
+value to C<undef>. This behaviour has changed as of version 0.43. In 
+older versions, the predicate (erroneously) checked for attribute 
+value definedness, instead of presence as it is now.
+
+If you really want to get rid of the value, you have to define and 
+use a I<clearer> (see below).
+
 
 =item I<clearer>
 
@@ -726,7 +736,7 @@ Stevan Little E<lt>stevan@iinteractive.comE<gt>
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright 2006, 2007 by Infinity Interactive, Inc.
+Copyright 2006-2008 by Infinity Interactive, Inc.
 
 L<http://www.iinteractive.com>
 

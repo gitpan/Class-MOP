@@ -9,7 +9,7 @@ use Class::MOP::Method::Constructor;
 use Carp         'confess';
 use Scalar::Util 'blessed';
 
-our $VERSION   = '0.03';
+our $VERSION   = '0.04';
 our $AUTHORITY = 'cpan:STEVAN';
 
 sub new {
@@ -234,6 +234,8 @@ sub create_methods_for_immutable_metaclass {
 
     $methods{get_mutable_metaclass_name} = sub { (shift)->{'___original_class'} };
 
+    $methods{immutable_transformer} = sub { $self };
+
     return \%methods;
 }
 
@@ -337,7 +339,7 @@ Stevan Little E<lt>stevan@iinteractive.comE<gt>
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright 2006, 2007 by Infinity Interactive, Inc.
+Copyright 2006-2008 by Infinity Interactive, Inc.
 
 L<http://www.iinteractive.com>
 

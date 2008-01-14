@@ -14,15 +14,20 @@ use Class::MOP::Method;
 use Class::MOP::Immutable;
 
 BEGIN {
-    our $VERSION   = '0.50';
+    our $VERSION   = '0.51';
     our $AUTHORITY = 'cpan:STEVAN';    
     
     use XSLoader;
     XSLoader::load( 'Class::MOP', $VERSION );    
     
     unless ($] < 5.009_005) {
+        require mro;
         no warnings 'redefine', 'prototype';
         *check_package_cache_flag = \&mro::get_pkg_gen;
+        *IS_RUNNING_ON_5_10 = sub () { 1 };
+    }
+    else {
+        *IS_RUNNING_ON_5_10 = sub () { 0 };        
     }
 }
 
@@ -69,14 +74,14 @@ sub load_class {
 }
 
 sub is_class_loaded {
-        my $class = shift;
-        no strict 'refs';
-        return 1 if defined ${"${class}::VERSION"} || defined @{"${class}::ISA"};
-        foreach (keys %{"${class}::"}) {
-                next if substr($_, -2, 2) eq '::';
-                return 1 if defined &{"${class}::$_"};
-        }
-        return 0;
+    my $class = shift;
+    no strict 'refs';
+    return 1 if defined ${"${class}::VERSION"} || defined @{"${class}::ISA"};
+    foreach (keys %{"${class}::"}) {
+            next if substr($_, -2, 2) eq '::';
+            return 1 if defined &{"${class}::$_"};
+    }
+    return 0;
 }
 
 
@@ -724,6 +729,18 @@ See L<Class::MOP::Method> for more details.
 
 =head1 FUNCTIONS
 
+=head2 Constants
+
+=over 4
+
+=item I<IS_RUNNING_ON_5_10>
+
+We set this constant depending on what version perl we are on, this 
+allows us to take advantage of new 5.10 features and stay backwards 
+compat.
+
+=back
+
 =head2 Utility functions
 
 =over 4
@@ -899,7 +916,7 @@ Scott (konobi) McWhirter
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright 2006, 2007 by Infinity Interactive, Inc.
+Copyright 2006-2008 by Infinity Interactive, Inc.
 
 L<http://www.iinteractive.com>
 
