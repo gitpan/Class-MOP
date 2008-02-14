@@ -9,7 +9,7 @@ use Class::MOP::Method::Accessor;
 use Carp         'confess';
 use Scalar::Util 'blessed', 'reftype', 'weaken';
 
-our $VERSION   = '0.22';
+our $VERSION   = '0.23';
 our $AUTHORITY = 'cpan:STEVAN';
 
 use base 'Class::MOP::Object';
@@ -49,22 +49,29 @@ sub new {
                        "wrap then in a CODE reference (ex: sub { [] } and not [])")
                 if exists $options{default} && ref $options{default};
     }
+    if( $options{required} and not( defined($options{builder}) || defined($options{init_arg}) || exists $options{default} ) ) {
+        confess("A required attribute must have either 'init_arg', 'builder', or 'default'");
+    }
     bless {
         '$!name'      => $name,
         '$!accessor'  => $options{accessor},
         '$!reader'    => $options{reader},
-        '$!writer'    => $options{writer},
-        '$!predicate' => $options{predicate},
-        '$!clearer'   => $options{clearer},
-        '$!builder'   => $options{builder},
-        '$!init_arg'  => $options{init_arg},
-        '$!default'   => $options{default},
+        '$!writer'      => $options{writer},
+        '$!predicate'   => $options{predicate},
+        '$!clearer'     => $options{clearer},
+        '$!builder'     => $options{builder},
+        '$!init_arg'    => $options{init_arg},
+        '$!default'     => $options{default},
+        '$!initializer' => $options{initializer},        
         # keep a weakened link to the
         # class we are associated with
         '$!associated_class' => undef,
         # and a list of the methods
         # associated with this attr
         '@!associated_methods' => [],
+        # NOTE:
+        # protect this from silliness
+        init_arg => undef,
     } => $class;
 }
 
@@ -88,20 +95,50 @@ sub initialize_instance_slot {
 
     # if nothing was in the %params, we can use the
     # attribute's default value (if it has one)
-    if(exists $params->{$init_arg}){
-        $meta_instance->set_slot_value($instance, $self->name, $params->{$init_arg});
+    if(defined $init_arg and exists $params->{$init_arg}){
+        $self->_set_initial_slot_value(
+            $meta_instance, 
+            $instance,
+            $params->{$init_arg},
+        );
     } 
     elsif (defined $self->{'$!default'}) {
-        $meta_instance->set_slot_value($instance, $self->name, $self->default($instance));
+        $self->_set_initial_slot_value(
+            $meta_instance, 
+            $instance,
+            $self->default($instance),
+        );
     } 
     elsif (defined( my $builder = $self->{'$!builder'})) {
         if ($builder = $instance->can($builder)) {
-            $meta_instance->set_slot_value($instance, $self->name, $instance->$builder);
+            $self->_set_initial_slot_value(
+                $meta_instance, 
+                $instance,
+                $instance->$builder,
+            );
         } 
         else {
             confess(blessed($instance)." does not support builder method '". $self->{'$!builder'} ."' for attribute '" . $self->name . "'");
         }
     }
+}
+
+sub _set_initial_slot_value {
+    my ($self, $meta_instance, $instance, $value) = @_;
+
+    my $slot_name = $self->name;
+
+    return $meta_instance->set_slot_value($instance, $slot_name, $value)
+        unless $self->has_initializer;
+
+    my $callback = sub {
+        $meta_instance->set_slot_value($instance, $slot_name, $_[0]);
+    };
+    
+    my $initializer = $self->initializer;
+
+    # most things will just want to set a value, so make it first arg
+    $instance->$initializer($value, $callback, $self);
 }
 
 # NOTE:
@@ -113,22 +150,24 @@ sub name { $_[0]->{'$!name'} }
 sub associated_class   { $_[0]->{'$!associated_class'}   }
 sub associated_methods { $_[0]->{'@!associated_methods'} }
 
-sub has_accessor  { defined($_[0]->{'$!accessor'})  ? 1 : 0 }
-sub has_reader    { defined($_[0]->{'$!reader'})    ? 1 : 0 }
-sub has_writer    { defined($_[0]->{'$!writer'})    ? 1 : 0 }
-sub has_predicate { defined($_[0]->{'$!predicate'}) ? 1 : 0 }
-sub has_clearer   { defined($_[0]->{'$!clearer'})   ? 1 : 0 }
-sub has_builder   { defined($_[0]->{'$!builder'})   ? 1 : 0 }
-sub has_init_arg  { defined($_[0]->{'$!init_arg'})  ? 1 : 0 }
-sub has_default   { defined($_[0]->{'$!default'})   ? 1 : 0 }
+sub has_accessor    { defined($_[0]->{'$!accessor'})     ? 1 : 0 }
+sub has_reader      { defined($_[0]->{'$!reader'})       ? 1 : 0 }
+sub has_writer      { defined($_[0]->{'$!writer'})       ? 1 : 0 }
+sub has_predicate   { defined($_[0]->{'$!predicate'})    ? 1 : 0 }
+sub has_clearer     { defined($_[0]->{'$!clearer'})      ? 1 : 0 }
+sub has_builder     { defined($_[0]->{'$!builder'})      ? 1 : 0 }
+sub has_init_arg    { defined($_[0]->{'$!init_arg'})     ? 1 : 0 }
+sub has_default     { defined($_[0]->{'$!default'})      ? 1 : 0 }
+sub has_initializer { defined($_[0]->{'$!initializer'})  ? 1 : 0 }
 
-sub accessor  { $_[0]->{'$!accessor'}  }
-sub reader    { $_[0]->{'$!reader'}    }
-sub writer    { $_[0]->{'$!writer'}    }
-sub predicate { $_[0]->{'$!predicate'} }
-sub clearer   { $_[0]->{'$!clearer'}   }
-sub builder   { $_[0]->{'$!builder'}   }
-sub init_arg  { $_[0]->{'$!init_arg'}  }
+sub accessor    { $_[0]->{'$!accessor'}    }
+sub reader      { $_[0]->{'$!reader'}      }
+sub writer      { $_[0]->{'$!writer'}      }
+sub predicate   { $_[0]->{'$!predicate'}   }
+sub clearer     { $_[0]->{'$!clearer'}     }
+sub builder     { $_[0]->{'$!builder'}     }
+sub init_arg    { $_[0]->{'$!init_arg'}    }
+sub initializer { $_[0]->{'$!initializer'} }
 
 # end bootstrapped away method section.
 # (all methods below here are kept intact)
@@ -215,6 +254,15 @@ sub associate_method {
 }
 
 ## Slot management
+
+sub set_initial_value {
+    my ($self, $instance, $value) = @_;
+    $self->_set_initial_slot_value(
+        Class::MOP::Class->initialize(blessed($instance))->get_meta_instance,
+        $instance,
+        $value
+    );
+}
 
 sub set_value {
     my ($self, $instance, $value) = @_;
@@ -396,7 +444,8 @@ value of C<-foo>, then the following code will Just Work.
   MyClass->meta->construct_instance(-foo => "Hello There");
 
 In an init_arg is not assigned, it will automatically use the
-value of C<$name>.
+value of C<$name>.  If an explicit C<undef> is given for an init_arg,
+an attribute value can't be specified during initialization.
 
 =item I<builder>
 
@@ -438,7 +487,7 @@ so:
 And lastly, if the value of your attribute is dependent upon
 some other aspect of the instance structure, then you can take
 advantage of the fact that when the I<default> value is a CODE
-reference, it is passed the raw (unblessed) instance structure
+reference, it is passed the (as yet unfinished) instance structure
 as it's only argument. So you can do things like this:
 
   Class::MOP::Attribute->new('$object_identity' => (
@@ -451,6 +500,37 @@ any kind of dependent initializations. However, if this is
 something you need, you could subclass B<Class::MOP::Class> and
 this class to acheive it. However, this is currently left as
 an exercise to the reader :).
+
+=item I<initializer>
+
+This may be a method name (referring to a method on the class with this
+attribute) or a CODE ref.  The initializer is used to set the attribute value
+on an instance when the attribute is set during instance initialization.  When
+called, it is passed the instance (as the invocant), the value to set, a
+slot-setting CODE ref, and the attribute meta-instance.  The slot-setting code
+is provided to make it easy to set the (possibly altered) value on the instance
+without going through several more method calls.
+
+This contrived example shows an initializer that sets the attribute to twice
+the given value.
+
+  Class::MOP::Attribute->new('$doubled' => (
+      initializer => sub {
+          my ($instance, $value, $set) = @_;
+          $set->($value * 2);
+      },
+  ));
+
+As method names can be given as initializers, one can easily make
+attribute initialization use the writer:
+
+  Class::MOP::Attribute->new('$some_attr' => (
+      writer      => 'some_attr',
+      initializer => 'some_attr',
+  ));
+
+Your writer will simply need to examine it's C<@_> and determine under
+which context it is being called.
 
 =back
 
@@ -508,7 +588,6 @@ value definedness, instead of presence as it is now.
 If you really want to get rid of the value, you have to define and 
 use a I<clearer> (see below).
 
-
 =item I<clearer>
 
 This is the a method that will uninitialize the attr, reverting lazy values
@@ -518,7 +597,14 @@ back to their "unfulfilled" state.
 
 =item B<clone (%options)>
 
+This will return a clone of the attribute instance, allowing the overriding
+of various attributes through the C<%options> supplied.
+
 =item B<initialize_instance_slot ($instance, $params)>
+
+This method is used internally to initialize the approriate slot for this 
+attribute in a given C<$instance>, the C<$params> passed are those that were
+passed to the constructor.
 
 =back
 
@@ -536,6 +622,11 @@ know what you are doing.
 
 Set the value without going through the accessor. Note that this may be done to
 even attributes with just read only accessors.
+
+=item B<set_initial_value ($instance, $value)>
+
+This method sets the value without going through the accessor -- but it is only
+called when the instance data is first initialized.
 
 =item B<get_value ($instance)>
 
@@ -574,6 +665,8 @@ passed into C<new>. I think they are pretty much self-explanitory.
 
 =item B<clearer>
 
+=item B<initializer>
+
 =item B<init_arg>
 
 =item B<is_default_a_coderef>
@@ -607,7 +700,7 @@ Return the CODE reference of a method suitable for reading / writing the
 value of the attribute in the associated class. Suitable for use whether 
 C<reader> and C<writer> or C<accessor> was specified or not.
 
-NOTE: If not reader/writer/accessor was specified, this will use the 
+NOTE: If no reader/writer/accessor was specified, this will use the 
 attribute get_value/set_value methods, which can be very inefficient.
 
 =back
@@ -627,6 +720,8 @@ These are all basic predicate methods for the values passed into C<new>.
 =item B<has_predicate>
 
 =item B<has_clearer>
+
+=item B<has_initializer>
 
 =item B<has_init_arg>
 
@@ -684,7 +779,8 @@ used internally by the accessor generator.
 =item B<associated_methods>
 
 This will return the list of methods which have been associated with
-the C<associate_method> methods.
+the C<associate_method> methods. This is a good way of seeing what 
+methods are used to manage a given attribute. 
 
 =item B<install_accessors>
 
@@ -725,7 +821,7 @@ to this class.
 
 It should also be noted that B<Class::MOP> will actually bootstrap
 this module by installing a number of attribute meta-objects into
-it's metaclass. This will allow this class to reap all the benifits
+it's metaclass. This will allow this class to reap all the benefits
 of the MOP when subclassing it.
 
 =back

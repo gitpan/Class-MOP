@@ -1,5 +1,22 @@
 Revision history for Perl extension Class-MOP.
 
+0.53 Thurs. Feb. 14, 1008
+    ~~ several doc. fixes and updates ~~
+        
+    * Class::MOP::Class
+      Class::MOP::Method::Constructor
+      Class::MOP::Attribute
+        - making init_arg accept an undefined value
+          to indicate that no constructor args can 
+          be passed (thanks to nothingmuch)
+          - added tests for this
+        - added attribute initializer attribute (rjbs)
+          
+    * Class::MOP.
+        - making this use the new init_arg => undef
+          feature instead of the silly hack from 
+          before (thanks to nothingmuch)
+
 0.52 Tues. Jan. 22, 2008
     * Class::MOP::Class
       - fixed bug in rebless_instance 

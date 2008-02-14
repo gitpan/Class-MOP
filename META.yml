@@ -20,19 +20,19 @@ no_index:
 provides: 
   Class::MOP: 
     file: lib/Class/MOP.pm
-    version: 0.52
+    version: 0.53
   Class::MOP::Attribute: 
     file: lib/Class/MOP/Attribute.pm
-    version: 0.22
+    version: 0.23
   Class::MOP::Class: 
     file: lib/Class/MOP/Class.pm
-    version: 0.27
+    version: 0.28
   Class::MOP::Immutable: 
     file: lib/Class/MOP/Immutable.pm
     version: 0.04
   Class::MOP::Instance: 
     file: lib/Class/MOP/Instance.pm
-    version: 0.03
+    version: 0.04
   Class::MOP::Method: 
     file: lib/Class/MOP/Method.pm
     version: 0.05
@@ -41,7 +41,7 @@ provides:
     version: 0.02
   Class::MOP::Method::Constructor: 
     file: lib/Class/MOP/Method/Constructor.pm
-    version: 0.03
+    version: 0.04
   Class::MOP::Method::Generated: 
     file: lib/Class/MOP/Method/Generated.pm
     version: 0.01
@@ -64,4 +64,4 @@ requires:
   Carp: 0
   Scalar::Util: 1.18
   Sub::Name: 0.02
-version: 0.52
+version: 0.53

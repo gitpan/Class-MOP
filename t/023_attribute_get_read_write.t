@@ -34,6 +34,14 @@ and get_read/write_method_ref methods
     Foo->meta->add_attribute('gorch' => 
         reader => { 'get_gorch', => sub { (shift)->{gorch} } }
     );       
+
+    package Bar;
+    use metaclass;
+    Bar->meta->superclasses('Foo');
+
+    Bar->meta->add_attribute('quux' =>
+        accessor => 'quux',
+    );
 }
 
 can_ok('Foo', 'get_bar');

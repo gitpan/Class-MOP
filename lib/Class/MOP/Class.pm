@@ -12,7 +12,7 @@ use Carp         'confess';
 use Scalar::Util 'blessed', 'reftype', 'weaken';
 use Sub::Name    'subname';
 
-our $VERSION   = '0.27';
+our $VERSION   = '0.28';
 our $AUTHORITY = 'cpan:STEVAN';
 
 use base 'Class::MOP::Module';
@@ -386,8 +386,10 @@ sub clone_instance {
     my $meta_instance = $class->get_meta_instance();
     my $clone = $meta_instance->clone_instance($instance);
     foreach my $attr ($class->compute_all_applicable_attributes()) {
-        if (exists $params{$attr->init_arg}) {
-            $meta_instance->set_slot_value($clone, $attr->name, $params{$attr->init_arg});
+        if ( defined( my $init_arg = $attr->init_arg ) ) {
+            if (exists $params{$init_arg}) {
+                $attr->set_value($clone, $params{$init_arg});
+            }
         }
     }
     return $clone;
@@ -414,10 +416,17 @@ sub rebless_instance {
     # rebless!
     $meta_instance->rebless_instance_structure($instance, $self);
 
-    # check and upgrade all attributes
-    my %params = map { $_->name => $meta_instance->get_slot_value($instance, $_->name) }
-                 grep { $meta_instance->is_slot_initialized($instance, $_->name) }
-                 $self->compute_all_applicable_attributes;
+    my %params;
+
+    foreach my $attr ( $self->compute_all_applicable_attributes ) {
+        if ( $attr->has_value($instance) ) {
+            if ( defined( my $init_arg = $attr->init_arg ) ) {
+                $params{$init_arg} = $attr->get_value($instance);
+            } else {
+                $attr->set_value($instance);
+            }
+        }
+    }
 
     foreach my $attr ($self->compute_all_applicable_attributes) {
         $attr->initialize_instance_slot($meta_instance, $instance, \%params);
@@ -1040,7 +1049,8 @@ but in some cases you might want to use it, so it is here.
 
 =item B<reset_package_cache_flag>
 
-Clear this flag, used in Moose.
+Clears the package cache flag to announce to the internals that we need 
+to rebuild the method map.
 
 =back
 
@@ -1053,7 +1063,13 @@ to use them or not.
 
 =item B<instance_metaclass>
 
+Returns the class name of the instance metaclass, see L<Class::MOP::Instance> 
+for more information on the instance metaclasses.
+
 =item B<get_meta_instance>
+
+Returns an instance of L<Class::MOP::Instance> to be used in the construction 
+of a new instance of the class. 
 
 =item B<new_object (%params)>
 
@@ -1066,12 +1082,9 @@ would call a C<new> this method like so:
       $class->meta->new_object(%params);
   }
 
-Of course the ideal place for this would actually be in C<UNIVERSAL::>
-but that is considered bad style, so we do not do that.
-
 =item B<construct_instance (%params)>
 
-This method is used to construct an instace structure suitable for
+This method is used to construct an instance structure suitable for
 C<bless>-ing into your package of choice. It works in conjunction
 with the Attribute protocol to collect all applicable attributes.
 
@@ -1095,9 +1108,6 @@ class would call a C<clone> this method like so:
       $self->meta->clone_object($self, %params);
   }
 
-Of course the ideal place for this would actually be in C<UNIVERSAL::>
-but that is considered bad style, so we do not do that.
-
 =item B<clone_instance($instance, %params)>
 
 This method is a compliment of C<construct_instance> (which means if
@@ -1120,10 +1130,7 @@ is too I<context-specific> to be part of the MOP.
 
 This will change the class of C<$instance> to the class of the invoking
 C<Class::MOP::Class>. You may only rebless the instance to a subclass of
-itself. This limitation may be relaxed in the future.
-
-This can be useful in a number of situations, such as when you are writing
-a program that doesn't know everything at object construction time.
+itself. 
 
 =back
 
@@ -1157,18 +1164,11 @@ This is a read-write attribute which represents the superclass
 relationships of the class the B<Class::MOP::Class> instance is
 associated with. Basically, it can get and set the C<@ISA> for you.
 
-B<NOTE:>
-Perl will occasionally perform some C<@ISA> and method caching, if
-you decide to change your superclass relationship at runtime (which
-is quite insane and very much not recommened), then you should be
-aware of this and the fact that this module does not make any
-attempt to address this issue.
-
 =item B<class_precedence_list>
 
 This computes the a list of all the class's ancestors in the same order
-in which method dispatch will be done. This is similair to
-what B<Class::ISA::super_path> does, but we don't remove duplicate names.
+in which method dispatch will be done. This is similair to what 
+B<Class::ISA::super_path> does, but we don't remove duplicate names.
 
 =item B<linearized_isa>
 
@@ -1177,7 +1177,7 @@ duplicates removed.
 
 =item B<subclasses>
 
-This returns a list of subclasses for this class.
+This returns a list of subclasses for this class. 
 
 =back
 
@@ -1187,7 +1187,12 @@ This returns a list of subclasses for this class.
 
 =item B<get_method_map>
 
+Returns a HASH ref of name to CODE reference mapping for this class.
+
 =item B<method_metaclass>
+
+Returns the class name of the method metaclass, see L<Class::MOP::Method> 
+for more information on the method metaclasses.
 
 =item B<add_method ($method_name, $method)>
 
@@ -1401,9 +1406,14 @@ their own. See L<Class::MOP::Attribute> for more details.
 
 =item B<attribute_metaclass>
 
+Returns the class name of the attribute metaclass, see L<Class::MOP::Attribute> 
+for more information on the attribute metaclasses.
+
 =item B<get_attribute_map>
 
-=item B<add_attribute ($attribute_meta_object | $attribute_name, %attribute_spec)>
+This returns a HASH ref of name to attribute meta-object mapping.
+
+=item B<add_attribute ($attribute_meta_object | ($attribute_name, %attribute_spec))>
 
 This stores the C<$attribute_meta_object> (or creates one from the
 C<$attribute_name> and C<%attribute_spec>) in the B<Class::MOP::Class>

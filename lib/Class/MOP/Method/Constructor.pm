@@ -7,7 +7,7 @@ use warnings;
 use Carp         'confess';
 use Scalar::Util 'blessed', 'weaken', 'looks_like_number';
 
-our $VERSION   = '0.03';
+our $VERSION   = '0.04';
 our $AUTHORITY = 'cpan:STEVAN';
 
 use base 'Class::MOP::Method::Generated';
@@ -129,17 +129,28 @@ sub _generate_slot_initializer {
         $default = '$instance->'.$attr->builder;
     }
 
-  'if(exists $params{\'' . $attr->init_arg . '\'}){' . "\n" .
-        $self->meta_instance->inline_set_slot_value(
-            '$instance',
-            ("'" . $attr->name . "'"),
-            '$params{\'' . $attr->init_arg . '\'}' ) . "\n" .
-   '} ' . (!defined $default ? '' : 'else {' . "\n" .
-        $self->meta_instance->inline_set_slot_value(
-            '$instance',
-            ("'" . $attr->name . "'"),
-             $default ) . "\n" .
-   '}');
+    if ( defined $attr->init_arg ) {
+      return (
+          'if(exists $params{\'' . $attr->init_arg . '\'}){' . "\n" .
+                $self->meta_instance->inline_set_slot_value(
+                    '$instance',
+                    ("'" . $attr->name . "'"),
+                    '$params{\'' . $attr->init_arg . '\'}' ) . "\n" .
+           '} ' . (!defined $default ? '' : 'else {' . "\n" .
+                $self->meta_instance->inline_set_slot_value(
+                    '$instance',
+                    ("'" . $attr->name . "'"),
+                     $default ) . "\n" .
+           '}')
+        );
+    } elsif ( defined $default ) {
+        return (
+            $self->meta_instance->inline_set_slot_value(
+                '$instance',
+                ("'" . $attr->name . "'"),
+                 $default ) . "\n"
+        );
+    } else { return '' }
 }
 
 1;
@@ -171,7 +182,8 @@ Class::MOP::Method::Constructor - Method Meta Object for constructors
 =head1 DESCRIPTION
 
 This is a subclass of C<Class::MOP::Method> which deals with
-class constructors.
+class constructors. This is used when making a class immutable
+to generate an optimized constructor.
 
 =head1 METHODS
 
@@ -208,7 +220,7 @@ This creates the code reference for the constructor itself.
 
 =back
 
-=head2 Method Generators
+=head2 Method Generators 
 
 =over 4
 

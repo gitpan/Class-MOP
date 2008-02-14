@@ -6,7 +6,7 @@ use warnings;
 
 use Scalar::Util 'weaken', 'blessed';
 
-our $VERSION   = '0.03';
+our $VERSION   = '0.04';
 our $AUTHORITY = 'cpan:STEVAN';
 
 sub meta {
@@ -63,14 +63,14 @@ sub get_all_slots {
 
 sub is_valid_slot {
     my ($self, $slot_name) = @_;
-    exists $self->{'@!slots'}->{$slot_name} ? 1 : 0;
+    exists $self->{'@!slots'}->{$slot_name};
 }
 
 # operations on created instances
 
 sub get_slot_value {
     my ($self, $instance, $slot_name) = @_;
-    $self->is_slot_initialized($instance, $slot_name) ? $instance->{$slot_name} : undef;
+    $instance->{$slot_name};
 }
 
 sub set_slot_value {
@@ -104,7 +104,7 @@ sub deinitialize_all_slots {
 
 sub is_slot_initialized {
     my ($self, $instance, $slot_name, $value) = @_;
-    exists $instance->{$slot_name} ? 1 : 0;
+    exists $instance->{$slot_name};
 }
 
 sub weaken_slot_value {
@@ -138,8 +138,7 @@ sub inline_slot_access {
 
 sub inline_get_slot_value {
     my ($self, $instance, $slot_name) = @_;
-    'exists ' . $self->inline_slot_access($instance, $slot_name) .
-    ' ? ' . $self->inline_slot_access($instance, $slot_name) . ' : undef'
+    $self->inline_slot_access($instance, $slot_name);
 }
 
 sub inline_set_slot_value {
@@ -158,7 +157,7 @@ sub inline_deinitialize_slot {
 }
 sub inline_is_slot_initialized {
     my ($self, $instance, $slot_name) = @_;
-    "exists " . $self->inline_slot_access($instance, $slot_name) . " ? 1 : 0";
+    "exists " . $self->inline_slot_access($instance, $slot_name);
 }
 
 sub inline_weaken_slot_value {
@@ -181,26 +180,15 @@ __END__
 
 Class::MOP::Instance - Instance Meta Object
 
-=head1 SYNOPSIS
-
-  # for the most part, this protocol is internal
-  # and not for public usage, but this how one
-  # might use it
-
-  package Foo;
-
-  use strict;
-  use warnings;
-  use metaclass (
-      ':instance_metaclass'  => 'ArrayBasedStorage::Instance',
-  );
-
-  # now Foo->new produces blessed ARRAY ref based objects
-
 =head1 DESCRIPTION
 
-This is a sub-protocol which governs instance creation
-and access to the slots of the instance structure.
+The meta instance is used by attributes for low level storage.
+
+Using this API generally violates attribute encapsulation and is not
+reccomended, instead look at L<Class::MOP::Attribute/get_value>,
+L<Class::MOP::Attribute/set_value> for the reccomended way to fiddle with
+attribute values in a generic way, independant of how/whether accessors have
+been defined. Accessors can be found using L<Class::MOP::Class/get_attribute>.
 
 This may seem like over-abstraction, but by abstracting
 this process into a sub-protocol we make it possible to
@@ -241,6 +229,8 @@ This does just exactly what it says it does.
 
 =item B<clone_instance ($instance_structure)>
 
+This too does just exactly what it says it does.
+
 =back
 
 =head2 Instrospection
@@ -252,12 +242,16 @@ we will add then when we need them basically.
 
 =item B<associated_metaclass>
 
+This returns the metaclass associated with this instance.
+
 =item B<get_all_slots>
 
 This will return the current list of slots based on what was
 given to this object in C<new>.
 
 =item B<is_valid_slot ($slot_name)>
+
+This will return true if C<$slot_name> is a valid slot name.
 
 =back
 
@@ -267,6 +261,10 @@ An important distinction of this sub-protocol is that the
 instance meta-object is a different entity from the actual
 instance it creates. For this reason, any actions on slots
 require that the C<$instance_structure> is passed into them.
+
+The names of these methods pretty much explain exactly 
+what they do, if that is not enough then I suggest reading 
+the source, it is very straightfoward.
 
 =over 4
 
@@ -294,19 +292,13 @@ require that the C<$instance_structure> is passed into them.
 
 =head2 Inlineable Instance Operations
 
-This part of the API is currently un-used. It is there for use
-in future experiments in class finailization mostly. Best to
-ignore this for now.
-
 =over 4
 
 =item B<is_inlinable>
 
 Each meta-instance should override this method to tell Class::MOP if it's
-possible to inline the slot access.
-
-This is currently only used by Class::MOP::Class::Immutable when performing
-optimizations.
+possible to inline the slot access. This is currently only used by 
+L<Class::MOP::Immutable> when performing optimizations.
 
 =item B<inline_create_instance>
 
