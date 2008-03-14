@@ -12,14 +12,10 @@ use Carp         'confess';
 use Scalar::Util 'blessed', 'reftype', 'weaken';
 use Sub::Name    'subname';
 
-our $VERSION   = '0.28';
+our $VERSION   = '0.29';
 our $AUTHORITY = 'cpan:STEVAN';
 
 use base 'Class::MOP::Module';
-
-# Self-introspection
-
-sub meta { Class::MOP::Class->initialize(blessed($_[0]) || $_[0]) }
 
 # Creation
 
@@ -243,6 +239,18 @@ sub create {
                    "(I found an uneven number of params in \@_)";
 
     my (%options) = @_;
+    
+    (ref $options{superclasses} eq 'ARRAY')
+        || confess "You must pass an ARRAY ref of superclasses"
+            if exists $options{superclasses};
+            
+    (ref $options{attributes} eq 'ARRAY')
+        || confess "You must pass an ARRAY ref of attributes"
+            if exists $options{attributes};      
+            
+    (ref $options{methods} eq 'HASH')
+        || confess "You must pass an HASH ref of methods"
+            if exists $options{methods};                  
 
     my $code = "package $package_name;";
     $code .= "\$$package_name\:\:VERSION = '" . $options{version} . "';"
@@ -396,7 +404,7 @@ sub clone_instance {
 }
 
 sub rebless_instance {
-    my ($self, $instance) = @_;
+    my ($self, $instance, %params) = @_;
 
     my $old_metaclass;
     if ($instance->can('meta')) {
@@ -416,13 +424,13 @@ sub rebless_instance {
     # rebless!
     $meta_instance->rebless_instance_structure($instance, $self);
 
-    my %params;
-
     foreach my $attr ( $self->compute_all_applicable_attributes ) {
         if ( $attr->has_value($instance) ) {
             if ( defined( my $init_arg = $attr->init_arg ) ) {
-                $params{$init_arg} = $attr->get_value($instance);
-            } else {
+                $params{$init_arg} = $attr->get_value($instance)
+                    unless exists $params{$init_arg};
+            } 
+            else {
                 $attr->set_value($instance);
             }
         }
@@ -866,6 +874,8 @@ sub is_immutable { 0 }
             print STDERR "# of Metaclass options:      ", keys %IMMUTABLE_OPTIONS;
             print STDERR "# of Immutable transformers: ", keys %IMMUTABLE_TRANSFORMERS;
         }
+        
+        1;
     }
 
     sub make_mutable{
@@ -875,6 +885,7 @@ sub is_immutable { 0 }
         confess "unable to find immutabilizing options" unless ref $options;
         my $transformer = delete $options->{IMMUTABLE_TRANSFORMER};
         $transformer->make_metaclass_mutable($self, $options);
+        1;
     }
 }
 
@@ -1126,11 +1137,12 @@ shallow cloning is outside the scope of the meta-object protocol. I
 think Yuval "nothingmuch" Kogman put it best when he said that cloning
 is too I<context-specific> to be part of the MOP.
 
-=item B<rebless_instance($instance)>
+=item B<rebless_instance($instance, ?%params)>
 
 This will change the class of C<$instance> to the class of the invoking
 C<Class::MOP::Class>. You may only rebless the instance to a subclass of
-itself. 
+itself. You may pass in optional C<%params> which are like constructor 
+params and will override anything already defined in the instance.
 
 =back
 

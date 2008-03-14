@@ -14,7 +14,7 @@ use Class::MOP::Method;
 use Class::MOP::Immutable;
 
 BEGIN {
-    our $VERSION   = '0.53';
+    our $VERSION   = '0.54';
     our $AUTHORITY = 'cpan:STEVAN';    
     
     use XSLoader;
@@ -77,9 +77,9 @@ sub is_class_loaded {
     my $class = shift;
     no strict 'refs';
     return 1 if defined ${"${class}::VERSION"} || defined @{"${class}::ISA"};
-    foreach (keys %{"${class}::"}) {
-            next if substr($_, -2, 2) eq '::';
-            return 1 if defined &{"${class}::$_"};
+    foreach my $symbol (keys %{"${class}::"}) {
+            next if substr($symbol, -2, 2) eq '::';
+            return 1 if defined &{"${class}::${symbol}"};
     }
     return 0;
 }

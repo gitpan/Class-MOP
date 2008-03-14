@@ -1,5 +1,43 @@
 Revision history for Perl extension Class-MOP.
 
+0.54 Fri. March, 14, 2008
+    * Class::MOP
+      metaclass.pm
+      - making sure that load_class never gets
+        passed a value from @_ or $_ to squash 
+        Ovid's bug (http://use.perl.org/~Ovid/journal/35763)
+
+    * Class::MOP::Class
+      - make_{immutable,mutable} now return 1
+        (cause Sartak asked)
+      - improved error handling in ->create method
+      - rebless_instance now takes extra params which 
+        will be used to populate values 
+        - added tests for this
+        
+    * Class::MOP::Object
+      - localizing the Data::Dumper configurations so 
+        that it does not pollute others (RT #33509)        
+ 
+    * Class::MOP::Class
+      Class::MOP::Package
+      Class::MOP::Module
+      Class::MOP::Method
+      Class::MOP::Attribute
+      - these classes no longer define their own ->meta, 
+        but instead just inherit from Class::MOP::Object      
+      
+    * Class::MOP::Instance
+      Class::MOP::Immutable                        
+      - these classes now inherit from Class::MOP::Object
+ 
+    * t/
+      - fixed the filename length on several 
+        test files so we install on VMS better
+        (RT #32295)
+      - fixed incorrect use of catdir when it 
+        should be catfile (RT #32385)
+
 0.53 Thurs. Feb. 14, 1008
     ~~ several doc. fixes and updates ~~
         
