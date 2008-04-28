@@ -12,7 +12,7 @@ use Carp         'confess';
 use Scalar::Util 'blessed', 'reftype', 'weaken';
 use Sub::Name    'subname';
 
-our $VERSION   = '0.29';
+our $VERSION   = '0.30';
 our $AUTHORITY = 'cpan:STEVAN';
 
 use base 'Class::MOP::Module';
@@ -431,7 +431,7 @@ sub rebless_instance {
                     unless exists $params{$init_arg};
             } 
             else {
-                $attr->set_value($instance);
+                $attr->set_value($instance, $attr->get_value($instance));
             }
         }
     }
@@ -439,6 +439,8 @@ sub rebless_instance {
     foreach my $attr ($self->compute_all_applicable_attributes) {
         $attr->initialize_instance_slot($meta_instance, $instance, \%params);
     }
+    
+    $instance;
 }
 
 # Inheritance
@@ -505,17 +507,12 @@ sub subclasses {
 
 
 sub linearized_isa {
-    if (Class::MOP::IS_RUNNING_ON_5_10()) {
-        return @{ mro::get_linear_isa( (shift)->name ) };
-    }
-    else {
-        my %seen;
-        return grep { !($seen{$_}++) } (shift)->class_precedence_list;
-    }
+    return @{ mro::get_linear_isa( (shift)->name ) };
 }
 
 sub class_precedence_list {
     my $self = shift;
+    my $name = $self->name;
 
     unless (Class::MOP::IS_RUNNING_ON_5_10()) { 
         # NOTE:
@@ -525,15 +522,26 @@ sub class_precedence_list {
         # blow up otherwise. Yes, it's an ugly hack, better
         # suggestions are welcome.        
         # - SL
-        ($self->name || return)->isa('This is a test for circular inheritance') 
+        ($name || return)->isa('This is a test for circular inheritance') 
     }
 
-    (
-        $self->name,
-        map {
-            $self->initialize($_)->class_precedence_list()
-        } $self->superclasses()
-    );
+    # if our mro is c3, we can 
+    # just grab the linear_isa
+    if (mro::get_mro($name) eq 'c3') {
+        return @{ mro::get_linear_isa($name) }
+    }
+    else {
+        # NOTE:
+        # we can't grab the linear_isa for dfs
+        # since it has all the duplicates 
+        # already removed.
+        return (
+            $name,
+            map {
+                $self->initialize($_)->class_precedence_list()
+            } $self->superclasses()
+        );
+    }
 }
 
 ## Methods

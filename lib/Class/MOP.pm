@@ -4,6 +4,8 @@ package Class::MOP;
 use strict;
 use warnings;
 
+use MRO::Compat;
+
 use Carp         'confess';
 use Scalar::Util 'weaken';
 
@@ -14,7 +16,7 @@ use Class::MOP::Method;
 use Class::MOP::Immutable;
 
 BEGIN {
-    our $VERSION   = '0.54';
+    our $VERSION   = '0.55';
     our $AUTHORITY = 'cpan:STEVAN';    
     
     use XSLoader;
