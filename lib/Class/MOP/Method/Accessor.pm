@@ -7,7 +7,7 @@ use warnings;
 use Carp         'confess';
 use Scalar::Util 'blessed', 'weaken';
 
-our $VERSION   = '0.02';
+our $VERSION   = '0.03';
 our $AUTHORITY = 'cpan:STEVAN';
 
 use base 'Class::MOP::Method::Generated';
@@ -25,9 +25,14 @@ sub new {
     (blessed($options{attribute}) && $options{attribute}->isa('Class::MOP::Attribute'))
         || confess "You must supply an attribute which is a 'Class::MOP::Attribute' instance";
 
+    ($options{package_name} && $options{name})
+        || confess "You must supply the package_name and name parameters";
+
     my $self = bless {
         # from our superclass
         '&!body'          => undef,
+        '$!package_name' => $options{package_name},
+        '$!name'         => $options{name},        
         # specific to this subclass
         '$!attribute'     => $options{attribute},
         '$!is_inline'     => ($options{is_inline} || 0),

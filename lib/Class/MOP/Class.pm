@@ -10,9 +10,8 @@ use Class::MOP::Method::Wrapped;
 
 use Carp         'confess';
 use Scalar::Util 'blessed', 'reftype', 'weaken';
-use Sub::Name    'subname';
 
-our $VERSION   = '0.30';
+our $VERSION   = '0.31';
 our $AUTHORITY = 'cpan:STEVAN';
 
 use base 'Class::MOP::Module';
@@ -321,10 +320,24 @@ sub get_method_map {
                         $map->{$symbol}->body == $code;
 
         my ($pkg, $name) = Class::MOP::get_code_info($code);
-        next if ($pkg  || '') ne $class_name &&
-                ($name || '') ne '__ANON__';
+        
+        # NOTE:
+        # in 5.10 constant.pm the constants show up 
+        # as being in the right package, but in pre-5.10
+        # they show up as constant::__ANON__ so we 
+        # make an exception here to be sure that things
+        # work as expected in both.
+        # - SL
+        unless ($pkg eq 'constant' && $name eq '__ANON__') {
+            next if ($pkg  || '') ne $class_name ||
+                    (($name || '') ne '__ANON__' && ($pkg  || '') ne $class_name);
+        }
 
-        $map->{$symbol} = $method_metaclass->wrap($code);
+        $map->{$symbol} = $method_metaclass->wrap(
+            $code,
+            package_name => $class_name,
+            name         => $symbol,
+        );
     }
 
     return $map;
@@ -554,17 +567,34 @@ sub add_method {
     my $body;
     if (blessed($method)) {
         $body = $method->body;
+        if ($method->package_name ne $self->name && 
+            $method->name         ne $method_name) {
+            warn "Hello there, got somethig for you." 
+                . " Method says " . $method->package_name . " " . $method->name
+                . " Class says " . $self->name . " " . $method_name;
+            $method = $method->clone(
+                package_name => $self->name,
+                name         => $method_name            
+            ) if $method->can('clone');
+        }
     }
     else {
         $body = $method;
         ('CODE' eq (reftype($body) || ''))
             || confess "Your code block must be a CODE reference";
-        $method = $self->method_metaclass->wrap($body);
+        $method = $self->method_metaclass->wrap(
+            $body => (
+                package_name => $self->name,
+                name         => $method_name
+            )
+        );
     }
     $self->get_method_map->{$method_name} = $method;
-
-    my $full_method_name = ($self->name . '::' . $method_name);
-    $self->add_package_symbol("&${method_name}" => subname $full_method_name => $body);
+    
+    my $full_method_name = ($self->name . '::' . $method_name);    
+    $self->add_package_symbol("&${method_name}" => 
+        Class::MOP::subname($full_method_name => $body)
+    );
     $self->update_package_cache_flag;    
 }
 
@@ -599,7 +629,9 @@ sub add_method {
         (defined $method_name && $method_name)
             || confess "You must pass in a method name";
         my $method = $fetch_and_prepare_method->($self, $method_name);
-        $method->add_before_modifier(subname ':before' => $method_modifier);
+        $method->add_before_modifier(
+            Class::MOP::subname(':before' => $method_modifier)
+        );
     }
 
     sub add_after_method_modifier {
@@ -607,7 +639,9 @@ sub add_method {
         (defined $method_name && $method_name)
             || confess "You must pass in a method name";
         my $method = $fetch_and_prepare_method->($self, $method_name);
-        $method->add_after_modifier(subname ':after' => $method_modifier);
+        $method->add_after_modifier(
+            Class::MOP::subname(':after' => $method_modifier)
+        );
     }
 
     sub add_around_method_modifier {
@@ -615,7 +649,9 @@ sub add_method {
         (defined $method_name && $method_name)
             || confess "You must pass in a method name";
         my $method = $fetch_and_prepare_method->($self, $method_name);
-        $method->add_around_modifier(subname ':around' => $method_modifier);
+        $method->add_around_modifier(
+            Class::MOP::subname(':around' => $method_modifier)
+        );
     }
 
     # NOTE:
@@ -900,23 +936,34 @@ sub is_immutable { 0 }
 sub create_immutable_transformer {
     my $self = shift;
     my $class = Class::MOP::Immutable->new($self, {
-       read_only   => [qw/superclasses/],
-       cannot_call => [qw/
+        read_only   => [qw/superclasses/],
+        cannot_call => [qw/
            add_method
            alias_method
            remove_method
            add_attribute
            remove_attribute
-           add_package_symbol
            remove_package_symbol
-       /],
-       memoize     => {
+        /],
+        memoize     => {
            class_precedence_list             => 'ARRAY',
            linearized_isa                    => 'ARRAY',
            compute_all_applicable_attributes => 'ARRAY',
            get_meta_instance                 => 'SCALAR',
            get_method_map                    => 'SCALAR',
-       }
+        },
+        # NOTE:
+        # this is ugly, but so are typeglobs, 
+        # so whattayahgonnadoboutit
+        # - SL
+        wrapped => { 
+            add_package_symbol => sub {
+                my $original = shift;
+                confess "Cannot add package symbols to an immutable metaclass" 
+                    unless (caller(2))[3] eq 'Class::MOP::Package::get_package_symbol'; 
+                goto $original->body;
+            },
+        },
     });
     return $class;
 }
@@ -1267,7 +1314,7 @@ C<$method_name>, or return undef if that method does not exist.
 The Class::MOP::Method is codifiable, so you can use it like a normal
 CODE reference, see L<Class::MOP::Method> for more information.
 
-=item B<find_method_by_name ($method_name>
+=item B<find_method_by_name ($method_name)>
 
 This will return a CODE reference of the specified C<$method_name>,
 or return undef if that method does not exist.

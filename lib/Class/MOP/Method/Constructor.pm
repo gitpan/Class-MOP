@@ -7,7 +7,7 @@ use warnings;
 use Carp         'confess';
 use Scalar::Util 'blessed', 'weaken', 'looks_like_number';
 
-our $VERSION   = '0.04';
+our $VERSION   = '0.05';
 our $AUTHORITY = 'cpan:STEVAN';
 
 use base 'Class::MOP::Method::Generated';
@@ -20,9 +20,14 @@ sub new {
         || confess "You must pass a metaclass instance if you want to inline"
             if $options{is_inline};
 
+    ($options{package_name} && $options{name})
+        || confess "You must supply the package_name and name parameters";
+
     my $self = bless {
         # from our superclass
-        '&!body'          => undef,
+        '&!body'                 => undef,
+        '$!package_name'         => $options{package_name},
+        '$!name'                 => $options{name},        
         # specific to this subclass
         '%!options'              => $options{options} || {},
         '$!associated_metaclass' => $options{metaclass},

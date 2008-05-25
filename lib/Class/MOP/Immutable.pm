@@ -9,7 +9,7 @@ use Class::MOP::Method::Constructor;
 use Carp         'confess';
 use Scalar::Util 'blessed';
 
-our $VERSION   = '0.05';
+our $VERSION   = '0.06';
 our $AUTHORITY = 'cpan:STEVAN';
 
 use base 'Class::MOP::Object';
@@ -98,9 +98,11 @@ sub make_metaclass_immutable {
         $metaclass->add_method(
             $options{constructor_name},
             $constructor_class->new(
-                options   => \%options,
-                metaclass => $metaclass,
-                is_inline => 1,
+                options      => \%options,
+                metaclass    => $metaclass,
+                is_inline    => 1,
+                package_name => $metaclass->name,
+                name         => $options{constructor_name}
             )
         ) unless $metaclass->has_method($options{constructor_name});
     }
@@ -113,8 +115,10 @@ sub make_metaclass_immutable {
         my $destructor_class = $options{destructor_class};
 
         my $destructor = $destructor_class->new(
-            options   => \%options,
-            metaclass => $metaclass,
+            options      => \%options,
+            metaclass    => $metaclass,
+            package_name => $metaclass->name,
+            name         => 'DESTROY'            
         );
 
         $metaclass->add_method('DESTROY' => $destructor)
@@ -170,7 +174,7 @@ sub make_metaclass_mutable {
 
     if ($options{inline_destructor} && $immutable->has_method('DESTROY')) {
         $immutable->remove_method('DESTROY')
-          if $immutable->get_method('DESTROY')->blessed eq $options{destructor_class};
+          if blessed($immutable->get_method('DESTROY')) eq $options{destructor_class};
     }
 
     # NOTE:
@@ -190,10 +194,10 @@ sub make_metaclass_mutable {
     # 14:26 <@stevan> the only user of ::Method::Constructor is immutable
     # 14:27 <@stevan> if someone uses it outside of immutable,.. they are either: mst or groditi
     # 14:27 <@stevan> so I am not worried
-    if ($options{inline_constructor}) {
+    if ($options{inline_constructor}  && $immutable->has_method($options{constructor_name})) {
         my $constructor_class = $options{constructor_class} || 'Class::MOP::Method::Constructor';
         $immutable->remove_method( $options{constructor_name}  )
-          if $immutable->get_method($options{constructor_name})->blessed eq $constructor_class;
+          if blessed($immutable->get_method($options{constructor_name})) eq $constructor_class;
     }
 }
 
@@ -232,6 +236,19 @@ sub create_methods_for_immutable_metaclass {
         elsif ($type eq 'SCALAR') {
             $methods{$method_name} = sub { $_[0]->{'___' . $method_name} };
         }
+    }
+    
+    my $wrapped_methods = $self->options->{wrapped};
+    
+    foreach my $method_name (keys %{ $wrapped_methods }) {
+        my $method = $self->metaclass->meta->find_method_by_name($method_name);
+
+        (defined $method)
+            || confess "Could not find the method '$method_name' in " . $self->metaclass->name;
+
+        my $wrapper = $wrapped_methods->{$method_name};
+
+        $methods{$method_name} = sub { $wrapper->($method, @_) };
     }
 
     $methods{get_mutable_metaclass_name} = sub { (shift)->{'___original_class'} };

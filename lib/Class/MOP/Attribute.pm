@@ -9,7 +9,7 @@ use Class::MOP::Method::Accessor;
 use Carp         'confess';
 use Scalar::Util 'blessed', 'reftype', 'weaken';
 
-our $VERSION   = '0.24';
+our $VERSION   = '0.25';
 our $AUTHORITY = 'cpan:STEVAN';
 
 use base 'Class::MOP::Object';
@@ -41,7 +41,7 @@ sub new {
     } else {
         (is_default_a_coderef(\%options))
             || confess("References are not allowed as default values, you must ".
-                       "wrap then in a CODE reference (ex: sub { [] } and not [])")
+                       "wrap the default of '$name' in a CODE reference (ex: sub { [] } and not [])")
                 if exists $options{default} && ref $options{default};
     }
     if( $options{required} and not( defined($options{builder}) || defined($options{init_arg}) || exists $options{default} ) ) {
@@ -167,6 +167,9 @@ sub initializer { $_[0]->{'$!initializer'} }
 # end bootstrapped away method section.
 # (all methods below here are kept intact)
 
+sub has_read_method  { $_[0]->has_reader || $_[0]->has_accessor }
+sub has_write_method { $_[0]->has_writer || $_[0]->has_accessor }
+
 sub get_read_method  { 
     my $self   = shift;    
     my $reader = $self->reader || $self->accessor;
@@ -193,7 +196,17 @@ sub get_read_method_ref {
         return $self->associated_class->get_method($reader);
     }
     else {
-        return sub { $self->get_value(@_) };
+        my $code = sub { $self->get_value(@_) };
+        if (my $class = $self->associated_class) {
+            return $class->method_metaclass->wrap(
+                $code,
+                package_name => $class->name,
+                name         => '__ANON__'
+            );
+        }
+        else {
+            return $code;
+        }
     }
 }
 
@@ -203,7 +216,17 @@ sub get_write_method_ref {
         return $self->associated_class->get_method($writer);
     }
     else {
-        return sub { $self->set_value(@_) };
+        my $code = sub { $self->set_value(@_) };
+        if (my $class = $self->associated_class) {
+            return $class->method_metaclass->wrap(
+                $code,
+                package_name => $class->name,
+                name         => '__ANON__'
+            );
+        }
+        else {
+            return $code;
+        }
     }
 }
 
@@ -301,7 +324,11 @@ sub process_accessors {
         (reftype($accessor) eq 'HASH')
             || confess "bad accessor/reader/writer/predicate/clearer format, must be a HASH ref";
         my ($name, $method) = %{$accessor};
-        $method = $self->accessor_metaclass->wrap($method);
+        $method = $self->accessor_metaclass->wrap(
+            $method,
+            package_name => $self->associated_class->name,
+            name         => $name,
+        );
         $self->associate_method($method);
         return ($name, $method);
     }
@@ -313,6 +340,8 @@ sub process_accessors {
                 attribute     => $self,
                 is_inline     => $inline_me,
                 accessor_type => $type,
+                package_name  => $self->associated_class->name,
+                name          => $accessor,
             );
         };
         confess "Could not create the '$type' method for " . $self->name . " because : $@" if $@;
@@ -697,6 +726,14 @@ C<reader> and C<writer> or C<accessor> was specified or not.
 
 NOTE: If no reader/writer/accessor was specified, this will use the 
 attribute get_value/set_value methods, which can be very inefficient.
+
+=item B<has_read_method>
+
+=item B<has_write_method>
+
+Return whether a method exists suitable for reading / writing the value 
+of the attribute in the associated class. Suitable for use whether 
+C<reader> and C<writer> or C<accessor> was used.
 
 =back
 
