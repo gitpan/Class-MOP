@@ -24,8 +24,21 @@ get_code_info(coderef)
   PPCODE:
     if( SvOK(coderef) && SvROK(coderef) && SvTYPE(SvRV(coderef)) == SVt_PVCV){
       coderef = SvRV(coderef);
-      name    = GvNAME( CvGV(coderef) );
-      pkg     = HvNAME( GvSTASH(CvGV(coderef)) );
+      /* I think this only gets triggered with a mangled coderef, but if
+         we hit it without the guard, we segfault. The slightly odd return
+         value strikes me as an improvement (mst)
+      */
+#ifdef isGV_with_GP
+      if ( isGV_with_GP(CvGV(coderef))) {
+#endif
+        pkg     = HvNAME( GvSTASH(CvGV(coderef)) );
+        name    = GvNAME( CvGV(coderef) );
+#ifdef isGV_with_GP
+      } else {
+        pkg     = "__UNKNOWN__";
+        name    = "__ANON__";
+      }
+#endif
 
       EXTEND(SP, 2);
       PUSHs(newSVpvn(pkg, strlen(pkg)));

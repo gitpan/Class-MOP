@@ -1,71 +1,69 @@
----
-abstract: 'A Meta Object Protocol for Perl 5'
-author:
-  - 'Stevan Little <stevan@iinteractive.com>'
-build_requires:
+--- 
+abstract: A Meta Object Protocol for Perl 5
+author: 
+  - Stevan Little <stevan@iinteractive.com>
+build_requires: 
   File::Spec: 0
   Test::Exception: 0.21
   Test::More: 0.62
 distribution_type: module
-generated_by: 'Module::Install version 0.73'
+generated_by: Module::Install version 0.68
 license: perl
-meta-spec:
+meta-spec: 
   url: http://module-build.sourceforge.net/META-spec-v1.3.html
   version: 1.3
 name: Class-MOP
-no_index:
-  directory:
+no_index: 
+  directory: 
     - inc
     - t
-    - examples
-    - examples
-provides:
-  Class::MOP:
+provides: 
+  Class::MOP: 
     file: lib/Class/MOP.pm
-    version: 0.58
-  Class::MOP::Attribute:
+    version: 0.56
+  Class::MOP::Attribute: 
     file: lib/Class/MOP/Attribute.pm
-    version: 0.25
-  Class::MOP::Class:
+    version: 0.24
+  Class::MOP::Class: 
     file: lib/Class/MOP/Class.pm
-    version: 0.32
-  Class::MOP::Immutable:
+    version: 0.31
+  Class::MOP::Immutable: 
     file: lib/Class/MOP/Immutable.pm
     version: 0.06
-  Class::MOP::Instance:
+  Class::MOP::Instance: 
     file: lib/Class/MOP/Instance.pm
     version: 0.05
-  Class::MOP::Method:
+  Class::MOP::Method: 
     file: lib/Class/MOP/Method.pm
-    version: 0.08
-  Class::MOP::Method::Accessor:
+    version: 0.07
+  Class::MOP::Method::Accessor: 
     file: lib/Class/MOP/Method/Accessor.pm
-    version: 0.04
-  Class::MOP::Method::Constructor:
-    file: lib/Class/MOP/Method/Constructor.pm
-    version: 0.06
-  Class::MOP::Method::Generated:
-    file: lib/Class/MOP/Method/Generated.pm
     version: 0.03
-  Class::MOP::Method::Wrapped:
+  Class::MOP::Method::Constructor: 
+    file: lib/Class/MOP/Method/Constructor.pm
+    version: 0.05
+  Class::MOP::Method::Generated: 
+    file: lib/Class/MOP/Method/Generated.pm
+    version: 0.02
+  Class::MOP::Method::Wrapped: 
     file: lib/Class/MOP/Method/Wrapped.pm
     version: 0.03
-  Class::MOP::Module:
+  Class::MOP::Module: 
     file: lib/Class/MOP/Module.pm
     version: 0.03
-  Class::MOP::Object:
+  Class::MOP::Object: 
     file: lib/Class/MOP/Object.pm
     version: 0.03
-  Class::MOP::Package:
+  Class::MOP::Package: 
     file: lib/Class/MOP/Package.pm
-    version: 0.09
-  metaclass:
+    version: 0.08
+  metaclass: 
     file: lib/metaclass.pm
     version: 0.05
-requires:
+requires: 
   Carp: 0
   MRO::Compat: 0.05
   Scalar::Util: 1.18
   Sub::Identify: 0.03
   Sub::Name: 0.02
-version: 0.58
+version: 0.56

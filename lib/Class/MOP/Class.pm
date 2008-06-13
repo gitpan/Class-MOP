@@ -9,9 +9,9 @@ use Class::MOP::Instance;
 use Class::MOP::Method::Wrapped;
 
 use Carp         'confess';
-use Scalar::Util 'blessed', 'reftype', 'weaken';
+use Scalar::Util 'blessed', 'weaken';
 
-our $VERSION   = '0.32';
+our $VERSION   = '0.33';
 our $AUTHORITY = 'cpan:STEVAN';
 
 use base 'Class::MOP::Module';
@@ -103,7 +103,8 @@ sub construct_class_instance {
             # we can tell the first time the 
             # methods are fetched
             # - SL
-            '$!_package_cache_flag'       => undef,            
+            '$!_package_cache_flag'       => undef,  
+            '$!_meta_instance'            => undef,          
         } => $class;
     }
     else {
@@ -367,7 +368,7 @@ sub construct_instance {
     # NOTE:
     # this will only work for a HASH instance type
     if ($class->is_anon_class) {
-        (reftype($instance) eq 'HASH')
+        (Scalar::Util::reftype($instance) eq 'HASH')
             || confess "Currently only HASH based instances are supported with instance of anon-classes";
         # NOTE:
         # At some point we should make this official
@@ -379,11 +380,26 @@ sub construct_instance {
     return $instance;
 }
 
+
 sub get_meta_instance {
-    my $class = shift;
-    return $class->instance_metaclass->new(
-        $class,
-        $class->compute_all_applicable_attributes()
+    my $self = shift;
+    # NOTE:
+    # just about any fiddling with @ISA or 
+    # any fiddling with attributes will 
+    # also fiddle with the symbol table 
+    # and therefore invalidate the package 
+    # cache, in which case we should blow 
+    # away the meta-instance cache. Of course
+    # this will invalidate it more often then 
+    # is probably needed, but better safe 
+    # then sorry.
+    # - SL
+    $self->{'$!_meta_instance'} = undef
+        if defined $self->{'$!_package_cache_flag'} && 
+                   $self->{'$!_package_cache_flag'} == Class::MOP::check_package_cache_flag($self->name);
+    $self->{'$!_meta_instance'} ||= $self->instance_metaclass->new(
+        $self,
+        $self->compute_all_applicable_attributes()
     );
 }
 
@@ -459,10 +475,11 @@ sub rebless_instance {
 # Inheritance
 
 sub superclasses {
-    my $self = shift;
+    my $self     = shift;
+    my $var_spec = { sigil => '@', type => 'ARRAY', name => 'ISA' };
     if (@_) {
         my @supers = @_;
-        @{$self->get_package_symbol('@ISA')} = @supers;
+        @{$self->get_package_symbol($var_spec)} = @supers;
         # NOTE:
         # we need to check the metaclass
         # compatibility here so that we can
@@ -471,7 +488,7 @@ sub superclasses {
         # we don't know about
         $self->check_metaclass_compatability();
     }
-    @{$self->get_package_symbol('@ISA')};
+    @{$self->get_package_symbol($var_spec)};
 }
 
 sub subclasses {
@@ -580,7 +597,7 @@ sub add_method {
     }
     else {
         $body = $method;
-        ('CODE' eq (reftype($body) || ''))
+        ('CODE' eq ref($body))
             || confess "Your code block must be a CODE reference";
         $method = $self->method_metaclass->wrap(
             $body => (
@@ -592,7 +609,8 @@ sub add_method {
     $self->get_method_map->{$method_name} = $method;
     
     my $full_method_name = ($self->name . '::' . $method_name);    
-    $self->add_package_symbol("&${method_name}" => 
+    $self->add_package_symbol(
+        { sigil => '&', type => 'CODE', name => $method_name }, 
         Class::MOP::subname($full_method_name => $body)
     );
     $self->update_package_cache_flag;    
@@ -674,10 +692,12 @@ sub alias_method {
         || confess "You must define a method name";
 
     my $body = (blessed($method) ? $method->body : $method);
-    ('CODE' eq (reftype($body) || ''))
+    ('CODE' eq ref($body))
         || confess "Your code block must be a CODE reference";
 
-    $self->add_package_symbol("&${method_name}" => $body);
+    $self->add_package_symbol(
+        { sigil => '&', type => 'CODE', name => $method_name } => $body
+    );
     $self->update_package_cache_flag;     
 }
 
@@ -711,7 +731,9 @@ sub remove_method {
 
     my $removed_method = delete $self->get_method_map->{$method_name};
     
-    $self->remove_package_symbol("&${method_name}");
+    $self->remove_package_symbol(
+        { sigil => '&', type => 'CODE', name => $method_name }
+    );
     
     $self->update_package_cache_flag;        
 
@@ -900,16 +922,36 @@ sub is_immutable { 0 }
 #      the reference stored in  $IMMUTABLE_TRANSFORMERS{$class} and ||= should DWIM
 
 {
+
     my %IMMUTABLE_TRANSFORMERS;
     my %IMMUTABLE_OPTIONS;
+
+    sub get_immutable_options {
+        my $self = shift;
+        return if $self->is_mutable;
+        confess "unable to find immutabilizing options"
+            unless exists $IMMUTABLE_OPTIONS{$self->name};
+        my %options = %{$IMMUTABLE_OPTIONS{$self->name}};
+        delete $options{IMMUTABLE_TRANSFORMER};
+        return \%options;
+    }
+
+    sub get_immutable_transformer {
+        my $self = shift;
+        if( $self->is_mutable ){
+            my $class = blessed $self || $self;
+            return $IMMUTABLE_TRANSFORMERS{$class} ||= $self->create_immutable_transformer;
+        }
+        confess "unable to find transformer for immutable class"
+            unless exists $IMMUTABLE_OPTIONS{$self->name};
+        return $IMMUTABLE_OPTIONS{$self->name}->{IMMUTABLE_TRANSFORMER};
+    }
+
     sub make_immutable {
         my $self = shift;
         my %options = @_;
-        my $class = blessed $self || $self;
 
-        $IMMUTABLE_TRANSFORMERS{$class} ||= $self->create_immutable_transformer;
-        my $transformer = $IMMUTABLE_TRANSFORMERS{$class};
-
+        my $transformer = $self->get_immutable_transformer;
         $transformer->make_metaclass_immutable($self, \%options);
         $IMMUTABLE_OPTIONS{$self->name} =
             { %options,  IMMUTABLE_TRANSFORMER => $transformer };
@@ -918,7 +960,7 @@ sub is_immutable { 0 }
             print STDERR "# of Metaclass options:      ", keys %IMMUTABLE_OPTIONS;
             print STDERR "# of Immutable transformers: ", keys %IMMUTABLE_TRANSFORMERS;
         }
-        
+
         1;
     }
 
@@ -1563,6 +1605,15 @@ the L<Class::MOP::Immutable> documentation.
 
 This method will reverse tranforamtion upon the class which
 made it immutable.
+
+=item B<get_immutable_transformer>
+
+Return a transformer suitable for making this class immutable or, if this
+class is immutable, the transformer used to make it immutable.
+
+=item B<get_immutable_options>
+
+If the class is immutable, return the options used to make it immutable.
 
 =item B<create_immutable_transformer>
 

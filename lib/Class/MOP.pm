@@ -16,7 +16,7 @@ use Class::MOP::Method;
 use Class::MOP::Immutable;
 
 BEGIN {
-    our $VERSION   = '0.58';
+    our $VERSION   = '0.59';
     our $AUTHORITY = 'cpan:STEVAN';    
     
     *IS_RUNNING_ON_5_10 = ($] < 5.009_005) 
@@ -124,6 +124,12 @@ BEGIN {
 
 sub load_class {
     my $class = shift;
+
+    if (ref($class) || !defined($class) || !length($class)) {
+        my $display = defined($class) ? $class : 'undef';
+        confess "Invalid class name ($display)";
+    }
+
     # see if this is already
     # loaded in the symbol table
     return 1 if is_class_loaded($class);
@@ -141,12 +147,31 @@ sub load_class {
 
 sub is_class_loaded {
     my $class = shift;
-    no strict 'refs';
-    return 1 if defined ${"${class}::VERSION"} || defined @{"${class}::ISA"};
-    foreach my $symbol (keys %{"${class}::"}) {
-            next if substr($symbol, -2, 2) eq '::';
-            return 1 if defined &{"${class}::${symbol}"};
+
+    return 0 if ref($class) || !defined($class) || !length($class);
+
+    # walk the symbol table tree to avoid autovififying
+    # \*{${main::}{"Foo::"}} == \*main::Foo::
+
+    my $pack = \*::;
+    foreach my $part (split('::', $class)) {
+        return 0 unless exists ${$$pack}{"${part}::"};
+        $pack = \*{${$$pack}{"${part}::"}};
     }
+
+    # check for $VERSION or @ISA
+    return 1 if exists ${$$pack}{VERSION}
+             && defined *{${$$pack}{VERSION}}{SCALAR};
+    return 1 if exists ${$$pack}{ISA}
+             && defined *{${$$pack}{ISA}}{ARRAY};
+
+    # check for any method
+    foreach ( keys %{$$pack} ) {
+        next if substr($_, -2, 2) eq '::';
+        return 1 if defined *{${$$pack}{$_}}{CODE};
+    }
+
+    # fail
     return 0;
 }
 
@@ -530,7 +555,7 @@ Class::MOP::Method->meta->add_method('wrap' => sub {
     my $code    = shift;
     my %options = @_;
 
-    ('CODE' eq (Scalar::Util::reftype($code) || ''))
+    ('CODE' eq ref($code))
         || confess "You must supply a CODE reference to bless, not (" . ($code || 'undef') . ")";
 
     ($options{package_name} && $options{name})
