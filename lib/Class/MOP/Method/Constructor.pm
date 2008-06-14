@@ -7,7 +7,7 @@ use warnings;
 use Carp         'confess';
 use Scalar::Util 'blessed', 'weaken', 'looks_like_number';
 
-our $VERSION   = '0.60';
+our $VERSION   = '0.61';
 our $AUTHORITY = 'cpan:STEVAN';
 
 use base 'Class::MOP::Method::Generated';
@@ -157,8 +157,6 @@ sub _generate_slot_initializer {
         );
     } else { return '' }
 }
-
-1;
 
 1;
 
