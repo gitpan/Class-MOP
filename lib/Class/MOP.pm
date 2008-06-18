@@ -17,7 +17,7 @@ use Class::MOP::Immutable;
 
 BEGIN {
     
-    our $VERSION   = '0.61';
+    our $VERSION   = '0.62';
     our $AUTHORITY = 'cpan:STEVAN';    
     
     *IS_RUNNING_ON_5_10 = ($] < 5.009_005) 
@@ -169,7 +169,15 @@ sub is_class_loaded {
     # check for any method
     foreach ( keys %{$$pack} ) {
         next if substr($_, -2, 2) eq '::';
-        return 1 if defined *{${$$pack}{$_}}{CODE};
+
+        my $glob = ${$$pack}{$_} || next;
+
+        # constant subs
+        if ( IS_RUNNING_ON_5_10 ) {
+            return 1 if ref $glob eq 'SCALAR';
+        }
+
+        return 1 if defined *{$glob}{CODE};
     }
 
     # fail
