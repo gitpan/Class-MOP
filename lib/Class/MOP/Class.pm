@@ -11,7 +11,7 @@ use Class::MOP::Method::Wrapped;
 use Carp         'confess';
 use Scalar::Util 'blessed', 'weaken';
 
-our $VERSION   = '0.62';
+our $VERSION   = '0.63';
 our $AUTHORITY = 'cpan:STEVAN';
 
 use base 'Class::MOP::Module';
@@ -407,7 +407,8 @@ sub clone_object {
     my $class    = shift;
     my $instance = shift;
     (blessed($instance) && $instance->isa($class->name))
-        || confess "You must pass an instance ($instance) of the metaclass (" . $class->name . ")";
+        || confess "You must pass an instance of the metaclass (" . $class->name . "), not ($instance)";
+
     # NOTE:
     # we need to protect the integrity of the
     # Class::MOP::Class singletons here, they
@@ -419,7 +420,7 @@ sub clone_object {
 sub clone_instance {
     my ($class, $instance, %params) = @_;
     (blessed($instance))
-        || confess "You can only clone instances, \$self is not a blessed instance";
+        || confess "You can only clone instances, ($instance) is not a blessed instance";
     my $meta_instance = $class->get_meta_instance();
     my $clone = $meta_instance->clone_instance($instance);
     foreach my $attr ($class->compute_all_applicable_attributes()) {
@@ -586,7 +587,7 @@ sub add_method {
         $body = $method->body;
         if ($method->package_name ne $self->name && 
             $method->name         ne $method_name) {
-            warn "Hello there, got somethig for you." 
+            warn "Hello there, got something for you." 
                 . " Method says " . $method->package_name . " " . $method->name
                 . " Class says " . $self->name . " " . $method_name;
             $method = $method->clone(
