@@ -9,7 +9,7 @@ use Class::MOP::Method::Accessor;
 use Carp         'confess';
 use Scalar::Util 'blessed', 'weaken';
 
-our $VERSION   = '0.63';
+our $VERSION   = '0.64';
 our $AUTHORITY = 'cpan:STEVAN';
 
 use base 'Class::MOP::Object';
@@ -418,14 +418,14 @@ Class::MOP::Attribute - Attribute Meta Object
 
 =head1 SYNOPSIS
 
-  Class::MOP::Attribute->new('$foo' => (
+  Class::MOP::Attribute->new( foo => (
       accessor  => 'foo',        # dual purpose get/set accessor
       predicate => 'has_foo'     # predicate check for defined-ness
       init_arg  => '-foo',       # class->new will look for a -foo key
       default   => 'BAR IS BAZ!' # if no -foo key is provided, use this
   ));
 
-  Class::MOP::Attribute->new('$.bar' => (
+  Class::MOP::Attribute->new( bar => (
       reader    => 'bar',        # getter
       writer    => 'set_bar',    # setter
       predicate => 'has_bar'     # predicate check for defined-ness

@@ -6,7 +6,7 @@ use warnings;
 
 use Scalar::Util 'weaken', 'blessed';
 
-our $VERSION   = '0.63';
+our $VERSION   = '0.64';
 our $AUTHORITY = 'cpan:STEVAN';
 
 use base 'Class::MOP::Object';
@@ -77,7 +77,7 @@ sub set_slot_value {
 
 sub initialize_slot {
     my ($self, $instance, $slot_name) = @_;
-    #$self->set_slot_value($instance, $slot_name, undef);
+    return;
 }
 
 sub deinitialize_slot {
@@ -145,7 +145,7 @@ sub inline_set_slot_value {
 
 sub inline_initialize_slot {
     my ($self, $instance, $slot_name) = @_;
-    $self->inline_set_slot_value($instance, $slot_name, 'undef'),
+    return '';
 }
 
 sub inline_deinitialize_slot {

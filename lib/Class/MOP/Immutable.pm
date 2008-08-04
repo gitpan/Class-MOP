@@ -9,7 +9,7 @@ use Class::MOP::Method::Constructor;
 use Carp         'confess';
 use Scalar::Util 'blessed';
 
-our $VERSION   = '0.63';
+our $VERSION   = '0.64';
 our $AUTHORITY = 'cpan:STEVAN';
 
 use base 'Class::MOP::Object';
@@ -59,7 +59,15 @@ my %DEFAULT_METHODS = (
         return Class::MOP::Class->initialize($self) unless blessed($self);
         # otherwise, they are asking for the metaclass
         # which has been made immutable, which is itself
-        return $self;
+        # except in the cases where it is a metaclass itself
+        # that has been made immutable and for that we need 
+        # to dig a bit ...
+        if ($self->isa('Class::MOP::Class')) {
+            return $self->{'___original_class'}->meta;
+        }
+        else {
+            return $self;
+        }
     },
     is_mutable     => sub { 0  },
     is_immutable   => sub { 1  },
@@ -73,17 +81,16 @@ my %DEFAULT_METHODS = (
 sub make_metaclass_immutable {
     my ($self, $metaclass, $options) = @_;
 
-    foreach my $pair (
-            [ inline_accessors   => 1     ],
-            [ inline_constructor => 1     ],
-            [ inline_destructor  => 0     ],
-            [ constructor_name   => 'new' ],
-            [ debug              => 0     ],
-        ) {
-        $options->{$pair->[0]} = $pair->[1] unless exists $options->{$pair->[0]};
-    }
+    my %options = (
+        inline_accessors   => 1,
+        inline_constructor => 1,
+        inline_destructor  => 0,
+        constructor_name   => 'new',
+        debug              => 0,
+        %$options,
+    );
 
-    my %options = %$options;
+    %$options = %options; # FIXME who the hell is relying on this?!? tests fail =(
 
     if ($options{inline_accessors}) {
         foreach my $attr_name ($metaclass->get_attribute_list) {
