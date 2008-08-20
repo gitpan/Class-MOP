@@ -9,7 +9,8 @@ use Class::MOP::Method::Accessor;
 use Carp         'confess';
 use Scalar::Util 'blessed', 'weaken';
 
-our $VERSION   = '0.64';
+our $VERSION   = '0.64_01';
+$VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
 
 use base 'Class::MOP::Object';
@@ -24,9 +25,12 @@ use base 'Class::MOP::Object';
 # meta-objects.
 #     - Ain't meta-circularity grand? :)
 sub new {
-    my $class   = shift;
-    my $name    = shift;
-    my %options = @_;
+    my ( $class, @args ) = @_;
+
+    unshift @args, "name" if @args % 2 == 1;
+    my %options = @args;
+
+    my $name = $options{name};
 
     (defined $name && $name)
         || confess "You must provide a name for the attribute";
@@ -47,27 +51,32 @@ sub new {
     if( $options{required} and not( defined($options{builder}) || defined($options{init_arg}) || exists $options{default} ) ) {
         confess("A required attribute must have either 'init_arg', 'builder', or 'default'");
     }
+
+    $class->_new(\%options);
+}
+
+sub _new {
+    my $class = shift;
+    my $options = @_ == 1 ? $_[0] : {@_};
+
     bless {
-        '$!name'      => $name,
-        '$!accessor'  => $options{accessor},
-        '$!reader'    => $options{reader},
-        '$!writer'      => $options{writer},
-        '$!predicate'   => $options{predicate},
-        '$!clearer'     => $options{clearer},
-        '$!builder'     => $options{builder},
-        '$!init_arg'    => $options{init_arg},
-        '$!default'     => $options{default},
-        '$!initializer' => $options{initializer},        
+        'name'        => $options->{name},
+        'accessor'    => $options->{accessor},
+        'reader'      => $options->{reader},
+        'writer'      => $options->{writer},
+        'predicate'   => $options->{predicate},
+        'clearer'     => $options->{clearer},
+        'builder'     => $options->{builder},
+        'init_arg'    => $options->{init_arg},
+        'default'     => $options->{default},
+        'initializer' => $options->{initializer},        
         # keep a weakened link to the
         # class we are associated with
-        '$!associated_class' => undef,
+        'associated_class' => undef,
         # and a list of the methods
         # associated with this attr
-        '@!associated_methods' => [],
-        # NOTE:
-        # protect this from silliness
-        init_arg => undef,
-    } => $class;
+        'associated_methods' => [],
+    }, $class;
 }
 
 # NOTE:
@@ -80,12 +89,13 @@ sub clone {
     my %options = @_;
     (blessed($self))
         || confess "Can only clone an instance";
-    return bless { %{$self}, %options } => blessed($self);
+    return bless { %{$self}, %options } => ref($self);
 }
 
 sub initialize_instance_slot {
     my ($self, $meta_instance, $instance, $params) = @_;
-    my $init_arg = $self->{'$!init_arg'};
+    my $init_arg = $self->{'init_arg'};
+
     # try to fetch the init arg from the %params ...
 
     # if nothing was in the %params, we can use the
@@ -97,14 +107,14 @@ sub initialize_instance_slot {
             $params->{$init_arg},
         );
     } 
-    elsif (defined $self->{'$!default'}) {
+    elsif (defined $self->{'default'}) {
         $self->_set_initial_slot_value(
             $meta_instance, 
             $instance,
             $self->default($instance),
         );
     } 
-    elsif (defined( my $builder = $self->{'$!builder'})) {
+    elsif (defined( my $builder = $self->{'builder'})) {
         if ($builder = $instance->can($builder)) {
             $self->_set_initial_slot_value(
                 $meta_instance, 
@@ -113,7 +123,7 @@ sub initialize_instance_slot {
             );
         } 
         else {
-            confess(blessed($instance)." does not support builder method '". $self->{'$!builder'} ."' for attribute '" . $self->name . "'");
+            confess(ref($instance)." does not support builder method '". $self->{'builder'} ."' for attribute '" . $self->name . "'");
         }
     }
 }
@@ -140,29 +150,29 @@ sub _set_initial_slot_value {
 # the next bunch of methods will get bootstrapped
 # away in the Class::MOP bootstrapping section
 
-sub name { $_[0]->{'$!name'} }
+sub name { $_[0]->{'name'} }
 
-sub associated_class   { $_[0]->{'$!associated_class'}   }
-sub associated_methods { $_[0]->{'@!associated_methods'} }
+sub associated_class   { $_[0]->{'associated_class'}   }
+sub associated_methods { $_[0]->{'associated_methods'} }
 
-sub has_accessor    { defined($_[0]->{'$!accessor'})     ? 1 : 0 }
-sub has_reader      { defined($_[0]->{'$!reader'})       ? 1 : 0 }
-sub has_writer      { defined($_[0]->{'$!writer'})       ? 1 : 0 }
-sub has_predicate   { defined($_[0]->{'$!predicate'})    ? 1 : 0 }
-sub has_clearer     { defined($_[0]->{'$!clearer'})      ? 1 : 0 }
-sub has_builder     { defined($_[0]->{'$!builder'})      ? 1 : 0 }
-sub has_init_arg    { defined($_[0]->{'$!init_arg'})     ? 1 : 0 }
-sub has_default     { defined($_[0]->{'$!default'})      ? 1 : 0 }
-sub has_initializer { defined($_[0]->{'$!initializer'})  ? 1 : 0 }
+sub has_accessor    { defined($_[0]->{'accessor'}) }
+sub has_reader      { defined($_[0]->{'reader'}) }
+sub has_writer      { defined($_[0]->{'writer'}) }
+sub has_predicate   { defined($_[0]->{'predicate'}) }
+sub has_clearer     { defined($_[0]->{'clearer'}) }
+sub has_builder     { defined($_[0]->{'builder'}) }
+sub has_init_arg    { defined($_[0]->{'init_arg'}) }
+sub has_default     { defined($_[0]->{'default'}) }
+sub has_initializer { defined($_[0]->{'initializer'}) }
 
-sub accessor    { $_[0]->{'$!accessor'}    }
-sub reader      { $_[0]->{'$!reader'}      }
-sub writer      { $_[0]->{'$!writer'}      }
-sub predicate   { $_[0]->{'$!predicate'}   }
-sub clearer     { $_[0]->{'$!clearer'}     }
-sub builder     { $_[0]->{'$!builder'}     }
-sub init_arg    { $_[0]->{'$!init_arg'}    }
-sub initializer { $_[0]->{'$!initializer'} }
+sub accessor    { $_[0]->{'accessor'}    }
+sub reader      { $_[0]->{'reader'}      }
+sub writer      { $_[0]->{'writer'}      }
+sub predicate   { $_[0]->{'predicate'}   }
+sub clearer     { $_[0]->{'clearer'}     }
+sub builder     { $_[0]->{'builder'}     }
+sub init_arg    { $_[0]->{'init_arg'}    }
+sub initializer { $_[0]->{'initializer'} }
 
 # end bootstrapped away method section.
 # (all methods below here are kept intact)
@@ -231,7 +241,7 @@ sub get_write_method_ref {
 }
 
 sub is_default_a_coderef {
-    ('CODE' eq ref($_[0]->{'$!default'} || $_[0]->{default}))
+    ('CODE' eq ref($_[0]->{'default'} || $_[0]->{default}))
 }
 
 sub default {
@@ -241,9 +251,9 @@ sub default {
         # we pass in the instance and default
         # can return a value based on that
         # instance. Somewhat crude, but works.
-        return $self->{'$!default'}->($instance);
+        return $self->{'default'}->($instance);
     }
-    $self->{'$!default'};
+    $self->{'default'};
 }
 
 # slots
@@ -256,19 +266,19 @@ sub attach_to_class {
     my ($self, $class) = @_;
     (blessed($class) && $class->isa('Class::MOP::Class'))
         || confess "You must pass a Class::MOP::Class instance (or a subclass)";
-    weaken($self->{'$!associated_class'} = $class);
+    weaken($self->{'associated_class'} = $class);
 }
 
 sub detach_from_class {
     my $self = shift;
-    $self->{'$!associated_class'} = undef;
+    $self->{'associated_class'} = undef;
 }
 
 # method association
 
 sub associate_method {
     my ($self, $method) = @_;
-    push @{$self->{'@!associated_methods'}} => $method;
+    push @{$self->{'associated_methods'}} => $method;
 }
 
 ## Slot management
@@ -276,7 +286,7 @@ sub associate_method {
 sub set_initial_value {
     my ($self, $instance, $value) = @_;
     $self->_set_initial_slot_value(
-        Class::MOP::Class->initialize(blessed($instance))->get_meta_instance,
+        Class::MOP::Class->initialize(ref($instance))->get_meta_instance,
         $instance,
         $value
     );
@@ -285,7 +295,7 @@ sub set_initial_value {
 sub set_value {
     my ($self, $instance, $value) = @_;
 
-    Class::MOP::Class->initialize(blessed($instance))
+    Class::MOP::Class->initialize(ref($instance))
                      ->get_meta_instance
                      ->set_slot_value($instance, $self->name, $value);
 }
@@ -293,7 +303,7 @@ sub set_value {
 sub get_value {
     my ($self, $instance) = @_;
 
-    Class::MOP::Class->initialize(blessed($instance))
+    Class::MOP::Class->initialize(ref($instance))
                      ->get_meta_instance
                      ->get_slot_value($instance, $self->name);
 }
@@ -301,7 +311,7 @@ sub get_value {
 sub has_value {
     my ($self, $instance) = @_;
 
-    Class::MOP::Class->initialize(blessed($instance))
+    Class::MOP::Class->initialize(ref($instance))
                      ->get_meta_instance
                      ->is_slot_initialized($instance, $self->name);
 }
@@ -309,7 +319,7 @@ sub has_value {
 sub clear_value {
     my ($self, $instance) = @_;
 
-    Class::MOP::Class->initialize(blessed($instance))
+    Class::MOP::Class->initialize(ref($instance))
                      ->get_meta_instance
                      ->deinitialize_slot($instance, $self->name);
 }
@@ -386,7 +396,7 @@ sub install_accessors {
         }
         my $method = $class->get_method($accessor);
         $class->remove_method($accessor)
-            if (blessed($method) && $method->isa('Class::MOP::Method::Accessor'));
+            if (ref($method) && $method->isa('Class::MOP::Method::Accessor'));
     };
 
     sub remove_accessors {

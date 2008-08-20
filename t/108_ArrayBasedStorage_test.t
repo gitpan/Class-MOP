@@ -3,7 +3,7 @@
 use strict;
 use warnings;
 
-use Test::More tests => 72;
+use Test::More tests => 73;
 use File::Spec;
 use Scalar::Util 'reftype';
 
@@ -39,6 +39,9 @@ BEGIN {
     }
 
     package Bar;
+    use metaclass (
+        'instance_metaclass'  => 'ArrayBasedStorage::Instance',
+    );
 
     use strict;
     use warnings;
@@ -51,6 +54,9 @@ BEGIN {
     ));
 
     package Baz;
+    use metaclass (
+        'instance_metaclass'  => 'ArrayBasedStorage::Instance',
+    );
 
     use strict;
     use warnings;
@@ -64,6 +70,9 @@ BEGIN {
     ));
 
     package Bar::Baz;
+    use metaclass (
+        'instance_metaclass'  => 'ArrayBasedStorage::Instance',
+    );
 
     use strict;
     use warnings;
@@ -188,4 +197,9 @@ is($baz->foo(), 'This is Bar::Baz::foo', '... Bar::Baz::foo == "This is Bar"');
 is($baz->get_bar(), 'FOO is BAR', '... Bar::Baz::bar has been initialized');
 is($baz->bling(), 'Baz::bling', '... Bar::Baz::bling has been initialized');
 
+Foo->meta->add_attribute( forgotten => is => "rw" );
+
+my $new_baz = Bar::Baz->new;
+
+cmp_ok( scalar(@$new_baz), ">", scalar(@$baz), "additional slot due to refreshed meta instance" );
 

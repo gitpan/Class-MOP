@@ -9,31 +9,54 @@ use Class::MOP::Method::Constructor;
 use Carp         'confess';
 use Scalar::Util 'blessed';
 
-our $VERSION   = '0.64';
+our $VERSION   = '0.64_01';
+$VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
 
 use base 'Class::MOP::Object';
 
 sub new {
-    my ($class, $metaclass, $options) = @_;
+    my ($class, @args) = @_;
 
-    my $self = bless {
-        '$!metaclass'           => $metaclass,
-        '%!options'             => $options,
-        '$!immutable_metaclass' => undef,
-    } => $class;
+    my ( $metaclass, $options );
+
+    if ( @args == 2 ) {
+        # compatibility args
+        ( $metaclass, $options ) = @args;
+    } else {
+        unshift @args, "metaclass" if @args % 2 == 1;
+
+        # default named args
+        my %options = @args;
+        $options = \%options;
+        $metaclass = $options{metaclass};
+    }
+
+    my $self = $class->_new(
+        'metaclass'           => $metaclass,
+        'options'             => $options,
+        'immutable_metaclass' => undef,
+    );
 
     # NOTE:
     # we initialize the immutable
     # version of the metaclass here
+    # FIXME lazify
     $self->create_immutable_metaclass;
 
     return $self;
 }
 
-sub immutable_metaclass { (shift)->{'$!immutable_metaclass'} }
-sub metaclass           { (shift)->{'$!metaclass'}           }
-sub options             { (shift)->{'%!options'}             }
+sub _new {
+    my $class = shift;
+    my $options = @_ == 1 ? $_[0] : {@_};
+
+    bless $options, $class;
+}
+
+sub immutable_metaclass { (shift)->{'immutable_metaclass'} }
+sub metaclass           { (shift)->{'metaclass'}           }
+sub options             { (shift)->{'options'}             }
 
 sub create_immutable_metaclass {
     my $self = shift;
@@ -43,7 +66,7 @@ sub create_immutable_metaclass {
     # metaclass is just a anon-class
     # which shadows the methods
     # appropriately
-    $self->{'$!immutable_metaclass'} = Class::MOP::Class->create_anon_class(
+    $self->{'immutable_metaclass'} = Class::MOP::Class->create_anon_class(
         superclasses => [ blessed($self->metaclass) ],
         methods      => $self->create_methods_for_immutable_metaclass,
     );
@@ -111,7 +134,7 @@ sub make_metaclass_immutable {
                 package_name => $metaclass->name,
                 name         => $options{constructor_name}
             )
-        ) unless $metaclass->has_method($options{constructor_name});
+        ) if $options{replace_constructor} or !$metaclass->has_method($options{constructor_name});
     }
 
     if ($options{inline_destructor}) {

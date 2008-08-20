@@ -7,7 +7,8 @@ use warnings;
 use Carp         'confess';
 use Scalar::Util 'blessed', 'weaken', 'looks_like_number';
 
-our $VERSION   = '0.64';
+our $VERSION   = '0.64_01';
+$VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
 
 use base 'Class::MOP::Method::Generated';
@@ -23,42 +24,49 @@ sub new {
     ($options{package_name} && $options{name})
         || confess "You must supply the package_name and name parameters $Class::MOP::Method::UPGRADE_ERROR_TEXT";
 
-    my $self = bless {
-        # from our superclass
-        '&!body'                 => undef,
-        '$!package_name'         => $options{package_name},
-        '$!name'                 => $options{name},        
-        # specific to this subclass
-        '%!options'              => $options{options} || {},
-        '$!associated_metaclass' => $options{metaclass},
-        '$!is_inline'            => ($options{is_inline} || 0),
-    } => $class;
+    my $self = $class->_new(\%options);
 
     # we don't want this creating
     # a cycle in the code, if not
     # needed
-    weaken($self->{'$!associated_metaclass'});
+    weaken($self->{'associated_metaclass'});
 
     $self->initialize_body;
 
     return $self;
 }
 
+sub _new {
+    my $class = shift;
+    my $options = @_ == 1 ? $_[0] : {@_};
+
+    bless {
+        # from our superclass
+        'body'                 => undef,
+        'package_name'         => $options->{package_name},
+        'name'                 => $options->{name},        
+        # specific to this subclass
+        'options'              => $options->{options} || {},
+        'associated_metaclass' => $options->{metaclass},
+        'is_inline'            => ($options->{is_inline} || 0),
+    }, $class;
+}
+
 ## accessors
 
-sub options              { (shift)->{'%!options'}              }
-sub associated_metaclass { (shift)->{'$!associated_metaclass'} }
+sub options              { (shift)->{'options'}              }
+sub associated_metaclass { (shift)->{'associated_metaclass'} }
 
 ## cached values ...
 
 sub meta_instance {
     my $self = shift;
-    $self->{'$!meta_instance'} ||= $self->associated_metaclass->get_meta_instance;
+    $self->{'meta_instance'} ||= $self->associated_metaclass->get_meta_instance;
 }
 
 sub attributes {
     my $self = shift;
-    $self->{'@!attributes'} ||= [ $self->associated_metaclass->compute_all_applicable_attributes ]
+    $self->{'attributes'} ||= [ $self->associated_metaclass->compute_all_applicable_attributes ]
 }
 
 ## method
@@ -69,7 +77,7 @@ sub initialize_body {
 
     $method_name .= '_inline' if $self->is_inline;
 
-    $self->{'&!body'} = $self->$method_name;
+    $self->{'body'} = $self->$method_name;
 }
 
 sub generate_constructor_method {
@@ -80,10 +88,12 @@ sub generate_constructor_method_inline {
     my $self = shift;
 
     my $source = 'sub {';
-    $source .= "\n" . 'my ($class, %params) = @_;';
+    $source .= "\n" . 'my $class = shift;';
 
-    $source .= "\n" . 'return Class::MOP::Class->initialize($class)->new_object(%params)';
+    $source .= "\n" . 'return Class::MOP::Class->initialize($class)->new_object(@_)';
     $source .= "\n" . '    if $class ne \'' . $self->associated_metaclass->name . '\';';
+
+    $source .= "\n" . 'my $params = @_ == 1 ? $_[0] : {@_};';
 
     $source .= "\n" . 'my $instance = ' . $self->meta_instance->inline_create_instance('$class');
     $source .= ";\n" . (join ";\n" => map {
@@ -136,11 +146,11 @@ sub _generate_slot_initializer {
 
     if ( defined $attr->init_arg ) {
       return (
-          'if(exists $params{\'' . $attr->init_arg . '\'}){' . "\n" .
+          'if(exists $params->{\'' . $attr->init_arg . '\'}){' . "\n" .
                 $self->meta_instance->inline_set_slot_value(
                     '$instance',
                     ("'" . $attr->name . "'"),
-                    '$params{\'' . $attr->init_arg . '\'}' ) . "\n" .
+                    '$params->{\'' . $attr->init_arg . '\'}' ) . "\n" .
            '} ' . (!defined $default ? '' : 'else {' . "\n" .
                 $self->meta_instance->inline_set_slot_value(
                     '$instance',

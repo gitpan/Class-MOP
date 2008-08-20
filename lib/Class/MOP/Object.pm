@@ -6,7 +6,8 @@ use warnings;
 
 use Scalar::Util 'blessed';
 
-our $VERSION   = '0.64';
+our $VERSION   = '0.64_01';
+$VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
 
 # introspection
@@ -14,6 +15,10 @@ our $AUTHORITY = 'cpan:STEVAN';
 sub meta { 
     require Class::MOP::Class;
     Class::MOP::Class->initialize(blessed($_[0]) || $_[0]);
+}
+
+sub _new {
+    shift->meta->new_object(@_);
 }
 
 # RANT:

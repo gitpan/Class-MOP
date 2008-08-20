@@ -7,7 +7,8 @@ use warnings;
 use Scalar::Util 'blessed';
 use Carp         'confess';
 
-our $VERSION   = '0.64';
+our $VERSION   = '0.64_01';
+$VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
 
 use base 'Class::MOP::Object';
@@ -15,22 +16,59 @@ use base 'Class::MOP::Object';
 # creation ...
 
 sub initialize {
-    my $class        = shift;
-    my $package_name = shift;
+    my ( $class, @args ) = @_;
+
+    unshift @args, "package" if @args % 2;
+
+    my %options = @args;
+    my $package_name = $options{package};
+
+
     # we hand-construct the class 
     # until we can bootstrap it
-    no strict 'refs';
-    return bless { 
-        '$!package'   => $package_name,
-        # NOTE:
-        # because of issues with the Perl API 
-        # to the typeglob in some versions, we 
-        # need to just always grab a new 
-        # reference to the hash in the accessor. 
-        # Ideally we could just store a ref and 
-        # it would Just Work, but oh well :\
-        '%!namespace' => \undef,
-    } => $class;
+    if ( my $meta = Class::MOP::get_metaclass_by_name($package_name) ) {
+       return $meta;
+    } else {
+       my $meta = ( ref $class || $class )->_new({
+           'package'   => $package_name,
+       });
+
+       Class::MOP::store_metaclass_by_name($package_name, $meta);
+
+       return $meta;
+    }
+}
+
+sub reinitialize {
+    my ( $class, @args ) = @_;
+
+    unshift @args, "package" if @args % 2;
+
+    my %options = @args;
+    my $package_name = delete $options{package};
+
+    (defined $package_name && $package_name && !blessed($package_name))
+        || confess "You must pass a package name and it cannot be blessed";
+
+    Class::MOP::remove_metaclass_by_name($package_name);
+
+    $class->initialize($package_name, %options); # call with first arg form for compat
+}
+
+sub _new {
+    my $class = shift;
+    my $options = @_ == 1 ? $_[0] : {@_};
+
+    # NOTE:
+    # because of issues with the Perl API 
+    # to the typeglob in some versions, we 
+    # need to just always grab a new 
+    # reference to the hash in the accessor. 
+    # Ideally we could just store a ref and 
+    # it would Just Work, but oh well :\
+    $options->{namespace} ||= \undef;
+
+    bless $options, $class;
 }
 
 # Attributes
@@ -39,7 +77,7 @@ sub initialize {
 # all these attribute readers will be bootstrapped 
 # away in the Class::MOP bootstrap section
 
-sub name      { $_[0]->{'$!package'} }
+sub name      { $_[0]->{'package'} }
 sub namespace { 
     # NOTE:
     # because of issues with the Perl API 
@@ -49,7 +87,7 @@ sub namespace {
     # we could just store a ref and it would
     # Just Work, but oh well :\    
     no strict 'refs';    
-    \%{$_[0]->{'$!package'} . '::'} 
+    \%{$_[0]->{'package'} . '::'} 
 }
 
 # utility methods
@@ -91,7 +129,7 @@ sub add_package_symbol {
         ? @{$variable}{qw[name sigil type]}
         : $self->_deconstruct_variable_name($variable); 
 
-    my $pkg = $self->{'$!package'};
+    my $pkg = $self->{'package'};
 
     no strict 'refs';
     no warnings 'redefine', 'misc';    
@@ -127,14 +165,14 @@ sub has_package_symbol {
     # then this is broken.
 
     if (ref($namespace->{$name}) eq 'SCALAR') {
-        return ($type eq 'CODE' ? 1 : 0);
+        return ($type eq 'CODE');
     }
     elsif ($type eq 'SCALAR') {    
         my $val = *{$namespace->{$name}}{$type};
-        return defined(${$val}) ? 1 : 0;        
+        return defined(${$val});
     }
     else {
-        defined(*{$namespace->{$name}}{$type}) ? 1 : 0;
+        defined(*{$namespace->{$name}}{$type});
     }
 }
 
@@ -224,33 +262,42 @@ sub list_all_package_symbols {
     # NOTE:
     # or we can filter based on 
     # type (SCALAR|ARRAY|HASH|CODE)
-    return grep { 
+    if ( $type_filter eq 'CODE' ) {
+        return grep { 
         (ref($namespace->{$_})
-            ? (ref($namespace->{$_}) eq 'SCALAR' && $type_filter eq 'CODE')
-            : (ref(\$namespace->{$_}) eq 'GLOB'
-               && defined(*{$namespace->{$_}}{$type_filter})));
-    } keys %{$namespace};
+                ? (ref($namespace->{$_}) eq 'SCALAR')
+                : (ref(\$namespace->{$_}) eq 'GLOB'
+                   && defined(*{$namespace->{$_}}{CODE})));
+        } keys %{$namespace};
+    } else {
+        return grep { *{$namespace->{$_}}{$type_filter} } keys %{$namespace};
+    }
 }
 
 sub get_all_package_symbols {
     my ($self, $type_filter) = @_;
     my $namespace = $self->namespace;
-    return %{$namespace} unless defined $type_filter;
-    
-    # NOTE:
-    # or we can filter based on 
-    # type (SCALAR|ARRAY|HASH|CODE)
-    no strict 'refs';
-    return map { 
-        $_ => (ref($namespace->{$_}) eq 'SCALAR'
-                    ? ($type_filter eq 'CODE' ? \&{$self->name . '::' . $_} : undef)
-                    : *{$namespace->{$_}}{$type_filter})
-    } grep { 
-        (ref($namespace->{$_})
-            ? (ref($namespace->{$_}) eq 'SCALAR' && $type_filter eq 'CODE')
-            : (ref(\$namespace->{$_}) eq 'GLOB'
-               && defined(*{$namespace->{$_}}{$type_filter})));
-    } keys %{$namespace};
+
+    return %$namespace unless defined $type_filter;
+
+    # for some reason this nasty impl is orders of magnitude aster than a clean version
+    if ( $type_filter eq 'CODE' ) {
+        my $pkg;
+        no strict 'refs';
+        return map {
+            (ref($namespace->{$_})
+                ? ( $_ => \&{$pkg ||= $self->name . "::$_"} )
+                : ( *{$namespace->{$_}}{CODE}
+                    ? ( $_ => *{$namespace->{$_}}{$type_filter} )
+                    : ()))
+        } keys %$namespace;
+    } else {
+        return map {
+            $_ => *{$namespace->{$_}}{$type_filter}
+        } grep {
+            !ref($namespace->{$_}) && *{$namespace->{$_}}{$type_filter}
+        } keys %$namespace;
+    }
 }
 
 1;
@@ -281,6 +328,12 @@ Returns a metaclass for this package.
 
 This will initialize a Class::MOP::Package instance which represents 
 the package of C<$package_name>.
+
+=item B<reinitialize ($package_name, %options)>
+
+This removes the old metaclass, and creates a new one in it's place.
+Do B<not> use this unless you really know what you are doing, it could
+very easily make a very large mess of your program.
 
 =item B<name>
 

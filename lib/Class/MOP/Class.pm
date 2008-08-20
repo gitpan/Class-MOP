@@ -11,7 +11,8 @@ use Class::MOP::Method::Wrapped;
 use Carp         'confess';
 use Scalar::Util 'blessed', 'weaken';
 
-our $VERSION   = '0.64';
+our $VERSION   = '0.64_01';
+$VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
 
 use base 'Class::MOP::Module';
@@ -19,21 +20,22 @@ use base 'Class::MOP::Module';
 # Creation
 
 sub initialize {
-    my $class        = shift;
-    my $package_name = shift;
-    (defined $package_name && $package_name && !blessed($package_name))
-        || confess "You must pass a package name and it cannot be blessed";
-    return Class::MOP::get_metaclass_by_name($package_name)
-        || $class->construct_class_instance('package' => $package_name, @_);
-}
+    my $class = shift;
 
-sub reinitialize {
-    my $class        = shift;
-    my $package_name = shift;
-    (defined $package_name && $package_name && !blessed($package_name))
+    my $package_name;
+    
+    if ( @_ % 2 ) {
+        $package_name = shift;
+    } else {
+        my %options = @_;
+        $package_name = $options{package};
+    }
+
+    (defined $package_name && $package_name && !ref($package_name))
         || confess "You must pass a package name and it cannot be blessed";
-    Class::MOP::remove_metaclass_by_name($package_name);
-    $class->construct_class_instance('package' => $package_name, @_);
+
+    return Class::MOP::get_metaclass_by_name($package_name)
+        || $class->construct_class_instance(package => $package_name, @_);
 }
 
 # NOTE: (meta-circularity)
@@ -44,8 +46,8 @@ sub reinitialize {
 # normal &construct_instance.
 sub construct_class_instance {
     my $class        = shift;
-    my %options      = @_;
-    my $package_name = $options{'package'};
+    my $options      = @_ == 1 ? $_[0] : {@_};
+    my $package_name = $options->{package};
     (defined $package_name && $package_name)
         || confess "You must pass a package name";
     # NOTE:
@@ -62,57 +64,24 @@ sub construct_class_instance {
     # we need to deal with the possibility
     # of class immutability here, and then
     # get the name of the class appropriately
-    $class = (blessed($class)
+    $class = (ref($class)
                     ? ($class->is_immutable
                         ? $class->get_mutable_metaclass_name()
-                        : blessed($class))
+                        : ref($class))
                     : $class);
 
     # now create the metaclass
     my $meta;
     if ($class eq 'Class::MOP::Class') {
         no strict 'refs';
-        $meta = bless {
-            # inherited from Class::MOP::Package
-            '$!package'             => $package_name,
-
-            # NOTE:
-            # since the following attributes will
-            # actually be loaded from the symbol
-            # table, and actually bypass the instance
-            # entirely, we can just leave these things
-            # listed here for reference, because they
-            # should not actually have a value associated
-            # with the slot.
-            '%!namespace'           => \undef,
-            # inherited from Class::MOP::Module
-            '$!version'             => \undef,
-            '$!authority'           => \undef,
-            # defined in Class::MOP::Class
-            '@!superclasses'        => \undef,
-
-            '%!methods'             => {},
-            '%!attributes'          => {},
-            '$!attribute_metaclass' => $options{'attribute_metaclass'} || 'Class::MOP::Attribute',
-            '$!method_metaclass'    => $options{'method_metaclass'}    || 'Class::MOP::Method',
-            '$!instance_metaclass'  => $options{'instance_metaclass'}  || 'Class::MOP::Instance',
-            
-            ## uber-private variables
-            # NOTE:
-            # this starts out as undef so that 
-            # we can tell the first time the 
-            # methods are fetched
-            # - SL
-            '$!_package_cache_flag'       => undef,  
-            '$!_meta_instance'            => undef,          
-        } => $class;
+        $meta = $class->_new($options)
     }
     else {
         # NOTE:
         # it is safe to use meta here because
         # class will always be a subclass of
         # Class::MOP::Class, which defines meta
-        $meta = $class->meta->construct_instance(%options)
+        $meta = $class->meta->construct_instance($options)
     }
 
     # and check the metaclass compatibility
@@ -128,7 +97,38 @@ sub construct_class_instance {
     $meta;
 }
 
-sub reset_package_cache_flag  { (shift)->{'$!_package_cache_flag'} = undef } 
+sub _new {
+    my $class = shift;
+    my $options = @_ == 1 ? $_[0] : {@_};
+
+    bless {
+        # inherited from Class::MOP::Package
+        'package'             => $options->{package},
+
+        # NOTE:
+        # since the following attributes will
+        # actually be loaded from the symbol
+        # table, and actually bypass the instance
+        # entirely, we can just leave these things
+        # listed here for reference, because they
+        # should not actually have a value associated
+        # with the slot.
+        'namespace'           => \undef,
+        # inherited from Class::MOP::Module
+        'version'             => \undef,
+        'authority'           => \undef,
+        # defined in Class::MOP::Class
+        'superclasses'        => \undef,
+
+        'methods'             => {},
+        'attributes'          => {},
+        'attribute_metaclass' => $options->{'attribute_metaclass'} || 'Class::MOP::Attribute',
+        'method_metaclass'    => $options->{'method_metaclass'}    || 'Class::MOP::Method',
+        'instance_metaclass'  => $options->{'instance_metaclass'}  || 'Class::MOP::Instance',
+    }, $class;
+}
+
+sub reset_package_cache_flag  { (shift)->{'_package_cache_flag'} = undef } 
 sub update_package_cache_flag {
     my $self = shift;
     # NOTE:
@@ -137,14 +137,14 @@ sub update_package_cache_flag {
     # to our cache as well. This avoids us 
     # having to regenerate the method_map.
     # - SL    
-    $self->{'$!_package_cache_flag'} = Class::MOP::check_package_cache_flag($self->name);    
+    $self->{'_package_cache_flag'} = Class::MOP::check_package_cache_flag($self->name);    
 }
 
 sub check_metaclass_compatability {
     my $self = shift;
 
     # this is always okay ...
-    return if blessed($self)            eq 'Class::MOP::Class'   &&
+    return if ref($self)                eq 'Class::MOP::Class'   &&
               $self->instance_metaclass eq 'Class::MOP::Instance';
 
     my @class_list = $self->linearized_isa;
@@ -159,10 +159,10 @@ sub check_metaclass_compatability {
         # get the name of the class appropriately
         my $meta_type = ($meta->is_immutable
                             ? $meta->get_mutable_metaclass_name()
-                            : blessed($meta));
+                            : ref($meta));
 
         ($self->isa($meta_type))
-            || confess $self->name . "->meta => (" . (blessed($self)) . ")" .
+            || confess $self->name . "->meta => (" . (ref($self)) . ")" .
                        " is not compatible with the " .
                        $class_name . "->meta => (" . ($meta_type)     . ")";
         # NOTE:
@@ -194,7 +194,7 @@ sub check_metaclass_compatability {
     sub is_anon_class {
         my $self = shift;
         no warnings 'uninitialized';
-        $self->name =~ /^$ANON_CLASS_PREFIX/ ? 1 : 0;
+        $self->name =~ /^$ANON_CLASS_PREFIX/;
     }
 
     sub create_anon_class {
@@ -211,6 +211,9 @@ sub check_metaclass_compatability {
     # really need to be handled explicitly
     sub DESTROY {
         my $self = shift;
+
+        return if Class::MOP::in_global_destruction; # it'll happen soon anyway and this just makes things more complicated
+
         no warnings 'uninitialized';
         return unless $self->name =~ /^$ANON_CLASS_PREFIX/;
         my ($serial_id) = ($self->name =~ /^$ANON_CLASS_PREFIX(\d+)/);
@@ -226,17 +229,15 @@ sub check_metaclass_compatability {
 # creating classes with MOP ...
 
 sub create {
-    my $class        = shift;
-    my $package_name = shift;
+    my ( $class, @args ) = @_;
+
+    unshift @args, 'package' if @args % 2 == 1;
+
+    my (%options) = @args;
+    my $package_name = $options{package};
 
     (defined $package_name && $package_name)
         || confess "You must pass a package name";
-
-    (scalar @_ % 2 == 0)
-        || confess "You much pass all parameters as name => value pairs " .
-                   "(I found an uneven number of params in \@_)";
-
-    my (%options) = @_;
     
     (ref $options{superclasses} eq 'ARRAY')
         || confess "You must pass an ARRAY ref of superclasses"
@@ -261,8 +262,9 @@ sub create {
 
     my $meta = $class->initialize($package_name);
 
+    # FIXME totally lame
     $meta->add_method('meta' => sub {
-        $class->initialize(blessed($_[0]) || $_[0]);
+        $class->initialize(ref($_[0]) || $_[0]);
     });
 
     $meta->superclasses(@{$options{superclasses}})
@@ -291,22 +293,25 @@ sub create {
 # all these attribute readers will be bootstrapped
 # away in the Class::MOP bootstrap section
 
-sub get_attribute_map   { $_[0]->{'%!attributes'}          }
-sub attribute_metaclass { $_[0]->{'$!attribute_metaclass'} }
-sub method_metaclass    { $_[0]->{'$!method_metaclass'}    }
-sub instance_metaclass  { $_[0]->{'$!instance_metaclass'}  }
+sub get_attribute_map   { $_[0]->{'attributes'}          }
+sub attribute_metaclass { $_[0]->{'attribute_metaclass'} }
+sub method_metaclass    { $_[0]->{'method_metaclass'}    }
+sub instance_metaclass  { $_[0]->{'instance_metaclass'}  }
 
 # FIXME:
 # this is a prime canidate for conversion to XS
 sub get_method_map {
     my $self = shift;
     
-    if (defined $self->{'$!_package_cache_flag'} && 
-                $self->{'$!_package_cache_flag'} == Class::MOP::check_package_cache_flag($self->name)) {
-        return $self->{'%!methods'};
+    my $current = Class::MOP::check_package_cache_flag($self->name);
+
+    if (defined $self->{'_package_cache_flag'} && $self->{'_package_cache_flag'} == $current) {
+        return $self->{'methods'} ||= {};
     }
-    
-    my $map  = $self->{'%!methods'};
+
+    $self->{_package_cache_flag} = $current;
+
+    my $map  = $self->{'methods'} ||= {};
 
     my $class_name       = $self->name;
     my $method_metaclass = $self->method_metaclass;
@@ -336,8 +341,9 @@ sub get_method_map {
 
         $map->{$symbol} = $method_metaclass->wrap(
             $code,
-            package_name => $class_name,
-            name         => $symbol,
+            associated_metaclass => $self,
+            package_name         => $class_name,
+            name                 => $symbol,
         );
     }
 
@@ -348,6 +354,7 @@ sub get_method_map {
 
 sub new_object {
     my $class = shift;
+
     # NOTE:
     # we need to protect the integrity of the
     # Class::MOP::Class singletons here, so we
@@ -359,11 +366,12 @@ sub new_object {
 }
 
 sub construct_instance {
-    my ($class, %params) = @_;
+    my $class = shift;
+    my $params = @_ == 1 ? $_[0] : {@_};
     my $meta_instance = $class->get_meta_instance();
     my $instance = $meta_instance->create_instance();
     foreach my $attr ($class->compute_all_applicable_attributes()) {
-        $attr->initialize_instance_slot($meta_instance, $instance, \%params);
+        $attr->initialize_instance_slot($meta_instance, $instance, $params);
     }
     # NOTE:
     # this will only work for a HASH instance type
@@ -383,31 +391,28 @@ sub construct_instance {
 
 sub get_meta_instance {
     my $self = shift;
-    # NOTE:
-    # just about any fiddling with @ISA or 
-    # any fiddling with attributes will 
-    # also fiddle with the symbol table 
-    # and therefore invalidate the package 
-    # cache, in which case we should blow 
-    # away the meta-instance cache. Of course
-    # this will invalidate it more often then 
-    # is probably needed, but better safe 
-    # then sorry.
-    # - SL
-    $self->{'$!_meta_instance'} = undef
-        if defined $self->{'$!_package_cache_flag'} && 
-                   $self->{'$!_package_cache_flag'} == Class::MOP::check_package_cache_flag($self->name);
-    $self->{'$!_meta_instance'} ||= $self->instance_metaclass->new(
-        $self,
-        $self->compute_all_applicable_attributes()
+    $self->{'_meta_instance'} ||= $self->create_meta_instance();
+}
+
+sub create_meta_instance {
+    my $self = shift;
+    
+    my $instance = $self->instance_metaclass->new(
+        associated_metaclass => $self,
+        attributes => [ $self->compute_all_applicable_attributes() ],
     );
+
+    $self->add_meta_instance_dependencies()
+        if $instance->is_dependent_on_superclasses();
+
+    return $instance;
 }
 
 sub clone_object {
     my $class    = shift;
     my $instance = shift;
     (blessed($instance) && $instance->isa($class->name))
-        || confess "You must pass an instance of the metaclass (" . $class->name . "), not ($instance)";
+        || confess "You must pass an instance of the metaclass (" . (ref $class ? $class->name : $class) . "), not ($instance)";
 
     # NOTE:
     # we need to protect the integrity of the
@@ -443,7 +448,7 @@ sub rebless_instance {
         $old_metaclass = $instance->meta;
     }
     else {
-        $old_metaclass = $self->initialize(blessed($instance));
+        $old_metaclass = $self->initialize(ref($instance));
     }
 
     my $meta_instance = $self->get_meta_instance();
@@ -488,6 +493,7 @@ sub superclasses {
         # not potentially creating an issues
         # we don't know about
         $self->check_metaclass_compatability();
+        $self->update_meta_instance_dependencies();
     }
     @{$self->get_package_symbol($var_spec)};
 }
@@ -496,44 +502,49 @@ sub subclasses {
     my $self = shift;
 
     my $super_class = $self->name;
-    my @derived_classes;
-    
-    my $find_derived_classes;
-    $find_derived_classes = sub {
-        my ($outer_class) = @_;
 
-        my $symbol_table_hashref = do { no strict 'refs'; \%{"${outer_class}::"} };
+    if ( Class::MOP::HAVE_ISAREV() ) {
+        return @{ $super_class->mro::get_isarev() };
+    } else {
+        my @derived_classes;
 
-        SYMBOL:
-        for my $symbol ( keys %$symbol_table_hashref ) {
-            next SYMBOL if $symbol !~ /\A (\w+):: \z/x;
-            my $inner_class = $1;
+        my $find_derived_classes;
+        $find_derived_classes = sub {
+            my ($outer_class) = @_;
 
-            next SYMBOL if $inner_class eq 'SUPER';    # skip '*::SUPER'
+            my $symbol_table_hashref = do { no strict 'refs'; \%{"${outer_class}::"} };
 
-            my $class =
-              $outer_class
-              ? "${outer_class}::$inner_class"
-              : $inner_class;
+            SYMBOL:
+            for my $symbol ( keys %$symbol_table_hashref ) {
+                next SYMBOL if $symbol !~ /\A (\w+):: \z/x;
+                my $inner_class = $1;
 
-            if ( $class->isa($super_class) and $class ne $super_class ) {
-                push @derived_classes, $class;
+                next SYMBOL if $inner_class eq 'SUPER';    # skip '*::SUPER'
+
+                my $class =
+                $outer_class
+                ? "${outer_class}::$inner_class"
+                : $inner_class;
+
+                if ( $class->isa($super_class) and $class ne $super_class ) {
+                    push @derived_classes, $class;
+                }
+
+                next SYMBOL if $class eq 'main';           # skip 'main::*'
+
+                $find_derived_classes->($class);
             }
+        };
 
-            next SYMBOL if $class eq 'main';           # skip 'main::*'
+        my $root_class = q{};
+        $find_derived_classes->($root_class);
 
-            $find_derived_classes->($class);
-        }
-    };
+        undef $find_derived_classes;
 
-    my $root_class = q{};
-    $find_derived_classes->($root_class);
+        @derived_classes = sort { $a->isa($b) ? 1 : $b->isa($a) ? -1 : 0 } @derived_classes;
 
-    undef $find_derived_classes;
-
-    @derived_classes = sort { $a->isa($b) ? 1 : $b->isa($a) ? -1 : 0 } @derived_classes;
-
-    return @derived_classes;
+        return @derived_classes;
+    }
 }
 
 
@@ -577,6 +588,20 @@ sub class_precedence_list {
 
 ## Methods
 
+sub wrap_method_body {
+    my ( $self, %args ) = @_;
+
+    my $body = delete $args{body}; # delete is for compat
+
+    ('CODE' eq ref($body))
+        || confess "Your code block must be a CODE reference";
+
+    $self->method_metaclass->wrap( $body => (
+        package_name => $self->name,
+        %args,
+    ));
+}
+
 sub add_method {
     my ($self, $method_name, $method) = @_;
     (defined $method_name && $method_name)
@@ -598,15 +623,11 @@ sub add_method {
     }
     else {
         $body = $method;
-        ('CODE' eq ref($body))
-            || confess "Your code block must be a CODE reference";
-        $method = $self->method_metaclass->wrap(
-            $body => (
-                package_name => $self->name,
-                name         => $method_name
-            )
-        );
+        $method = $self->wrap_method_body( body => $body, name => $method_name );
     }
+
+    $method->attach_to_class($self);
+
     $self->get_method_map->{$method_name} = $method;
     
     my $full_method_name = ($self->name . '::' . $method_name);    
@@ -614,7 +635,8 @@ sub add_method {
         { sigil => '&', type => 'CODE', name => $method_name }, 
         Class::MOP::subname($full_method_name => $body)
     );
-    $self->update_package_cache_flag;    
+
+    $self->update_package_cache_flag; # still valid, since we just added the method to the map, and if it was invalid before that then get_method_map updated it
 }
 
 {
@@ -699,7 +721,8 @@ sub alias_method {
     $self->add_package_symbol(
         { sigil => '&', type => 'CODE', name => $method_name } => $body
     );
-    $self->update_package_cache_flag;     
+
+    $self->update_package_cache_flag; # the method map will not list aliased methods
 }
 
 sub has_method {
@@ -707,8 +730,7 @@ sub has_method {
     (defined $method_name && $method_name)
         || confess "You must define a method name";
 
-    return 0 unless exists $self->get_method_map->{$method_name};
-    return 1;
+    exists $self->get_method_map->{$method_name};
 }
 
 sub get_method {
@@ -735,8 +757,10 @@ sub remove_method {
     $self->remove_package_symbol(
         { sigil => '&', type => 'CODE', name => $method_name }
     );
-    
-    $self->update_package_cache_flag;        
+
+    $removed_method->detach_from_class if $removed_method;
+
+    $self->update_package_cache_flag; # still valid, since we just removed the method from the map
 
     return $removed_method;
 }
@@ -759,23 +783,21 @@ sub find_method_by_name {
     return;
 }
 
-sub compute_all_applicable_methods {
+sub get_all_methods {
     my $self = shift;
-    my (@methods, %seen_method);
-    foreach my $class ($self->linearized_isa) {
-        # fetch the meta-class ...
-        my $meta = $self->initialize($class);
-        foreach my $method_name ($meta->get_method_list()) {
-            next if exists $seen_method{$method_name};
-            $seen_method{$method_name}++;
-            push @methods => {
-                name  => $method_name,
-                class => $class,
-                code  => $meta->get_method($method_name)
-            };
-        }
-    }
-    return @methods;
+    my %methods = map { %{ $self->initialize($_)->get_method_map } } reverse $self->linearized_isa;
+    return values %methods;
+}
+
+# compatibility
+sub compute_all_applicable_methods {
+    return map {
+        {
+            name  => $_->name,
+            class => $_->package_name,
+            code  => $_, # sigh, overloading
+        },
+    } shift->get_all_methods(@_);
 }
 
 sub find_all_methods_by_name {
@@ -830,19 +852,91 @@ sub add_attribute {
     # name here so that we can properly detach
     # the old attr object, and remove any
     # accessors it would have generated
-    $self->remove_attribute($attribute->name)
-        if $self->has_attribute($attribute->name);
+    if ( $self->has_attribute($attribute->name) ) {
+        $self->remove_attribute($attribute->name);
+    } else {
+        $self->invalidate_meta_instances();
+    }
 
     # then onto installing the new accessors
-    $attribute->install_accessors();
     $self->get_attribute_map->{$attribute->name} = $attribute;
+
+    # invalidate package flag here
+    my $e = do { local $@; eval { $attribute->install_accessors() }; $@ };
+    if ( $e ) {
+        $self->remove_attribute($attribute->name);
+        die $e;
+    }
+
+    return $attribute;
+}
+
+sub update_meta_instance_dependencies {
+    my $self = shift;
+
+    if ( $self->{meta_instance_dependencies} ) {
+        return $self->add_meta_instance_dependencies;
+    }
+}
+
+sub add_meta_instance_dependencies {
+    my $self = shift;
+
+    $self->remove_meta_instance_depdendencies;
+
+    my @attrs = $self->compute_all_applicable_attributes();
+
+    my %seen;
+    my @classes = grep { not $seen{$_->name}++ } map { $_->associated_class } @attrs;
+
+    foreach my $class ( @classes ) { 
+        $class->add_dependent_meta_instance($self);
+    }
+
+    $self->{meta_instance_dependencies} = \@classes;
+}
+
+sub remove_meta_instance_depdendencies {
+    my $self = shift;
+
+    if ( my $classes = delete $self->{meta_instance_dependencies} ) {
+        foreach my $class ( @$classes ) {
+            $class->remove_dependent_meta_instance($self);
+        }
+
+        return $classes;
+    }
+
+    return;
+
+}
+
+sub add_dependent_meta_instance {
+    my ( $self, $metaclass ) = @_;
+    push @{ $self->{dependent_meta_instances} }, $metaclass;
+}
+
+sub remove_dependent_meta_instance {
+    my ( $self, $metaclass ) = @_;
+    my $name = $metaclass->name;
+    @$_ = grep { $_->name ne $name } @$_ for $self->{dependent_meta_instances};
+}
+
+sub invalidate_meta_instances {
+    my $self = shift;
+    $_->invalidate_meta_instance() for $self, @{ $self->{dependent_meta_instances} };
+}
+
+sub invalidate_meta_instance {
+    my $self = shift;
+    undef $self->{_meta_instance};
 }
 
 sub has_attribute {
     my ($self, $attribute_name) = @_;
     (defined $attribute_name && $attribute_name)
         || confess "You must define an attribute name";
-    exists $self->get_attribute_map->{$attribute_name} ? 1 : 0;
+    exists $self->get_attribute_map->{$attribute_name};
 }
 
 sub get_attribute {
@@ -863,6 +957,7 @@ sub remove_attribute {
     my $removed_attribute = $self->get_attribute_map->{$attribute_name};
     return unless defined $removed_attribute;
     delete $self->get_attribute_map->{$attribute_name};
+    $self->invalidate_meta_instances();
     $removed_attribute->remove_accessors();
     $removed_attribute->detach_from_class();
     return $removed_attribute;
@@ -873,19 +968,14 @@ sub get_attribute_list {
     keys %{$self->get_attribute_map};
 }
 
+sub get_all_attributes {
+    shift->compute_all_applicable_attributes(@_);
+}
+
 sub compute_all_applicable_attributes {
     my $self = shift;
-    my (@attrs, %seen_attr);
-    foreach my $class ($self->linearized_isa) {
-        # fetch the meta-class ...
-        my $meta = $self->initialize($class);
-        foreach my $attr_name ($meta->get_attribute_list()) {
-            next if exists $seen_attr{$attr_name};
-            $seen_attr{$attr_name}++;
-            push @attrs => $meta->get_attribute($attr_name);
-        }
-    }
-    return @attrs;
+    my %attrs = map { %{ $self->initialize($_)->get_attribute_map } } reverse $self->linearized_isa;
+    return values %attrs;
 }
 
 sub find_attribute_by_name {
@@ -897,6 +987,25 @@ sub find_attribute_by_name {
             if $meta->has_attribute($attr_name);
     }
     return;
+}
+
+# check if we can reinitialize
+sub is_pristine {
+    my $self = shift;
+
+    # if any local attr is defined
+    return if $self->get_attribute_list;
+
+    # or any non-declared methods
+    if ( my @methods = values %{ $self->get_method_map } ) {
+        my $metaclass = $self->method_metaclass;
+        foreach my $method ( @methods ) {
+            return if $method->isa("Class::MOP::Method::Generated");
+            # FIXME do we need to enforce this too? return unless $method->isa($metaclass);
+        }
+    }
+
+    return 1;
 }
 
 ## Class closing
@@ -940,7 +1049,7 @@ sub is_immutable { 0 }
     sub get_immutable_transformer {
         my $self = shift;
         if( $self->is_mutable ){
-            my $class = blessed $self || $self;
+            my $class = ref $self || $self;
             return $IMMUTABLE_TRANSFORMERS{$class} ||= $self->create_immutable_transformer;
         }
         confess "unable to find transformer for immutable class"
@@ -990,7 +1099,9 @@ sub create_immutable_transformer {
         /],
         memoize     => {
            class_precedence_list             => 'ARRAY',
-           linearized_isa                    => 'ARRAY',
+           linearized_isa                    => 'ARRAY', # FIXME perl 5.10 memoizes this on its own, no need?
+           get_all_methods                   => 'ARRAY',
+           #get_all_attributes               => 'ARRAY', # it's an alias, no need, but maybe in the future
            compute_all_applicable_attributes => 'ARRAY',
            get_meta_instance                 => 'SCALAR',
            get_method_map                    => 'SCALAR',
@@ -1127,12 +1238,6 @@ as we use a special reserved slot (C<__MOP__>) to store this.
 This initializes and returns returns a B<Class::MOP::Class> object
 for a given a C<$package_name>.
 
-=item B<reinitialize ($package_name, %options)>
-
-This removes the old metaclass, and creates a new one in it's place.
-Do B<not> use this unless you really know what you are doing, it could
-very easily make a very large mess of your program.
-
 =item B<construct_class_instance (%options)>
 
 This will construct an instance of B<Class::MOP::Class>, it is
@@ -1161,6 +1266,40 @@ but in some cases you might want to use it, so it is here.
 Clears the package cache flag to announce to the internals that we need 
 to rebuild the method map.
 
+=item B<add_meta_instance_dependencies>
+
+Registers this class as dependent on its superclasses.
+
+Only superclasses from which this class inherits attributes will be added.
+
+=item B<remove_meta_instance_depdendencies>
+
+Unregisters this class from its superclasses.
+
+=item B<update_meta_instance_dependencies>
+
+Reregisters if necessary.
+
+=item B<add_dependent_meta_instance> $metaclass
+
+Registers the class as having a meta instance dependent on this class.
+
+=item B<remove_dependent_meta_instance> $metaclass
+
+Remove the class from the list of dependent classes.
+
+=item B<invalidate_meta_instances>
+
+Clears the cached meta instance for this metaclass and all of the registered
+classes with dependent meta instances.
+
+Called by C<add_attribute> and C<remove_attribute> to recalculate the attribute
+slots.
+
+=item B<invalidate_meta_instance>
+
+Used by C<invalidate_meta_instances>.
+
 =back
 
 =head2 Object instance construction and cloning
@@ -1179,6 +1318,10 @@ for more information on the instance metaclasses.
 
 Returns an instance of L<Class::MOP::Instance> to be used in the construction 
 of a new instance of the class. 
+
+=item B<create_meta_instance>
+
+Called by C<get_meta_instance> if necessary.
 
 =item B<new_object (%params)>
 
@@ -1262,6 +1405,11 @@ This returns true if the class is still mutable.
 
 This returns true if the class has been made immutable.
 
+=item B<is_pristine>
+
+Checks whether the class has any data that will be lost if C<reinitialize> is
+called.
+
 =back
 
 =head2 Inheritance Relationships
@@ -1304,7 +1452,11 @@ Returns a HASH ref of name to CODE reference mapping for this class.
 Returns the class name of the method metaclass, see L<Class::MOP::Method> 
 for more information on the method metaclasses.
 
-=item B<add_method ($method_name, $method)>
+=item B<wrap_method_body(%attrs)>
+
+Wrap a code ref (C<$attrs{body>) with C<method_metaclass>.
+
+=item B<add_method ($method_name, $method, %attrs)>
 
 This will take a C<$method_name> and CODE reference to that
 C<$method> and install it into the class's package.
@@ -1377,13 +1529,20 @@ methods. It does B<not> provide a list of all applicable methods,
 including any inherited ones. If you want a list of all applicable
 methods, use the C<compute_all_applicable_methods> method.
 
+=item B<get_all_methods>
+
+This will traverse the inheritance heirachy and return a list of all
+the applicable L<Class::MOP::Method> objects for this class.
+
 =item B<compute_all_applicable_methods>
 
-This will return a list of all the methods names this class will
-respond to, taking into account inheritance. The list will be a list of
-HASH references, each one containing the following information; method
-name, the name of the class in which the method lives and a CODE
-reference for the actual method.
+Deprecated.
+
+This method returns a list of hashes describing the all the methods of the
+class.
+
+Use L<get_all_methods>, which is easier/better/faster. This method predates
+L<Class::MOP::Method>.
 
 =item B<find_all_methods_by_name ($method_name)>
 
@@ -1578,11 +1737,12 @@ use the C<compute_all_applicable_attributes> method.
 
 =item B<compute_all_applicable_attributes>
 
+=item B<get_all_attributes>
+
 This will traverse the inheritance heirachy and return a list of all
-the applicable attributes for this class. It does not construct a
-HASH reference like C<compute_all_applicable_methods> because all
-that same information is discoverable through the attribute
-meta-object itself.
+the applicable L<Class::MOP::Attribute> objects for this class.
+
+C<get_all_attributes> is an alias for consistency with C<get_all_methods>.
 
 =item B<find_attribute_by_name ($attr_name)>
 

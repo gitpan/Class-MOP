@@ -9,6 +9,27 @@ use MRO::Compat;
 use Carp          'confess';
 use Scalar::Util  'weaken';
 
+use Sub::Identify 'get_code_info';
+
+BEGIN {
+    local $@;
+    eval {
+        require Sub::Name;
+        Sub::Name->import(qw(subname));
+        1
+    } or eval 'sub subname { $_[1] }';
+
+    # this is either part of core or set up appropriately by MRO::Compat
+    *check_package_cache_flag = \&mro::get_pkg_gen;
+
+    eval {
+        require Devel::GlobalDestruction;
+        Devel::GlobalDestruction->import("in_global_destruction");
+        1;
+    } or *in_global_destruction = sub () { '' };
+}
+
+
 use Class::MOP::Class;
 use Class::MOP::Attribute;
 use Class::MOP::Method;
@@ -16,86 +37,32 @@ use Class::MOP::Method;
 use Class::MOP::Immutable;
 
 BEGIN {
-    
-    our $VERSION   = '0.64';
-    our $AUTHORITY = 'cpan:STEVAN';    
-    
     *IS_RUNNING_ON_5_10 = ($] < 5.009_005) 
         ? sub () { 0 }
         : sub () { 1 };    
 
-    # NOTE:
-    # we may not use this yet, but once 
-    # the get_code_info XS gets merged 
-    # upstream to it, we will always use 
-    # it. But for now it is just kinda 
-    # extra overhead.
-    # - SL
-    require Sub::Identify;
-        
-    # stash these for a sec, and see how things go
-    my $_PP_subname       = sub { $_[1] };
-    my $_PP_get_code_info = \&Sub::Identify::get_code_info;    
+    *HAVE_ISAREV = defined(&mro::get_isarev)
+        ? sub () { 1 }
+        : sub () { 1 };
+}
+
+our $VERSION   = '0.64_01';
+$VERSION = eval $VERSION;
+our $AUTHORITY = 'cpan:STEVAN';    
     
-    if ($ENV{CLASS_MOP_NO_XS}) {
-        # NOTE:
-        # this is if you really want things
-        # to be slow, then you can force the
-        # no-XS rule this way, otherwise we 
-        # make an effort to load as much of 
-        # the XS as possible.
-        # - SL
-        no warnings 'prototype', 'redefine';
-        
-        unless (IS_RUNNING_ON_5_10()) {
-            # get this from MRO::Compat ...
-            *check_package_cache_flag = \&MRO::Compat::__get_pkg_gen_pp;
-        }
-        else {
-            # NOTE:
-            # but if we are running 5.10 
-            # there is no need to use the 
-            # Pure Perl version since we 
-            # can use the built in mro 
-            # version instead.
-            # - SL
-            *check_package_cache_flag = \&mro::get_pkg_gen; 
-        }
-        # our own version of Sub::Name
-        *subname       = $_PP_subname;
-        # and the Sub::Identify version of the get_code_info
-        *get_code_info = $_PP_get_code_info;        
-    }
-    else {
-        # now try our best to get as much 
-        # of the XS loaded as possible
-        {
-            local $@;
-            eval {
-                require XSLoader;
-                XSLoader::load( 'Class::MOP', $VERSION );            
-            };
-            die $@ if $@ && $@ !~ /object version|loadable object/;
-            
-            # okay, so the XS failed to load, so 
-            # use the pure perl one instead.
-            *get_code_info = $_PP_get_code_info if $@; 
-        }        
-        
-        # get it from MRO::Compat
-        *check_package_cache_flag = \&mro::get_pkg_gen;        
-        
-        # now try and load the Sub::Name 
-        # module and use that as a means
-        # for naming our CVs, if not, we 
-        # use the workaround instead.
-        if ( eval { require Sub::Name } ) {
-            *subname = \&Sub::Name::subname;
-        } 
-        else {
-            *subname = $_PP_subname;
-        }     
-    }
+# after that everything is loaded, if we're allowed try to load faster XS
+# versions of various things
+unless ($ENV{CLASS_MOP_NO_XS}) {
+    my $e = do {
+        local $@;
+        eval {
+            require XSLoader;
+            __PACKAGE__->XSLoader::load($VERSION);
+        };
+        $@;
+    };
+
+    die $e if $e && $e !~ /object version|loadable object/;
 }
 
 {
@@ -136,17 +103,17 @@ sub load_class {
         # require it
         my $file = $class . '.pm';
         $file =~ s{::}{/}g;
-        eval { CORE::require($file) };
-        confess "Could not load class ($class) because : $@" if $@;
+        my $e = do { local $@; eval { require($file) }; $@ };
+        confess "Could not load class ($class) because : $e" if $e;
     }
 
     # initialize a metaclass if necessary
     unless (does_metaclass_exist($class)) {
-        eval { Class::MOP::Class->initialize($class) };
-        confess "Could not initialize class ($class) because : $@" if $@;
+        my $e = do { local $@; eval { Class::MOP::Class->initialize($class) }; $@ };
+        confess "Could not initialize class ($class) because : $e" if $e;
     }
 
-    return get_metaclass_by_name($class);
+    return get_metaclass_by_name($class) if defined wantarray;
 }
 
 sub is_class_loaded {
@@ -216,7 +183,7 @@ sub is_class_loaded {
 ## Class::MOP::Package
 
 Class::MOP::Package->meta->add_attribute(
-    Class::MOP::Attribute->new('$!package' => (
+    Class::MOP::Attribute->new('package' => (
         reader   => {
             # NOTE: we need to do this in order
             # for the instance meta-object to
@@ -226,12 +193,11 @@ Class::MOP::Package->meta->add_attribute(
             # rather than re-produce it here
             'name' => \&Class::MOP::Package::name
         },
-        init_arg => 'package',
     ))
 );
 
 Class::MOP::Package->meta->add_attribute(
-    Class::MOP::Attribute->new('%!namespace' => (
+    Class::MOP::Attribute->new('namespace' => (
         reader => {
             # NOTE:
             # we just alias the original method
@@ -242,15 +208,6 @@ Class::MOP::Package->meta->add_attribute(
         default  => sub { \undef }
     ))
 );
-
-# NOTE:
-# use the metaclass to construct the meta-package
-# which is a superclass of the metaclass itself :P
-Class::MOP::Package->meta->add_method('initialize' => sub {
-    my $class        = shift;
-    my $package_name = shift;
-    $class->meta->new_object('package' => $package_name, @_);
-});
 
 ## --------------------------------------------------------
 ## Class::MOP::Module
@@ -266,7 +223,7 @@ Class::MOP::Package->meta->add_method('initialize' => sub {
 # the metaclass, isn't abstraction great :)
 
 Class::MOP::Module->meta->add_attribute(
-    Class::MOP::Attribute->new('$!version' => (
+    Class::MOP::Attribute->new('version' => (
         reader => {
             # NOTE:
             # we just alias the original method
@@ -285,7 +242,7 @@ Class::MOP::Module->meta->add_attribute(
 # well.
 
 Class::MOP::Module->meta->add_attribute(
-    Class::MOP::Attribute->new('$!authority' => (
+    Class::MOP::Attribute->new('authority' => (
         reader => {
             # NOTE:
             # we just alias the original method
@@ -301,7 +258,7 @@ Class::MOP::Module->meta->add_attribute(
 ## Class::MOP::Class
 
 Class::MOP::Class->meta->add_attribute(
-    Class::MOP::Attribute->new('%!attributes' => (
+    Class::MOP::Attribute->new('attributes' => (
         reader   => {
             # NOTE: we need to do this in order
             # for the instance meta-object to
@@ -311,14 +268,12 @@ Class::MOP::Class->meta->add_attribute(
             # rather than re-produce it here
             'get_attribute_map' => \&Class::MOP::Class::get_attribute_map
         },
-        init_arg => 'attributes',
         default  => sub { {} }
     ))
 );
 
 Class::MOP::Class->meta->add_attribute(
-    Class::MOP::Attribute->new('%!methods' => (
-        init_arg => 'methods',
+    Class::MOP::Attribute->new('methods' => (
         reader   => {
             # NOTE:
             # we just alias the original method
@@ -330,7 +285,7 @@ Class::MOP::Class->meta->add_attribute(
 );
 
 Class::MOP::Class->meta->add_attribute(
-    Class::MOP::Attribute->new('@!superclasses' => (
+    Class::MOP::Attribute->new('superclasses' => (
         accessor => {
             # NOTE:
             # we just alias the original method
@@ -343,33 +298,31 @@ Class::MOP::Class->meta->add_attribute(
 );
 
 Class::MOP::Class->meta->add_attribute(
-    Class::MOP::Attribute->new('$!attribute_metaclass' => (
+    Class::MOP::Attribute->new('attribute_metaclass' => (
         reader   => {
             # NOTE:
             # we just alias the original method
             # rather than re-produce it here
             'attribute_metaclass' => \&Class::MOP::Class::attribute_metaclass
         },
-        init_arg => 'attribute_metaclass',
         default  => 'Class::MOP::Attribute',
     ))
 );
 
 Class::MOP::Class->meta->add_attribute(
-    Class::MOP::Attribute->new('$!method_metaclass' => (
+    Class::MOP::Attribute->new('method_metaclass' => (
         reader   => {
             # NOTE:
             # we just alias the original method
             # rather than re-produce it here
             'method_metaclass' => \&Class::MOP::Class::method_metaclass
         },
-        init_arg => 'method_metaclass',
         default  => 'Class::MOP::Method',
     ))
 );
 
 Class::MOP::Class->meta->add_attribute(
-    Class::MOP::Attribute->new('$!instance_metaclass' => (
+    Class::MOP::Attribute->new('instance_metaclass' => (
         reader   => {
             # NOTE: we need to do this in order
             # for the instance meta-object to
@@ -379,7 +332,6 @@ Class::MOP::Class->meta->add_attribute(
             # rather than re-produce it here
             'instance_metaclass' => \&Class::MOP::Class::instance_metaclass
         },
-        init_arg => 'instance_metaclass',
         default  => 'Class::MOP::Instance',
     ))
 );
@@ -394,8 +346,7 @@ Class::MOP::Class->meta->add_attribute(
 ## Class::MOP::Attribute
 
 Class::MOP::Attribute->meta->add_attribute(
-    Class::MOP::Attribute->new('$!name' => (
-        init_arg => 'name',
+    Class::MOP::Attribute->new('name' => (
         reader   => {
             # NOTE: we need to do this in order
             # for the instance meta-object to
@@ -409,8 +360,7 @@ Class::MOP::Attribute->meta->add_attribute(
 );
 
 Class::MOP::Attribute->meta->add_attribute(
-    Class::MOP::Attribute->new('$!associated_class' => (
-        init_arg => 'associated_class',
+    Class::MOP::Attribute->new('associated_class' => (
         reader   => {
             # NOTE: we need to do this in order
             # for the instance meta-object to
@@ -424,114 +374,74 @@ Class::MOP::Attribute->meta->add_attribute(
 );
 
 Class::MOP::Attribute->meta->add_attribute(
-    Class::MOP::Attribute->new('$!accessor' => (
-        init_arg  => 'accessor',
+    Class::MOP::Attribute->new('accessor' => (
         reader    => { 'accessor'     => \&Class::MOP::Attribute::accessor     },
         predicate => { 'has_accessor' => \&Class::MOP::Attribute::has_accessor },
     ))
 );
 
 Class::MOP::Attribute->meta->add_attribute(
-    Class::MOP::Attribute->new('$!reader' => (
-        init_arg  => 'reader',
+    Class::MOP::Attribute->new('reader' => (
         reader    => { 'reader'     => \&Class::MOP::Attribute::reader     },
         predicate => { 'has_reader' => \&Class::MOP::Attribute::has_reader },
     ))
 );
 
 Class::MOP::Attribute->meta->add_attribute(
-    Class::MOP::Attribute->new('$!initializer' => (
-        init_arg  => 'initializer',
+    Class::MOP::Attribute->new('initializer' => (
         reader    => { 'initializer'     => \&Class::MOP::Attribute::initializer     },
         predicate => { 'has_initializer' => \&Class::MOP::Attribute::has_initializer },
     ))
 );
 
 Class::MOP::Attribute->meta->add_attribute(
-    Class::MOP::Attribute->new('$!writer' => (
-        init_arg  => 'writer',
+    Class::MOP::Attribute->new('writer' => (
         reader    => { 'writer'     => \&Class::MOP::Attribute::writer     },
         predicate => { 'has_writer' => \&Class::MOP::Attribute::has_writer },
     ))
 );
 
 Class::MOP::Attribute->meta->add_attribute(
-    Class::MOP::Attribute->new('$!predicate' => (
-        init_arg  => 'predicate',
+    Class::MOP::Attribute->new('predicate' => (
         reader    => { 'predicate'     => \&Class::MOP::Attribute::predicate     },
         predicate => { 'has_predicate' => \&Class::MOP::Attribute::has_predicate },
     ))
 );
 
 Class::MOP::Attribute->meta->add_attribute(
-    Class::MOP::Attribute->new('$!clearer' => (
-        init_arg  => 'clearer',
+    Class::MOP::Attribute->new('clearer' => (
         reader    => { 'clearer'     => \&Class::MOP::Attribute::clearer     },
         predicate => { 'has_clearer' => \&Class::MOP::Attribute::has_clearer },
     ))
 );
 
 Class::MOP::Attribute->meta->add_attribute(
-    Class::MOP::Attribute->new('$!builder' => (
-        init_arg  => 'builder',
+    Class::MOP::Attribute->new('builder' => (
         reader    => { 'builder'     => \&Class::MOP::Attribute::builder     },
         predicate => { 'has_builder' => \&Class::MOP::Attribute::has_builder },
     ))
 );
 
 Class::MOP::Attribute->meta->add_attribute(
-    Class::MOP::Attribute->new('$!init_arg' => (
-        init_arg  => 'init_arg',
+    Class::MOP::Attribute->new('init_arg' => (
         reader    => { 'init_arg'     => \&Class::MOP::Attribute::init_arg     },
         predicate => { 'has_init_arg' => \&Class::MOP::Attribute::has_init_arg },
     ))
 );
 
 Class::MOP::Attribute->meta->add_attribute(
-    Class::MOP::Attribute->new('$!default' => (
-        init_arg  => 'default',
+    Class::MOP::Attribute->new('default' => (
         # default has a custom 'reader' method ...
         predicate => { 'has_default' => \&Class::MOP::Attribute::has_default },
     ))
 );
 
 Class::MOP::Attribute->meta->add_attribute(
-    Class::MOP::Attribute->new('@!associated_methods' => (
-        init_arg => 'associated_methods',
+    Class::MOP::Attribute->new('associated_methods' => (
         reader   => { 'associated_methods' => \&Class::MOP::Attribute::associated_methods },
         default  => sub { [] }
     ))
 );
-
-# NOTE: (meta-circularity)
-# This should be one of the last things done
-# it will "tie the knot" with Class::MOP::Attribute
-# so that it uses the attributes meta-objects
-# to construct itself.
-Class::MOP::Attribute->meta->add_method('new' => sub {
-    my $class   = shift;
-    my $name    = shift;
-    my %options = @_;
-
-    (defined $name && $name)
-        || confess "You must provide a name for the attribute";
-    $options{init_arg} = $name
-        if not exists $options{init_arg};
-
-    if(exists $options{builder}){
-        confess("builder must be a defined scalar value which is a method name")
-            if ref $options{builder} || !(defined $options{builder});
-        confess("Setting both default and builder is not allowed.")
-            if exists $options{default};
-    } else {
-        (Class::MOP::Attribute::is_default_a_coderef(\%options))
-            || confess("References are not allowed as default values, you must ".
-                       "wrap the default of '$name' in a CODE reference (ex: sub { [] } and not [])")
-                if exists $options{default} && ref $options{default};
-    }
-    # return the new object
-    $class->meta->new_object(name => $name, %options);
-});
 
 Class::MOP::Attribute->meta->add_method('clone' => sub {
     my $self  = shift;
@@ -540,42 +450,29 @@ Class::MOP::Attribute->meta->add_method('clone' => sub {
 
 ## --------------------------------------------------------
 ## Class::MOP::Method
-
 Class::MOP::Method->meta->add_attribute(
-    Class::MOP::Attribute->new('&!body' => (
-        init_arg => 'body',
+    Class::MOP::Attribute->new('body' => (
         reader   => { 'body' => \&Class::MOP::Method::body },
     ))
 );
 
 Class::MOP::Method->meta->add_attribute(
-    Class::MOP::Attribute->new('$!package_name' => (
-        init_arg => 'package_name',
+    Class::MOP::Attribute->new('associated_metaclass' => (
+        reader   => { 'associated_metaclass' => \&Class::MOP::Method::associated_metaclass },
+    ))
+);
+
+Class::MOP::Method->meta->add_attribute(
+    Class::MOP::Attribute->new('package_name' => (
         reader   => { 'package_name' => \&Class::MOP::Method::package_name },
     ))
 );
 
 Class::MOP::Method->meta->add_attribute(
-    Class::MOP::Attribute->new('$!name' => (
-        init_arg => 'name',
+    Class::MOP::Attribute->new('name' => (
         reader   => { 'name' => \&Class::MOP::Method::name },
     ))
 );
-
-Class::MOP::Method->meta->add_method('wrap' => sub {
-    my $class   = shift;
-    my $code    = shift;
-    my %options = @_;
-
-    ('CODE' eq ref($code))
-        || confess "You must supply a CODE reference to bless, not (" . ($code || 'undef') . ")";
-
-    ($options{package_name} && $options{name})
-        || confess "You must supply the package_name and name parameters";
-
-    # return the new object
-    $class->meta->new_object(body => $code, %options);
-});
 
 Class::MOP::Method->meta->add_method('clone' => sub {
     my $self  = shift;
@@ -591,35 +488,24 @@ Class::MOP::Method->meta->add_method('clone' => sub {
 # practices of attributes, but we put
 # it here for completeness
 Class::MOP::Method::Wrapped->meta->add_attribute(
-    Class::MOP::Attribute->new('%!modifier_table')
+    Class::MOP::Attribute->new('modifier_table')
 );
 
 ## --------------------------------------------------------
 ## Class::MOP::Method::Generated
 
 Class::MOP::Method::Generated->meta->add_attribute(
-    Class::MOP::Attribute->new('$!is_inline' => (
-        init_arg => 'is_inline',
+    Class::MOP::Attribute->new('is_inline' => (
         reader   => { 'is_inline' => \&Class::MOP::Method::Generated::is_inline },
         default  => 0, 
     ))
 );
 
-Class::MOP::Method::Generated->meta->add_method('new' => sub {
-    my ($class, %options) = @_;
-    ($options{package_name} && $options{name})
-        || confess "You must supply the package_name and name parameters";    
-    my $self = $class->meta->new_object(%options);
-    $self->initialize_body;  
-    $self;
-});
-
 ## --------------------------------------------------------
 ## Class::MOP::Method::Accessor
 
 Class::MOP::Method::Accessor->meta->add_attribute(
-    Class::MOP::Attribute->new('$!attribute' => (
-        init_arg => 'attribute',
+    Class::MOP::Attribute->new('attribute' => (
         reader   => {
             'associated_attribute' => \&Class::MOP::Method::Accessor::associated_attribute
         },
@@ -627,48 +513,16 @@ Class::MOP::Method::Accessor->meta->add_attribute(
 );
 
 Class::MOP::Method::Accessor->meta->add_attribute(
-    Class::MOP::Attribute->new('$!accessor_type' => (
-        init_arg => 'accessor_type',
+    Class::MOP::Attribute->new('accessor_type' => (
         reader   => { 'accessor_type' => \&Class::MOP::Method::Accessor::accessor_type },
     ))
 );
-
-Class::MOP::Method::Accessor->meta->add_method('new' => sub {
-    my $class   = shift;
-    my %options = @_;
-
-    (exists $options{attribute})
-        || confess "You must supply an attribute to construct with";
-
-    (exists $options{accessor_type})
-        || confess "You must supply an accessor_type to construct with";
-
-    (Scalar::Util::blessed($options{attribute}) && $options{attribute}->isa('Class::MOP::Attribute'))
-        || confess "You must supply an attribute which is a 'Class::MOP::Attribute' instance";
-
-    ($options{package_name} && $options{name})
-        || confess "You must supply the package_name and name parameters";
-
-    # return the new object
-    my $self = $class->meta->new_object(%options);
-    
-    # we don't want this creating
-    # a cycle in the code, if not
-    # needed
-    Scalar::Util::weaken($self->{'$!attribute'});
-
-    $self->initialize_body;  
-    
-    $self;
-});
-
 
 ## --------------------------------------------------------
 ## Class::MOP::Method::Constructor
 
 Class::MOP::Method::Constructor->meta->add_attribute(
-    Class::MOP::Attribute->new('%!options' => (
-        init_arg => 'options',
+    Class::MOP::Attribute->new('options' => (
         reader   => {
             'options' => \&Class::MOP::Method::Constructor::options
         },
@@ -677,37 +531,13 @@ Class::MOP::Method::Constructor->meta->add_attribute(
 );
 
 Class::MOP::Method::Constructor->meta->add_attribute(
-    Class::MOP::Attribute->new('$!associated_metaclass' => (
-        init_arg => 'metaclass',
+    Class::MOP::Attribute->new('associated_metaclass' => (
+        init_arg => "metaclass", # FIXME alias and rename
         reader   => {
             'associated_metaclass' => \&Class::MOP::Method::Constructor::associated_metaclass
         },
     ))
 );
-
-Class::MOP::Method::Constructor->meta->add_method('new' => sub {
-    my $class   = shift;
-    my %options = @_;
-
-    (Scalar::Util::blessed $options{metaclass} && $options{metaclass}->isa('Class::MOP::Class'))
-        || confess "You must pass a metaclass instance if you want to inline"
-            if $options{is_inline};
-
-    ($options{package_name} && $options{name})
-        || confess "You must supply the package_name and name parameters";
-
-    # return the new object
-    my $self = $class->meta->new_object(%options);
-    
-    # we don't want this creating
-    # a cycle in the code, if not
-    # needed
-    Scalar::Util::weaken($self->{'$!associated_metaclass'});
-
-    $self->initialize_body;  
-    
-    $self;
-});
 
 ## --------------------------------------------------------
 ## Class::MOP::Instance
@@ -717,12 +547,45 @@ Class::MOP::Method::Constructor->meta->add_method('new' => sub {
 # included for completeness
 
 Class::MOP::Instance->meta->add_attribute(
-    Class::MOP::Attribute->new('$!meta')
+    Class::MOP::Attribute->new('associated_metaclass',
+        reader   => { associated_metaclass => \&Class::MOP::Instance::associated_metaclass },
+    ),
 );
 
 Class::MOP::Instance->meta->add_attribute(
-    Class::MOP::Attribute->new('@!slots')
+    Class::MOP::Attribute->new('_class_name',
+        init_arg => undef,
+        reader   => { _class_name => \&Class::MOP::Instance::_class_name },
+        #lazy     => 1, # not yet supported by Class::MOP but out our version does it anyway
+        #default  => sub { $_[0]->associated_metaclass->name },
+    ),
 );
+
+Class::MOP::Instance->meta->add_attribute(
+    Class::MOP::Attribute->new('attributes',
+        reader   => { attributes => \&Class::MOP::Instance::attributes },
+    ),
+);
+
+Class::MOP::Instance->meta->add_attribute(
+    Class::MOP::Attribute->new('slots',
+        reader   => { slots => \&Class::MOP::Instance::slots },
+    ),
+);
+
+Class::MOP::Instance->meta->add_attribute(
+    Class::MOP::Attribute->new('slot_hash',
+        reader   => { slot_hash => \&Class::MOP::Instance::slot_hash },
+    ),
+);
+
+
+# we need the meta instance of the meta instance to be created now, in order
+# for the constructor to be able to use it
+Class::MOP::Instance->meta->get_meta_instance;
+
+# pretend the add_method never happenned. it hasn't yet affected anything
+undef Class::MOP::Instance->meta->{_package_cache_flag};
 
 ## --------------------------------------------------------
 ## Now close all the Class::MOP::* classes
@@ -735,8 +598,10 @@ Class::MOP::Instance->meta->add_attribute(
 # no actual benefits.
 
 $_->meta->make_immutable(
-    inline_constructor => 0,
-    inline_accessors   => 0,
+    inline_constructor  => 1,
+    replace_constructor => 1,
+    constructor_name    => "_new",
+    inline_accessors => 0,
 ) for qw/
     Class::MOP::Package
     Class::MOP::Module
@@ -950,6 +815,11 @@ We set this constant depending on what version perl we are on, this
 allows us to take advantage of new 5.10 features and stay backwards 
 compat.
 
+=item I<HAVE_ISAREV>
+
+Whether or not C<mro> provides C<get_isarev>, a much faster way to get all the
+subclasses of a certain class.
+
 =back
 
 =head2 Utility functions
@@ -994,6 +864,13 @@ B<NOTE: DO NOT USE THIS FUNCTION, IT IS FOR INTERNAL USE ONLY!>
 If possible, we will load the L<Sub::Name> module and this will function 
 as C<Sub::Name::subname> does, otherwise it will just return the C<$code>
 argument.
+
+=item B<in_global_destruction>
+
+If L<Devel::GlobalDestruction> is available, this returns true under global
+destruction.
+
+Otherwise it's a constant returning false.
 
 =back
 

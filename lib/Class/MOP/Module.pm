@@ -6,7 +6,8 @@ use warnings;
 
 use Scalar::Util 'blessed';
 
-our $VERSION   = '0.64';
+our $VERSION   = '0.64_01';
+$VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
 
 use base 'Class::MOP::Package';

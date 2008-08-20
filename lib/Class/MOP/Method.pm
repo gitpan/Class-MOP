@@ -5,9 +5,10 @@ use strict;
 use warnings;
 
 use Carp         'confess';
-use Scalar::Util 'blessed';
+use Scalar::Util 'weaken';
 
-our $VERSION   = '0.64';
+our $VERSION   = '0.64_01';
+$VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
 
 use base 'Class::MOP::Object';
@@ -29,7 +30,12 @@ before spending too much time chasing this one down.
 # construction
 
 sub wrap {
-    my ( $class, $code, %params ) = @_;
+    my ( $class, @args ) = @_;
+
+    unshift @args, 'body' if @args % 2 == 1;
+
+    my %params = @args;
+    my $code = $params{body};
 
     ('CODE' eq ref($code))
         || confess "You must supply a CODE reference to bless, not (" . ($code || 'undef') . ")";
@@ -37,29 +43,50 @@ sub wrap {
     ($params{package_name} && $params{name})
         || confess "You must supply the package_name and name parameters $UPGRADE_ERROR_TEXT";
 
-    bless {
-        '&!body'         => $code,
-        '$!package_name' => $params{package_name},
-        '$!name'         => $params{name},
-    } => blessed($class) || $class;
+    my $self = (ref($class) || $class)->_new(\%params);
+
+    weaken($self->{associated_metaclass}) if $self->{associated_metaclass};
+
+    return $self;
+}
+
+sub _new {
+    my $class = shift;
+    my $params = @_ == 1 ? $_[0] : {@_};
+
+    my $self = bless {
+        'body'                 => $params->{body},
+        'associated_metaclass' => $params->{associated_metaclass},
+        'package_name'         => $params->{package_name},
+        'name'                 => $params->{name},
+    } => $class;
 }
 
 ## accessors
 
-sub body { (shift)->{'&!body'} }
+sub body { (shift)->{'body'} }
 
-# TODO - add associated_class
+sub associated_metaclass { shift->{'associated_metaclass'} }
 
-# informational
+sub attach_to_class {
+    my ( $self, $class ) = @_;
+    $self->{associated_metaclass} = $class;
+    weaken($self->{associated_metaclass});
+}
+
+sub detach_from_class {
+    my $self = shift;
+    delete $self->{associated_metaclass};
+}
 
 sub package_name {
     my $self = shift;
-    $self->{'$!package_name'} ||= (Class::MOP::get_code_info($self->body))[0];
+    $self->{'package_name'} ||= (Class::MOP::get_code_info($self->body))[0];
 }
 
 sub name {
     my $self = shift;
-    $self->{'$!name'} ||= (Class::MOP::get_code_info($self->body))[1];
+    $self->{'name'} ||= (Class::MOP::get_code_info($self->body))[1];
 }
 
 sub fully_qualified_name {
@@ -133,6 +160,10 @@ This returns the actual CODE reference of the particular instance.
 
 This returns the name of the CODE reference.
 
+=item B<associated_metaclass>
+
+The metaclass of the method
+
 =item B<package_name>
 
 This returns the package name that the CODE reference is attached to.
@@ -140,6 +171,20 @@ This returns the package name that the CODE reference is attached to.
 =item B<fully_qualified_name>
 
 This returns the fully qualified name of the CODE reference.
+
+=back
+
+=head2 Metaclass
+
+=over 4
+
+=item B<attach_to_class>
+
+Sets the associated metaclass
+
+=item B<detach_from_class>
+
+Disassociates the method from the metaclass
 
 =back
 

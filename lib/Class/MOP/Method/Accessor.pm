@@ -7,7 +7,8 @@ use warnings;
 use Carp         'confess';
 use Scalar::Util 'blessed', 'weaken';
 
-our $VERSION   = '0.64';
+our $VERSION   = '0.64_01';
+$VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
 
 use base 'Class::MOP::Method::Generated';
@@ -28,31 +29,31 @@ sub new {
     ($options{package_name} && $options{name})
         || confess "You must supply the package_name and name parameters $Class::MOP::Method::UPGRADE_ERROR_TEXT";
 
-    my $self = bless {
-        # from our superclass
-        '&!body'          => undef,
-        '$!package_name' => $options{package_name},
-        '$!name'         => $options{name},        
-        # specific to this subclass
-        '$!attribute'     => $options{attribute},
-        '$!is_inline'     => ($options{is_inline} || 0),
-        '$!accessor_type' => $options{accessor_type},
-    } => $class;
+    my $self = $class->_new(\%options);
 
     # we don't want this creating
     # a cycle in the code, if not
     # needed
-    weaken($self->{'$!attribute'});
+    weaken($self->{'attribute'});
 
     $self->initialize_body;
 
     return $self;
 }
 
+sub _new {
+    my $class = shift;
+    my $options = @_ == 1 ? $_[0] : {@_};
+
+    $options->{is_inline} ||= 0;
+
+    return bless $options, $class;
+}
+
 ## accessors
 
-sub associated_attribute { (shift)->{'$!attribute'}     }
-sub accessor_type        { (shift)->{'$!accessor_type'} }
+sub associated_attribute { (shift)->{'attribute'}     }
+sub accessor_type        { (shift)->{'accessor_type'} }
 
 ## factory
 
@@ -66,7 +67,7 @@ sub initialize_body {
         ($self->is_inline ? 'inline' : ())
     );
 
-    eval { $self->{'&!body'} = $self->$method_name() };
+    eval { $self->{'body'} = $self->$method_name() };
     die $@ if $@;
 }
 

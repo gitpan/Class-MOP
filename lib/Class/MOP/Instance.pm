@@ -6,15 +6,47 @@ use warnings;
 
 use Scalar::Util 'weaken', 'blessed';
 
-our $VERSION   = '0.64';
+our $VERSION   = '0.64_01';
+$VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
 
 use base 'Class::MOP::Object';
 
+sub BUILDARGS {
+    my ($class, @args) = @_;
+
+    if ( @args == 1 ) {
+        unshift @args, "associated_metaclass";
+    } elsif ( @args >= 2 && blessed($args[0]) && $args[0]->isa("Class::MOP::Class") ) {
+        # compat mode
+        my ( $meta, @attrs ) = @args;
+        @args = ( associated_metaclass => $meta, attributes => \@attrs );
+    }
+
+    my %options = @args;
+    # FIXME lazy_build
+    $options{slots} ||= [ map { $_->slots } @{ $options{attributes} || [] } ];
+    $options{slot_hash} = { map { $_ => undef } @{ $options{slots} } }; # FIXME lazy_build
+
+    return \%options;
+}
+
 sub new {
-    my ($class, $meta, @attrs) = @_;
-    my @slots = map { $_->slots } @attrs;
-    my $instance = bless {
+    my $class = shift;
+    my $options = $class->BUILDARGS(@_);
+
+    # FIXME replace with a proper constructor
+    my $instance = $class->_new(%$options);
+
+    # FIXME weak_ref => 1,
+    weaken($instance->{'associated_metaclass'});
+
+    return $instance;
+}
+
+sub _new {
+    my ( $class, %options ) = @_;
+    bless {
         # NOTE:
         # I am not sure that it makes
         # sense to pass in the meta
@@ -25,42 +57,43 @@ sub new {
         # which is *probably* a safe
         # assumption,.. but you can
         # never tell <:)
-        '$!meta'  => $meta,
-        '@!slots' => { map { $_ => undef } @slots },
+        'associated_metaclass' => $options{associated_metaclass},
+        'attributes'           => $options{attributes},
+        'slots'                => $options{slots},
+        'slot_hash'            => $options{slot_hash},
     } => $class;
-
-    weaken($instance->{'$!meta'});
-
-    return $instance;
 }
 
-sub associated_metaclass { (shift)->{'$!meta'} }
+sub _class_name { $_[0]->{_class_name} ||= $_[0]->associated_metaclass->name }
+
+sub associated_metaclass { $_[0]{'associated_metaclass'} }
 
 sub create_instance {
     my $self = shift;
-    $self->bless_instance_structure({});
+    bless {}, $self->_class_name;
 }
 
+# for compatibility
 sub bless_instance_structure {
     my ($self, $instance_structure) = @_;
-    bless $instance_structure, $self->associated_metaclass->name;
+    bless $instance_structure, $self->_class_name;
 }
 
 sub clone_instance {
     my ($self, $instance) = @_;
-    $self->bless_instance_structure({ %$instance });
+    bless { %$instance }, $self->_class_name;
 }
 
 # operations on meta instance
 
 sub get_all_slots {
     my $self = shift;
-    return keys %{$self->{'@!slots'}};
+    return @{$self->{'slots'}};
 }
 
 sub is_valid_slot {
     my ($self, $slot_name) = @_;
-    exists $self->{'@!slots'}->{$slot_name};
+    exists $self->{'slot_hash'}->{$slot_name};
 }
 
 # operations on created instances
@@ -117,6 +150,10 @@ sub strengthen_slot_value {
 sub rebless_instance_structure {
     my ($self, $instance, $metaclass) = @_;
     bless $instance, $metaclass->name;
+}
+
+sub is_dependent_on_superclasses {
+    return; # for meta instances that require updates on inherited slot changes
 }
 
 # inlinable operation snippets
@@ -199,15 +236,18 @@ F<examples/InsideOutClass.pod> for details).
 
 =over 4
 
-=item B<new ($meta, @attrs)>
+=item B<new %args>
 
 Creates a new instance meta-object and gathers all the slots from
 the list of C<@attrs> given.
 
+=item B<BUILDARGS>
+
+Processes arguments for compatibility.
+
 =item B<meta>
 
-This will return a B<Class::MOP::Class> instance which is related
-to this class.
+Returns the metaclass of L<Class::MOP::Instance>.
 
 =back
 
@@ -217,16 +257,19 @@ to this class.
 
 =item B<create_instance>
 
-This creates the appropriate structure needed for the instance and
-then calls C<bless_instance_structure> to bless it into the class.
+This creates the appropriate structure needed for the instance and blesses it.
 
 =item B<bless_instance_structure ($instance_structure)>
 
 This does just exactly what it says it does.
 
+This method has been deprecated but remains for compatibility reasons. None of
+the subclasses of L<Class::MOP::Instance> ever bothered to actually make use of
+it, so it was deemed unnecessary fluff.
+
 =item B<clone_instance ($instance_structure)>
 
-This too does just exactly what it says it does.
+Creates a shallow clone of $instance_structure.
 
 =back
 
@@ -249,6 +292,13 @@ given to this object in C<new>.
 =item B<is_valid_slot ($slot_name)>
 
 This will return true if C<$slot_name> is a valid slot name.
+
+=item B<is_dependent_on_superclasses>
+
+This method returns true when the meta instance must be recreated on any
+superclass changes.
+
+Defaults to false.
 
 =back
 

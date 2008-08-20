@@ -6,7 +6,8 @@ use warnings;
 
 use Carp 'confess';
 
-our $VERSION   = '0.64';
+our $VERSION   = '0.64_01';
+$VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
 
 use base 'Class::MOP::Method';
@@ -18,23 +19,26 @@ sub new {
     ($options{package_name} && $options{name})
         || confess "You must supply the package_name and name parameters $Class::MOP::Method::UPGRADE_ERROR_TEXT";     
         
-    my $self = bless {
-        # from our superclass
-        '&!body'          => undef,
-        '$!package_name'  => $options{package_name},
-        '$!name'          => $options{name},        
-        # specific to this subclass
-        '$!is_inline'     => ($options{is_inline} || 0),
-    } => $class;
+    my $self = $class->_new(\%options);
     
     $self->initialize_body;
     
     return $self;
 }
 
+sub _new {
+    my $class = shift;
+    my $options = @_ == 1 ? $_[0] : {@_};
+
+    $options->{is_inline} ||= 0;
+    $options->{body} ||= undef;
+
+    bless $options, $class;
+}
+
 ## accessors
 
-sub is_inline { (shift)->{'$!is_inline'} }
+sub is_inline { (shift)->{'is_inline'} }
 
 sub initialize_body {
     confess "No body to initialize, " . __PACKAGE__ . " is an abstract base class";
