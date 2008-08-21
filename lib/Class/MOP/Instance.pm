@@ -6,7 +6,7 @@ use warnings;
 
 use Scalar::Util 'weaken', 'blessed';
 
-our $VERSION   = '0.64_01';
+our $VERSION   = '0.64_02';
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
 
@@ -89,6 +89,11 @@ sub clone_instance {
 sub get_all_slots {
     my $self = shift;
     return @{$self->{'slots'}};
+}
+
+sub get_all_attributes {
+    my $self = shift;
+    return @{$self->{attributes}};
 }
 
 sub is_valid_slot {
@@ -299,6 +304,12 @@ This method returns true when the meta instance must be recreated on any
 superclass changes.
 
 Defaults to false.
+
+=item B<get_all_attributes>
+
+This will return the current list of attributes (as
+Class::MOP::Attribute objects) based on what was given to this object
+in C<new>.
 
 =back
 

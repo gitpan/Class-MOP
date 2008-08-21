@@ -1,6 +1,17 @@
 Revision history for Perl extension Class-MOP.
 
-0.64_01
+0.64_02 Thu August 21, 2008
+    * Makefile.PL and Class::MOP
+      - Explicitly require Perl 5.8.0+ (Dave Rolsky)
+
+    * Makefile.PL
+      - Add missing prereqs that got lost in the switch away from
+        Module::Install.
+
+    * Class::MOP::Instance
+      - New method - get_all_attributes (nothingmuch)
+
+0.64_01 Wed August 20, 2008
     * Makefile.PL
       - We now check to see if you have a compiler. If you don't, the
         module installs without some XS bits, but will work the same
