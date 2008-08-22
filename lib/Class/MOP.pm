@@ -28,7 +28,7 @@ BEGIN {
         require Devel::GlobalDestruction;
         Devel::GlobalDestruction->import("in_global_destruction");
         1;
-    } or *in_global_destruction = sub () { '' };
+    } or *in_global_destruction = sub () { !1 };
 }
 
 
@@ -48,7 +48,7 @@ BEGIN {
         : sub () { 1 };
 }
 
-our $VERSION   = '0.64_02';
+our $VERSION   = '0.64_03';
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';    
     

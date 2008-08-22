@@ -7,7 +7,7 @@ use warnings;
 use Scalar::Util 'blessed';
 use Carp         'confess';
 
-our $VERSION   = '0.64_02';
+our $VERSION   = '0.64_03';
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
 
@@ -287,9 +287,9 @@ sub get_all_package_symbols {
         return map {
             (ref($namespace->{$_})
                 ? ( $_ => \&{$pkg ||= $self->name . "::$_"} )
-                : ( *{$namespace->{$_}}{CODE}
-                    ? ( $_ => *{$namespace->{$_}}{$type_filter} )
-                    : ()))
+                : ( (*{$namespace->{$_}}{CODE}) # the extra parents prevent breakage on 5.8.2
+                    ? ( $_ => *{$namespace->{$_}}{CODE} )
+                    : () ) )
         } keys %$namespace;
     } else {
         return map {
