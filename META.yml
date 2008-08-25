@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name:                Class-MOP
-version:             0.64_04
+version:             0.64_05
 abstract:            A Meta Object Protocol for Perl 5
 license:             perl
 generated_by:        ExtUtils::MakeMaker version 6.36
