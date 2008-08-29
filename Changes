@@ -1,5 +1,12 @@
 Revision history for Perl extension Class-MOP.
 
+0.64_07 Fri August 29, 2008
+    * Class::MOP
+      - Silenced warnings that managed to break Moose tests when XS
+        was loaded. (Dave Rolsky)
+      - Some XS versions of methods were ignored because of typos in
+        MOP.xs. (Dave Rolsky)
+
 0.64_06 Mon August 25, 2008
     * Class::MOP (MOP.xs)
       - Another MS VC++ fix, cannot declare a variable in the middle

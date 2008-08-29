@@ -7,7 +7,7 @@ use warnings;
 use Scalar::Util 'blessed';
 use Carp         'confess';
 
-our $VERSION   = '0.64_06';
+our $VERSION   = '0.64_07';
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
 
@@ -280,7 +280,7 @@ sub get_all_package_symbols {
 
     return %$namespace unless defined $type_filter;
 
-    # for some reason this nasty impl is orders of magnitude aster than a clean version
+    # for some reason this nasty impl is orders of magnitude faster than a clean version
     if ( $type_filter eq 'CODE' ) {
         my $pkg;
         no strict 'refs';

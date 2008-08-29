@@ -11,8 +11,6 @@ use MRO::Compat;
 use Carp          'confess';
 use Scalar::Util  'weaken';
 
-use Sub::Identify 'get_code_info';
-
 BEGIN {
     local $@;
     eval {
@@ -48,25 +46,40 @@ BEGIN {
         : sub () { 1 };
 }
 
-our $VERSION   = '0.64_06';
+our $VERSION   = '0.64_07';
 our $XS_VERSION = $VERSION;
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';    
     
 # after that everything is loaded, if we're allowed try to load faster XS
 # versions of various things
-unless ($ENV{CLASS_MOP_NO_XS}) {
+_try_load_xs() or _load_pure_perl();
+
+sub _try_load_xs {
+    return if $ENV{CLASS_MOP_NO_XS};
+
     my $e = do {
         local $@;
         eval {
             require XSLoader;
+            # just doing this - no warnings 'redefine' - doesn't work
+            # for some reason
+            local $^W = 0;
             __PACKAGE__->XSLoader::load($XS_VERSION);
         };
         $@;
     };
 
     die $e if $e && $e !~ /object version|loadable object/;
+
+    return $e ? 0 : 1;
 }
+
+sub _load_pure_perl {
+    require Sub::Identify;
+    Sub::Identify->import('get_code_info');
+}
+
 
 {
     # Metaclasses are singletons, so we cache them here.
@@ -96,7 +109,7 @@ unless ($ENV{CLASS_MOP_NO_XS}) {
 sub load_class {
     my $class = shift;
 
-    if (ref($class) || !defined($class) || !length($class)) {
+    unless ( _is_valid_class_name($class) ) {
         my $display = defined($class) ? $class : 'undef';
         confess "Invalid class name ($display)";
     }
@@ -104,9 +117,7 @@ sub load_class {
     # if the class is not already loaded in the symbol table..
     unless (is_class_loaded($class)) {
         # require it
-        my $file = $class . '.pm';
-        $file =~ s{::}{/}g;
-        my $e = do { local $@; eval { require($file) }; $@ };
+        my $e = do { local $@; eval "require $class"; $@ };
         confess "Could not load class ($class) because : $e" if $e;
     }
 
@@ -117,6 +128,18 @@ sub load_class {
     }
 
     return get_metaclass_by_name($class) if defined wantarray;
+}
+
+sub _is_valid_class_name {
+    my $class = shift;
+
+    return 0 if ref($class);
+    return 0 unless defined($class);
+    return 0 unless length($class);
+
+    return 1 if $class =~ /^\w+(?:::\w+)*$/;
+
+    return 0;
 }
 
 sub is_class_loaded {
