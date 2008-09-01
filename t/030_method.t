@@ -3,13 +3,12 @@
 use strict;
 use warnings;
 
-use Test::More tests => 28;
+use Test::More tests => 27;
 use Test::Exception;
 
-BEGIN {
-    use_ok('Class::MOP');    
-    use_ok('Class::MOP::Method');
-}
+use Class::MOP;
+use Class::MOP::Method;
+
 
 my $method = Class::MOP::Method->wrap(
     sub { 1 },
@@ -22,13 +21,14 @@ is($method->package_name, 'main', '... our package is main::');
 is($method->name, '__ANON__', '... our sub name is __ANON__');
 is($method->fully_qualified_name, 'main::__ANON__', '... our subs full name is main::__ANON__');
 
-dies_ok { Class::MOP::Method->wrap } '... cant call this method without some code';
-dies_ok { Class::MOP::Method->wrap([]) } '... cant call this method without some code';
-dies_ok { Class::MOP::Method->wrap(bless {} => 'Fail') } '... cant call this method without some code';
+dies_ok { Class::MOP::Method->wrap } q{... can't call wrap() without some code};
+dies_ok { Class::MOP::Method->wrap([]) } q{... can't call wrap() without some code};
+dies_ok { Class::MOP::Method->wrap(bless {} => 'Fail') } q{... can't call wrap() without some code};
 
-dies_ok { Class::MOP::Method->name } '... cant call this method with a class';
-dies_ok { Class::MOP::Method->package_name } '... cant call this method with a class';
-dies_ok { Class::MOP::Method->fully_qualified_name } '... cant call this method with a class';
+dies_ok { Class::MOP::Method->name } q{... can't call name() as a class method};
+dies_ok { Class::MOP::Method->body } q{... can't call body() as a class method};
+dies_ok { Class::MOP::Method->package_name } q{... can't call package_name() as a class method};
+dies_ok { Class::MOP::Method->fully_qualified_name } q{... can't call fully_qualified_name() as a class method};
 
 my $meta = Class::MOP::Method->meta;
 isa_ok($meta, 'Class::MOP::Class');

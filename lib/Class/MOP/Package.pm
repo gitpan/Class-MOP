@@ -7,7 +7,7 @@ use warnings;
 use Scalar::Util 'blessed';
 use Carp         'confess';
 
-our $VERSION   = '0.64_07';
+our $VERSION   = '0.65';
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
 
@@ -276,6 +276,10 @@ sub list_all_package_symbols {
 
 sub get_all_package_symbols {
     my ($self, $type_filter) = @_;
+
+    die "Cannot call get_all_package_symbols as a class method"
+        unless ref $self;
+
     my $namespace = $self->namespace;
 
     return %$namespace unless defined $type_filter;

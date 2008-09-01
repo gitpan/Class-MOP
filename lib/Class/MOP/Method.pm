@@ -7,7 +7,7 @@ use warnings;
 use Carp         'confess';
 use Scalar::Util 'weaken';
 
-our $VERSION   = '0.64_07';
+our $VERSION   = '0.65';
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
 
@@ -79,15 +79,9 @@ sub detach_from_class {
     delete $self->{associated_metaclass};
 }
 
-sub package_name {
-    my $self = shift;
-    $self->{'package_name'} ||= (Class::MOP::get_code_info($self->body))[0];
-}
+sub package_name { (shift)->{'package_name'} }
 
-sub name {
-    my $self = shift;
-    $self->{'name'} ||= (Class::MOP::get_code_info($self->body))[1];
-}
+sub name { (shift)->{'name'} }
 
 sub fully_qualified_name {
     my $code = shift;
