@@ -11,24 +11,6 @@ use MRO::Compat;
 use Carp          'confess';
 use Scalar::Util  'weaken';
 
-BEGIN {
-    local $@;
-    eval {
-        require Sub::Name;
-        Sub::Name->import(qw(subname));
-        1
-    } or eval 'sub subname { $_[1] }';
-
-    # this is either part of core or set up appropriately by MRO::Compat
-    *check_package_cache_flag = \&mro::get_pkg_gen;
-
-    eval {
-        require Devel::GlobalDestruction;
-        Devel::GlobalDestruction->import("in_global_destruction");
-        1;
-    } or *in_global_destruction = sub () { !1 };
-}
-
 
 use Class::MOP::Class;
 use Class::MOP::Attribute;
@@ -44,9 +26,12 @@ BEGIN {
     *HAVE_ISAREV = defined(&mro::get_isarev)
         ? sub () { 1 }
         : sub () { 1 };
+
+    # this is either part of core or set up appropriately by MRO::Compat
+    *check_package_cache_flag = \&mro::get_pkg_gen;
 }
 
-our $VERSION   = '0.65';
+our $VERSION   = '0.66';
 our $XS_VERSION = $VERSION;
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';    
@@ -66,6 +51,12 @@ sub _try_load_xs {
             # for some reason
             local $^W = 0;
             __PACKAGE__->XSLoader::load($XS_VERSION);
+
+            require Sub::Name;
+            Sub::Name->import(qw(subname));
+
+            require Devel::GlobalDestruction;
+            Devel::GlobalDestruction->import("in_global_destruction");
         };
         $@;
     };
@@ -78,6 +69,9 @@ sub _try_load_xs {
 sub _load_pure_perl {
     require Sub::Identify;
     Sub::Identify->import('get_code_info');
+
+    *subname = sub { $_[1] };
+    *in_global_destruction = sub () { !1 }
 }
 
 
@@ -121,13 +115,7 @@ sub load_class {
         confess "Could not load class ($class) because : $e" if $e;
     }
 
-    # initialize a metaclass if necessary
-    unless (does_metaclass_exist($class)) {
-        my $e = do { local $@; eval { Class::MOP::Class->initialize($class) }; $@ };
-        confess "Could not initialize class ($class) because : $e" if $e;
-    }
-
-    return get_metaclass_by_name($class) if defined wantarray;
+    get_metaclass_by_name($class) || $class if defined wantarray;
 }
 
 sub _is_valid_class_name {
@@ -500,9 +488,18 @@ Class::MOP::Method->meta->add_attribute(
     ))
 );
 
+Class::MOP::Method->meta->add_attribute(
+    Class::MOP::Attribute->new('original_method' => (
+        reader   => { 'original_method'      => \&Class::MOP::Method::original_method },
+        writer   => { '_set_original_method' => \&Class::MOP::Method::_set_original_method },
+    ))
+);
+
 Class::MOP::Method->meta->add_method('clone' => sub {
     my $self  = shift;
-    $self->meta->clone_object($self, @_);
+    my $clone = $self->meta->clone_object($self, @_);
+    $clone->_set_original_method($self);
+    return $clone;
 });
 
 ## --------------------------------------------------------
@@ -850,6 +847,8 @@ subclasses of a certain class.
 
 =head2 Utility functions
 
+Note that these are all called as B<functions, not methods>.
+
 =over 4
 
 =item B<load_class ($class_name)>
@@ -870,6 +869,8 @@ is probably correct about 99% of the time.
 
 =item B<check_package_cache_flag ($pkg)>
 
+B<NOTE: DO NOT USE THIS FUNCTION, IT IS FOR INTERNAL USE ONLY!>
+
 This will return an integer that is managed by C<Class::MOP::Class>
 to determine if a module's symbol table has been altered. 
 
@@ -878,6 +879,8 @@ versions prior to 5.10, this will use the C<PL_sub_generation> variable
 which is not package specific. 
 
 =item B<get_code_info ($code)>
+
+B<NOTE: DO NOT USE THIS FUNCTION, IT IS FOR INTERNAL USE ONLY!>
 
 This function returns two values, the name of the package the C<$code> 
 is from and the name of the C<$code> itself. This is used by several 
@@ -892,6 +895,8 @@ as C<Sub::Name::subname> does, otherwise it will just return the C<$code>
 argument.
 
 =item B<in_global_destruction>
+
+B<NOTE: DO NOT USE THIS FUNCTION, IT IS FOR INTERNAL USE ONLY!>
 
 If L<Devel::GlobalDestruction> is available, this returns true under global
 destruction.
