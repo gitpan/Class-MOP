@@ -11,7 +11,7 @@ use Class::MOP::Method::Wrapped;
 use Carp         'confess';
 use Scalar::Util 'blessed', 'weaken';
 
-our $VERSION   = '0.65';
+our $VERSION   = '0.67';
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
 
@@ -274,7 +274,16 @@ sub create {
     eval $code;
     confess "creation of $package_name failed : $@" if $@;
 
-    my $meta = $class->initialize($package_name);
+    my (%initialize_options) = @args;
+    delete @initialize_options{qw(
+        package
+        superclasses
+        attributes
+        methods
+        version
+        authority
+    )};
+    my $meta = $class->initialize( $package_name => %initialize_options );
 
     # FIXME totally lame
     $meta->add_method('meta' => sub {
@@ -500,6 +509,14 @@ sub superclasses {
     if (@_) {
         my @supers = @_;
         @{$self->get_package_symbol($var_spec)} = @supers;
+
+        # NOTE:
+        # on 5.8 and below, we need to call
+        # a method to get Perl to detect
+        # a cycle in the class hierarchy
+        my $class = $self->name;
+        $class->isa($class);
+
         # NOTE:
         # we need to check the metaclass
         # compatibility here so that we can
