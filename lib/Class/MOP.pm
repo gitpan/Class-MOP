@@ -31,7 +31,7 @@ BEGIN {
     *check_package_cache_flag = \&mro::get_pkg_gen;
 }
 
-our $VERSION   = '0.67';
+our $VERSION   = '0.68';
 our $XS_VERSION = $VERSION;
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';    
@@ -100,22 +100,62 @@ sub _load_pure_perl {
     # because I don't yet see a good reason to do so.
 }
 
-sub load_class {
+sub load_first_existing_class {
+    my @classes = @_
+        or return;
+
+    foreach my $class (@classes) {
+        unless ( _is_valid_class_name($class) ) {
+            my $display = defined($class) ? $class : 'undef';
+            confess "Invalid class name ($display)";
+        }
+    }
+
+    my $found;
+    my %exceptions;
+    for my $class (@classes) {
+        my $e = _try_load_one_class($class);
+
+        if ($e) {
+            $exceptions{$class} = $e;
+        }
+        else {
+            $found = $class;
+            last;
+        }
+    }
+
+    return $found if $found;
+
+    confess join(
+        "\n",
+        map {
+            sprintf(
+                "Could not load class (%s) because : %s", $_,
+                $exceptions{$_}
+                )
+            } @classes
+    );
+}
+
+sub _try_load_one_class {
     my $class = shift;
 
-    unless ( _is_valid_class_name($class) ) {
-        my $display = defined($class) ? $class : 'undef';
-        confess "Invalid class name ($display)";
-    }
+    return if is_class_loaded($class);
 
-    # if the class is not already loaded in the symbol table..
-    unless (is_class_loaded($class)) {
-        # require it
-        my $e = do { local $@; eval "require $class"; $@ };
-        confess "Could not load class ($class) because : $e" if $e;
-    }
+    my $file = $class . '.pm';
+    $file =~ s{::}{/}g;
 
-    get_metaclass_by_name($class) || $class if defined wantarray;
+    return do {
+        local $@;
+        eval { require($file) };
+        $@;
+    };
+}
+
+sub load_class {
+    my $class = load_first_existing_class($_[0]);
+    return get_metaclass_by_name($class) || $class;
 }
 
 sub _is_valid_class_name {
@@ -903,6 +943,16 @@ destruction.
 
 Otherwise it's a constant returning false.
 
+=item B<load_first_existing_class ($class_name, [$class_name, ...])>
+
+B<NOTE: DO NOT USE THIS FUNCTION, IT IS FOR INTERNAL USE ONLY!>
+
+Given a list of class names, this function will attempt to load each
+one in turn.
+
+If it finds a class it can load, it will return that class' name.
+If none of the classes can be loaded, it will throw an exception.
+
 =back
 
 =head2 Metaclass cache functions
@@ -1057,6 +1107,8 @@ Stevan Little E<lt>stevan@iinteractive.comE<gt>
 B<with contributions from:>
 
 Brandon (blblack) Black
+
+Florian (rafl) Ragwitz
 
 Guillermo (groditi) Roditi
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env perl
 use strict;
 use warnings;
-use Test::More tests => 22;
+use Test::More tests => 28;
 use Test::Exception;
 
 require Class::MOP;
@@ -19,6 +19,10 @@ ok(Class::MOP::_is_valid_class_name('Foo'), q{'Foo' is a valid class name});
 ok(Class::MOP::_is_valid_class_name('Foo::Bar'), q{'Foo::Bar' is a valid class name});
 ok(Class::MOP::_is_valid_class_name('Foo_::Bar2'), q{'Foo_::Bar2' is a valid class name});
 throws_ok { Class::MOP::load_class('bogus name') } qr/Invalid class name \(bogus name\)/;
+
+throws_ok {
+    Class::MOP::load_class('__PACKAGE__')
+} qr/__PACKAGE__\.pm.*\@INC/, 'errors sanely on __PACKAGE__.pm';
 
 my $meta = Class::MOP::load_class('BinaryTree');
 ok($meta, "successfully loaded the class BinaryTree");
@@ -39,11 +43,19 @@ ok( !Class::MOP::does_metaclass_exist("Class"), "no metaclass for non MOP class"
 
 throws_ok {
     Class::MOP::load_class('FakeClassOhNo');
-} qr/Can't locate /;
+}
+qr/Can't locate /;
 
 throws_ok {
     Class::MOP::load_class('SyntaxError');
-} qr/Missing right curly/;
+}
+qr/Missing right curly/;
+
+throws_ok {
+    Class::MOP::load_class('This::Does::Not::Exist');
+}
+qr/Could not load class \(This::Does::Not::Exist\) because :/,
+    'Many Moose tests rely on the exact formatting of this error';
 
 {
     package Other;
@@ -61,3 +73,14 @@ lives_ok {
 }
 
 isa_ok( Class::MOP::load_class("Lala"), "Class::MOP::Class", "when an object has a metaclass it is returned" );
+
+lives_ok {
+    is(Class::MOP::load_first_existing_class("Lala", "Does::Not::Exist"), "Lala", 'load_first_existing_class 1/2 params ok, class name returned');
+    is(Class::MOP::load_first_existing_class("Does::Not::Exist", "Lala"), "Lala", 'load_first_existing_class 2/2 params ok, class name returned');
+} 'load_classes works';
+
+throws_ok {
+    Class::MOP::load_first_existing_class("Does::Not::Exist", "Also::Does::Not::Exist")
+} qr/Could not load class \(Does::Not::Exist.*Could not load class \(Also::Does::Not::Exist/s, 'Multiple non-existant classes cause exception';
+
+
