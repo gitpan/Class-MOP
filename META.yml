@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name:               Class-MOP
-version:            0.68
+version:            0.69
 abstract:           A Meta Object Protocol for Perl 5
 author:
     - Stevan Little <stevan@iinteractive.com>
@@ -22,7 +22,7 @@ no_index:
     directory:
         - t
         - inc
-generated_by:       ExtUtils::MakeMaker version 6.46
+generated_by:       ExtUtils::MakeMaker version 6.48
 meta-spec:
     url:      http://module-build.sourceforge.net/META-spec-v1.4.html
     version:  1.4

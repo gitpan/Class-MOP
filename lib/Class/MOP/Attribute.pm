@@ -9,7 +9,7 @@ use Class::MOP::Method::Accessor;
 use Carp         'confess';
 use Scalar::Util 'blessed', 'weaken';
 
-our $VERSION   = '0.68';
+our $VERSION   = '0.69';
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
 
@@ -241,7 +241,7 @@ sub get_write_method_ref {
 }
 
 sub is_default_a_coderef {
-    ('CODE' eq ref($_[0]->{'default'} || $_[0]->{default}))
+    ('CODE' eq ref($_[0]->{'default'}))
 }
 
 sub default {
