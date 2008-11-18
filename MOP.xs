@@ -98,7 +98,7 @@ get_all_package_symbols(self, ...)
 
         PUTBACK;
 
-        if (he = hv_fetch_ent((HV *)SvRV(self), key_package, 0, hash_package))
+        if ((he = hv_fetch_ent((HV *)SvRV(self), key_package, 0, hash_package)))
             stash = gv_stashsv(HeVAL(he),0);
 
         if ( stash ) {
@@ -130,6 +130,10 @@ get_all_package_symbols(self, ...)
                             break;
                         case SVt_RV:
                             /* BAH! constants are horrible */
+
+                            if (!SvROK (gv)) {
+                                continue;
+                            }
 
                             /* we don't really care about the length,
                                but that's the API */
@@ -166,7 +170,7 @@ get_all_package_symbols(self, ...)
 
         }
 
-SV *
+void
 name(self)
     SV *self
     PREINIT:
@@ -176,14 +180,14 @@ name(self)
             die("Cannot call name as a class method");
         }
 
-        if (he = hv_fetch_ent((HV *)SvRV(self), key_package, 0, hash_package))
+        if ((he = hv_fetch_ent((HV *)SvRV(self), key_package, 0, hash_package)))
             XPUSHs(HeVAL(he));
         else
             ST(0) = &PL_sv_undef;
 
 MODULE = Class::MOP   PACKAGE = Class::MOP::Attribute
 
-SV *
+void
 name(self)
     SV *self
     PREINIT:
@@ -193,14 +197,14 @@ name(self)
             die("Cannot call name as a class method");
         }
 
-        if (he = hv_fetch_ent((HV *)SvRV(self), key_name, 0, hash_name))
+        if ((he = hv_fetch_ent((HV *)SvRV(self), key_name, 0, hash_name)))
             XPUSHs(HeVAL(he));
         else
             ST(0) = &PL_sv_undef;
 
 MODULE = Class::MOP   PACKAGE = Class::MOP::Method
 
-SV *
+void
 name(self)
     SV *self
     PREINIT:
@@ -210,12 +214,12 @@ name(self)
             die("Cannot call name as a class method");
         }
 
-        if (he = hv_fetch_ent((HV *)SvRV(self), key_name, 0, hash_name))
+        if ((he = hv_fetch_ent((HV *)SvRV(self), key_name, 0, hash_name)))
             XPUSHs(HeVAL(he));
         else
             ST(0) = &PL_sv_undef;
 
-SV *
+void
 package_name(self)
     SV *self
     PREINIT:
@@ -225,12 +229,12 @@ package_name(self)
             die("Cannot call package_name as a class method");
         }
 
-        if (he = hv_fetch_ent((HV *)SvRV(self), key_package_name, 0, hash_package_name))
+        if ((he = hv_fetch_ent((HV *)SvRV(self), key_package_name, 0, hash_package_name)))
             XPUSHs(HeVAL(he));
         else
             ST(0) = &PL_sv_undef;
 
-SV *
+void
 body(self)
     SV *self
     PREINIT:
@@ -240,7 +244,7 @@ body(self)
             die("Cannot call body as a class method");
         }
 
-        if (he = hv_fetch_ent((HV *)SvRV(self), key_body, 0, hash_body))
+        if ((he = hv_fetch_ent((HV *)SvRV(self), key_body, 0, hash_body)))
             XPUSHs(HeVAL(he));
         else
             ST(0) = &PL_sv_undef;
