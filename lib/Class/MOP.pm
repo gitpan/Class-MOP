@@ -31,7 +31,7 @@ BEGIN {
     *check_package_cache_flag = \&mro::get_pkg_gen;
 }
 
-our $VERSION   = '0.70_01';
+our $VERSION   = '0.71';
 our $XS_VERSION = $VERSION;
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';    
@@ -173,7 +173,7 @@ sub _is_valid_class_name {
 sub is_class_loaded {
     my $class = shift;
 
-    return 0 if ref($class) || !defined($class) || !length($class);
+    return 0 unless _is_valid_class_name($class);
 
     # walk the symbol table tree to avoid autovififying
     # \*{${main::}{"Foo::"}} == \*main::Foo::
