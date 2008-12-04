@@ -7,7 +7,7 @@ use warnings;
 use Carp         'confess';
 use Scalar::Util 'blessed', 'weaken', 'looks_like_number';
 
-our $VERSION   = '0.71';
+our $VERSION   = '0.71_01';
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
 
@@ -190,7 +190,7 @@ Class::MOP::Method::Constructor - Method Meta Object for constructors
   );
 
   # calling the constructor ...
-  $constructor->body->($metaclass->name, %params);
+  $constructor->body->execute($metaclass->name, %params);
 
 =head1 DESCRIPTION
 

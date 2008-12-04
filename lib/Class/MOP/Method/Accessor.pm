@@ -7,7 +7,7 @@ use warnings;
 use Carp         'confess';
 use Scalar::Util 'blessed', 'weaken';
 
-our $VERSION   = '0.71';
+our $VERSION   = '0.71_01';
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
 
@@ -201,7 +201,7 @@ Class::MOP::Method::Accessor - Method Meta Object for accessors
         accessor_type => 'reader',
     );
 
-    $reader->body->($instance); # call the reader method
+    $reader->body->execute($instance); # call the reader method
 
 =head1 DESCRIPTION
 

@@ -7,7 +7,7 @@ use warnings;
 use Carp         'confess';
 use Scalar::Util 'weaken';
 
-our $VERSION   = '0.71';
+our $VERSION   = '0.71_01';
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
 
@@ -43,7 +43,7 @@ sub wrap {
     ($params{package_name} && $params{name})
         || confess "You must supply the package_name and name parameters $UPGRADE_ERROR_TEXT";
 
-    my $self = (ref($class) || $class)->_new(\%params);
+    my $self = $class->_new(\%params);
 
     weaken($self->{associated_metaclass}) if $self->{associated_metaclass};
 
@@ -119,6 +119,11 @@ sub original_fully_qualified_name {
     $self->original_method
         ? $self->original_method->original_fully_qualified_name
         : $self->fully_qualified_name;
+}
+
+sub execute {
+    my $self = shift;
+    $self->body->(@_);
 }
 
 # NOTE:
@@ -243,6 +248,17 @@ Sets the associated metaclass
 =item B<detach_from_class>
 
 Disassociates the method from the metaclass
+
+=back
+
+=head2 Miscellaneous
+
+=over 4
+
+=item B<execute>
+
+Executes the method. Be sure to pass in the instance, since the
+method expects it.
 
 =back
 

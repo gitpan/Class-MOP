@@ -4,10 +4,11 @@ package Class::MOP::Package;
 use strict;
 use warnings;
 
+use B;
 use Scalar::Util 'blessed';
 use Carp         'confess';
 
-our $VERSION   = '0.71';
+our $VERSION   = '0.71_01';
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
 
@@ -291,9 +292,15 @@ sub get_all_package_symbols {
         return map {
             (ref($namespace->{$_})
                 ? ( $_ => \&{$pkg ||= $self->name . "::$_"} )
-                : ( (*{$namespace->{$_}}{CODE}) # the extra parents prevent breakage on 5.8.2
+                : ( ref \$namespace->{$_} eq 'GLOB' # don't use {CODE} unless it's really a glob to prevent stringification of stubs
+                    && (*{$namespace->{$_}}{CODE})  # the extra parents prevent breakage on 5.8.2
                     ? ( $_ => *{$namespace->{$_}}{CODE} )
-                    : () ) )
+                    : (do {
+                        my $sym = B::svref_2object(\$namespace->{$_});
+                        my $svt = ref $sym if $sym;
+                        ($sym && ($svt eq 'B::PV' || $svt eq 'B::IV'))
+                            ? ($_ => ($pkg ||= $self->name)->can($_))
+                            : () }) ) )
         } keys %$namespace;
     } else {
         return map {

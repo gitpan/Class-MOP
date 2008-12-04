@@ -9,7 +9,7 @@ use Class::MOP::Method::Constructor;
 use Carp         'confess';
 use Scalar::Util 'blessed';
 
-our $VERSION   = '0.71';
+our $VERSION   = '0.71_01';
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
 
@@ -38,12 +38,6 @@ sub new {
         'immutable_metaclass' => undef,
     );
 
-    # NOTE:
-    # we initialize the immutable
-    # version of the metaclass here
-    # FIXME lazify
-    $self->create_immutable_metaclass;
-
     return $self;
 }
 
@@ -54,7 +48,14 @@ sub _new {
     bless $options, $class;
 }
 
-sub immutable_metaclass { (shift)->{'immutable_metaclass'} }
+sub immutable_metaclass {
+    my $self = shift;
+
+    $self->create_immutable_metaclass unless $self->{'immutable_metaclass'};
+
+    return $self->{'immutable_metaclass'};
+}
+
 sub metaclass           { (shift)->{'metaclass'}           }
 sub options             { (shift)->{'options'}             }
 
@@ -173,16 +174,6 @@ sub make_metaclass_immutable {
 
         ($metaclass->can($method_name))
             || confess "Could not find the method '$method_name' in " . $metaclass->name;
-
-        if ($type eq 'ARRAY') {
-            $metaclass->{'___' . $method_name} = [ $metaclass->$method_name ];
-        }
-        elsif ($type eq 'HASH') {
-            $metaclass->{'___' . $method_name} = { $metaclass->$method_name };
-        }
-        elsif ($type eq 'SCALAR') {
-            $metaclass->{'___' . $method_name} = $metaclass->$method_name;
-        }
     }
 
     $metaclass->{'___original_class'} = blessed($metaclass);
@@ -242,12 +233,14 @@ sub create_methods_for_immutable_metaclass {
     my $self = shift;
 
     my %methods = %DEFAULT_METHODS;
+    my $metaclass = $self->metaclass;
+    my $meta = $metaclass->meta;
 
     foreach my $read_only_method (@{$self->options->{read_only}}) {
-        my $method = $self->metaclass->meta->find_method_by_name($read_only_method);
+        my $method = $meta->find_method_by_name($read_only_method);
 
         (defined $method)
-            || confess "Could not find the method '$read_only_method' in " . $self->metaclass->name;
+            || confess "Could not find the method '$read_only_method' in " . $metaclass->name;
 
         $methods{$read_only_method} = sub {
             confess "This method is read-only" if scalar @_ > 1;
@@ -264,24 +257,39 @@ sub create_methods_for_immutable_metaclass {
     my $memoized_methods = $self->options->{memoize};
     foreach my $method_name (keys %{$memoized_methods}) {
         my $type = $memoized_methods->{$method_name};
+        my $key = '___' . $method_name;
+        my $method = $meta->find_method_by_name($method_name);
+
         if ($type eq 'ARRAY') {
-            $methods{$method_name} = sub { @{$_[0]->{'___' . $method_name}} };
+            $methods{$method_name} = sub {
+                @{$_[0]->{$key}} = $method->execute($_[0])
+                    if !exists $_[0]->{$key};
+                return @{$_[0]->{$key}};
+            };
         }
         elsif ($type eq 'HASH') {
-            $methods{$method_name} = sub { %{$_[0]->{'___' . $method_name}} };
+            $methods{$method_name} = sub {
+                %{$_[0]->{$key}} = $method->execute($_[0])
+                    if !exists $_[0]->{$key};
+                return %{$_[0]->{$key}};
+            };
         }
         elsif ($type eq 'SCALAR') {
-            $methods{$method_name} = sub { $_[0]->{'___' . $method_name} };
+            $methods{$method_name} = sub {
+                $_[0]->{$key} = $method->execute($_[0])
+                    if !exists $_[0]->{$key};
+                return $_[0]->{$key};
+            };
         }
     }
     
     my $wrapped_methods = $self->options->{wrapped};
     
     foreach my $method_name (keys %{ $wrapped_methods }) {
-        my $method = $self->metaclass->meta->find_method_by_name($method_name);
+        my $method = $meta->find_method_by_name($method_name);
 
         (defined $method)
-            || confess "Could not find the method '$method_name' in " . $self->metaclass->name;
+            || confess "Could not find the method '$method_name' in " . $metaclass->name;
 
         my $wrapper = $wrapped_methods->{$method_name};
 

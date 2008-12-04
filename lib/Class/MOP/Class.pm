@@ -11,7 +11,7 @@ use Class::MOP::Method::Wrapped;
 use Carp         'confess';
 use Scalar::Util 'blessed', 'weaken';
 
-our $VERSION   = '0.71';
+our $VERSION   = '0.71_01';
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
 
@@ -315,8 +315,10 @@ sub instance_metaclass  { $_[0]->{'instance_metaclass'}  }
 # this is a prime canidate for conversion to XS
 sub get_method_map {
     my $self = shift;
-    
-    my $current = Class::MOP::check_package_cache_flag($self->name);
+
+    my $class_name = $self->name;
+
+    my $current = Class::MOP::check_package_cache_flag($class_name);
 
     if (defined $self->{'_package_cache_flag'} && $self->{'_package_cache_flag'} == $current) {
         return $self->{'methods'} ||= {};
@@ -324,9 +326,8 @@ sub get_method_map {
 
     $self->{_package_cache_flag} = $current;
 
-    my $map  = $self->{'methods'} ||= {};
+    my $map = $self->{'methods'} ||= {};
 
-    my $class_name       = $self->name;
     my $method_metaclass = $self->method_metaclass;
 
     my %all_code = $self->get_all_package_symbols('CODE');
@@ -644,15 +645,16 @@ sub add_method {
 
     $method->attach_to_class($self);
 
-    $self->get_method_map->{$method_name} = $method;
+    # This used to call get_method_map, which meant we would build all
+    # the method objects for the class just because we added one
+    # method. This is hackier, but quicker too.
+    $self->{methods}{$method_name} = $method;
     
     my $full_method_name = ($self->name . '::' . $method_name);    
     $self->add_package_symbol(
         { sigil => '&', type => 'CODE', name => $method_name }, 
         Class::MOP::subname($full_method_name => $body)
     );
-
-    $self->update_package_cache_flag; # still valid, since we just added the method to the map, and if it was invalid before that then get_method_map updated it
 }
 
 {
@@ -736,7 +738,7 @@ sub has_method {
     (defined $method_name && $method_name)
         || confess "You must define a method name";
 
-    exists $self->get_method_map->{$method_name};
+    exists $self->{methods}{$method_name} || exists $self->get_method_map->{$method_name};
 }
 
 sub get_method {
@@ -750,7 +752,7 @@ sub get_method {
     # will just return undef for me now
     # return unless $self->has_method($method_name);
 
-    return $self->get_method_map->{$method_name};
+    return $self->{methods}{$method_name} || $self->get_method_map->{$method_name};
 }
 
 sub remove_method {
