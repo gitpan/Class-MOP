@@ -95,4 +95,5 @@ t/lib/MyMetaClass/Instance.pm
 t/lib/MyMetaClass/Method.pm
 t/lib/MyMetaClass/Random.pm
 t/lib/SyntaxError.pm
+typemap
 META.yml                                 Module meta-data (added by MakeMaker)
