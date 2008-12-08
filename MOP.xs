@@ -9,6 +9,7 @@ This shuts up warnings from gcc -Wall
 #include "perl.h"
 #include "XSUB.h"
 
+#define NEED_newRV_noinc
 #define NEED_sv_2pv_flags
 #define NEED_sv_2pv_nolen
 #include "ppport.h"
@@ -228,7 +229,7 @@ mop_update_method_map(pTHX_ SV *const self, SV *const class_name, HV *const stas
 
         method_slot = *hv_fetch(map, method_name, method_name_len, TRUE);
         if ( SvOK(method_slot) ) {
-            SV* const body = call0(method_slot, key_body); /* $method_object->body() */
+            SV *const body = call0(method_slot, key_body); /* $method_object->body() */
             if ( SvROK(body) && ((CV *) SvRV(body)) == cv ) {
                 continue;
             }
@@ -307,8 +308,8 @@ void
 get_code_info(coderef)
     SV *coderef
     PREINIT:
-        char* pkg  = NULL;
-        char* name = NULL;
+        char *pkg  = NULL;
+        char *name = NULL;
     PPCODE:
         if (get_code_info(coderef, &pkg, &name)) {
             EXTEND(SP, 2);

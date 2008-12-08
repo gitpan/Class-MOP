@@ -1,5 +1,13 @@
 Revision history for Perl extension Class-MOP.
 
+0.72 Mon, December 8, 2008
+    * Class::MOP::Package
+      - Pass options to _new, so subclass' attributes can be
+        initialized (Sartak)
+    * Class::MOP::Method
+      - In the docs, indicate that package_name and name are required
+        when calling ->wrap (Stefan O'Rear)
+
 0.71_02 Fri, December 5, 2008
     * Class::MOP::Immutable
       - Added a new attribute, inlined_constructor, which is true if

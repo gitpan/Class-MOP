@@ -8,7 +8,7 @@ use B;
 use Scalar::Util 'blessed';
 use Carp         'confess';
 
-our $VERSION   = '0.71_02';
+our $VERSION   = '0.72';
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
 
@@ -32,6 +32,7 @@ sub initialize {
     } else {
         my $meta = ( ref $class || $class )->_new({
             'package'   => $package_name,
+            %options,
         });
 
         Class::MOP::store_metaclass_by_name($package_name, $meta);
