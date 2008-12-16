@@ -11,7 +11,7 @@ use Class::MOP::Method::Wrapped;
 use Carp         'confess';
 use Scalar::Util 'blessed', 'weaken';
 
-our $VERSION   = '0.72';
+our $VERSION   = '0.73';
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
 
@@ -1183,6 +1183,10 @@ manipulation of Perl 5 classes (and it can create them too). The
 best way to understand what this module can do, is to read the
 documentation for each of it's methods.
 
+=head1 INHERITANCE
+
+B<Class::MOP::Class> is a subclass of L<Class::MOP::Module>
+
 =head1 METHODS
 
 =head2 Self Introspection
@@ -1351,7 +1355,7 @@ This method is used to construct an instance structure suitable for
 C<bless>-ing into your package of choice. It works in conjunction
 with the Attribute protocol to collect all applicable attributes.
 
-This will construct and instance using a HASH ref as storage
+This will construct an instance using a HASH ref as storage
 (currently only HASH references are supported). This will collect all
 the applicable attributes and layout out the fields in the HASH ref,
 it will then initialize them using either use the corresponding key
