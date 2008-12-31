@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name:               Class-MOP
-version:            0.74
+version:            0.75
 abstract:           A Meta Object Protocol for Perl 5
 author:
     - Stevan Little <stevan@iinteractive.com>
