@@ -31,13 +31,11 @@ BEGIN {
     *check_package_cache_flag = \&mro::get_pkg_gen;
 }
 
-our $VERSION   = '0.75';
+our $VERSION   = '0.76';
 our $XS_VERSION = $VERSION;
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';    
-    
-# after that everything is loaded, if we're allowed try to load faster XS
-# versions of various things
+
 _try_load_xs() or _load_pure_perl();
 
 sub _try_load_xs {
@@ -57,6 +55,8 @@ sub _try_load_xs {
 
             require Devel::GlobalDestruction;
             Devel::GlobalDestruction->import("in_global_destruction");
+
+            *USING_XS = sub () { 1 };
         };
         $@;
     };
@@ -71,7 +71,9 @@ sub _load_pure_perl {
     Sub::Identify->import('get_code_info');
 
     *subname = sub { $_[1] };
-    *in_global_destruction = sub () { !1 }
+    *in_global_destruction = sub () { !1 };
+
+    *USING_XS = sub () { 0 };
 }
 
 
@@ -449,6 +451,12 @@ Class::MOP::Attribute->meta->add_attribute(
 );
 
 Class::MOP::Attribute->meta->add_attribute(
+    Class::MOP::Attribute->new('definition_context' => (
+        reader    => { 'definition_context'     => \&Class::MOP::Attribute::definition_context     },
+    ))
+);
+
+Class::MOP::Attribute->meta->add_attribute(
     Class::MOP::Attribute->new('writer' => (
         reader    => { 'writer'     => \&Class::MOP::Attribute::writer     },
         predicate => { 'has_writer' => \&Class::MOP::Attribute::has_writer },
@@ -561,6 +569,12 @@ Class::MOP::Method::Generated->meta->add_attribute(
     Class::MOP::Attribute->new('is_inline' => (
         reader   => { 'is_inline' => \&Class::MOP::Method::Generated::is_inline },
         default  => 0, 
+    ))
+);
+
+Class::MOP::Method::Generated->meta->add_attribute(
+    Class::MOP::Attribute->new('definition_context' => (
+        reader   => { 'definition_context' => \&Class::MOP::Method::Generated::definition_context },
     ))
 );
 
@@ -879,6 +893,10 @@ compat.
 Whether or not C<mro> provides C<get_isarev>, a much faster way to get all the
 subclasses of a certain class.
 
+=item I<USING_XS>
+
+Whether or not the running C<Class::MOP> is using its XS version.
+
 =back
 
 =head2 Utility functions
@@ -953,32 +971,32 @@ If none of the classes can be loaded, it will throw an exception.
 
 =head2 Metaclass cache functions
 
-Class::MOP holds a cache of metaclasses, the following are functions
+Class::MOP holds a cache of metaclasses. The following are functions
 (B<not methods>) which can be used to access that cache. It is not
-recommended that you mess with this, bad things could happen. But if
-you are brave and willing to risk it, go for it.
+recommended that you mess with these. Bad things could happen, but if
+you are brave and willing to risk it: go for it!
 
 =over 4
 
 =item B<get_all_metaclasses>
 
-This will return an hash of all the metaclass instances that have
-been cached by B<Class::MOP::Class> keyed by the package name.
+This will return a hash of all the metaclass instances that have
+been cached by B<Class::MOP::Class>, keyed by the package name.
 
 =item B<get_all_metaclass_instances>
 
-This will return an array of all the metaclass instances that have
+This will return a list of all the metaclass instances that have
 been cached by B<Class::MOP::Class>.
 
 =item B<get_all_metaclass_names>
 
-This will return an array of all the metaclass names that have
+This will return a list of all the metaclass names that have
 been cached by B<Class::MOP::Class>.
 
 =item B<get_metaclass_by_name ($name)>
 
-This will return a cached B<Class::MOP::Class> instance of nothing
-if no metaclass exist by that C<$name>.
+This will return a cached B<Class::MOP::Class> instance, or nothing
+if no metaclass exists with that C<$name>.
 
 =item B<store_metaclass_by_name ($name, $meta)>
 
@@ -986,18 +1004,19 @@ This will store a metaclass in the cache at the supplied C<$key>.
 
 =item B<weaken_metaclass ($name)>
 
-In rare cases it is desireable to store a weakened reference in 
-the metaclass cache. This function will weaken the reference to 
-the metaclass stored in C<$name>.
+In rare cases (e.g. anonymous metaclasses) it is desirable to
+store a weakened reference in the metaclass cache. This
+function will weaken the reference to the metaclass stored
+in C<$name>.
 
 =item B<does_metaclass_exist ($name)>
 
 This will return true of there exists a metaclass stored in the 
-C<$name> key and return false otherwise.
+C<$name> key, and return false otherwise.
 
 =item B<remove_metaclass_by_name ($name)>
 
-This will remove a the metaclass stored in the C<$name> key.
+This will remove the metaclass stored in the C<$name> key.
 
 =back
 

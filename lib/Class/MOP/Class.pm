@@ -11,7 +11,7 @@ use Class::MOP::Method::Wrapped;
 use Carp         'confess';
 use Scalar::Util 'blessed', 'weaken';
 
-our $VERSION   = '0.75';
+our $VERSION   = '0.76';
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
 
@@ -744,12 +744,6 @@ sub get_method {
     (defined $method_name && $method_name)
         || confess "You must define a method name";
 
-    # NOTE:
-    # I don't really need this here, because
-    # if the method_map is missing a key it
-    # will just return undef for me now
-    # return unless $self->has_method($method_name);
-
     return $self->{methods}{$method_name} || $self->get_method_map->{$method_name};
 }
 
@@ -1459,7 +1453,8 @@ This returns a list of subclasses for this class.
 
 =item B<get_method_map>
 
-Returns a HASH ref of name to CODE reference mapping for this class.
+Returns a HASH ref of name to L<Class::MOP::Method> instance mapping
+for this class.
 
 =item B<method_metaclass>
 
@@ -1525,16 +1520,17 @@ CODE reference, see L<Class::MOP::Method> for more information.
 
 =item B<find_method_by_name ($method_name)>
 
-This will return a CODE reference of the specified C<$method_name>,
-or return undef if that method does not exist.
+This will return a L<Class::MOP::Method> instance for the specified
+C<$method_name>, or return undef if that method does not exist.
 
 Unlike C<get_method> this will also look in the superclasses.
 
 =item B<remove_method ($method_name)>
 
 This will attempt to remove a given C<$method_name> from the class.
-It will return the CODE reference that it has removed, and will
-attempt to use B<Sub::Name> to clear the methods associated name.
+It will return the L<Class::MOP::Method> instance that it has removed,
+and will attempt to use B<Sub::Name> to clear the methods associated
+name.
 
 =item B<get_method_list>
 

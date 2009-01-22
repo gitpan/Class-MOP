@@ -6,7 +6,7 @@ use warnings;
 
 use Carp 'confess';
 
-our $VERSION   = '0.75';
+our $VERSION   = '0.76';
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
 
@@ -38,13 +38,67 @@ sub _new {
 
 ## accessors
 
-sub is_inline { (shift)->{'is_inline'} }
+sub is_inline { $_[0]{is_inline} }
+
+sub definition_context { $_[0]{definition_context} }
 
 sub initialize_body {
     confess "No body to initialize, " . __PACKAGE__ . " is an abstract base class";
 }
 
+sub _eval_closure {
+    # my ($self, $captures, $sub_body) = @_;
+    my $__captures = $_[1];
+    eval join(
+        "\n",
+        (
+            map {
+                /^([\@\%\$])/
+                    or die "capture key should start with \@, \% or \$: $_";
+                q[my ]
+                . $_ . q[ = ]
+                . $1
+                . q[{$__captures->{']
+                . $_
+                . q['}};];
+            } keys %$__captures
+        ),
+        $_[2]
+    );
+}
 
+sub _add_line_directive {
+    my ( $self, %args ) = @_;
+
+    my ( $line, $file );
+
+    if ( my $ctx = ( $args{context} || $self->definition_context ) ) {
+        $line = $ctx->{line};
+        if ( my $desc = $ctx->{description} ) {
+            $file = "$desc defined at $ctx->{file}";
+        } else {
+            $file = $ctx->{file};
+        }
+    } else {
+        ( $line, $file ) = ( 0, "generated method (unknown origin)" );
+    }
+
+    my $code = $args{code};
+
+    # if it's an array of lines, join it up
+    # don't use newlines so that the definition context is more meaningful
+    $code = join(@$code, ' ') if ref $code;
+
+    return qq{#line $line "$file"\n} . $code;
+}
+
+sub _compile_code {
+    my ( $self, %args ) = @_;
+
+    my $code = $self->_add_line_directive(%args);
+
+    $self->_eval_closure($args{environment}, $code);
+}
 
 1;
 
