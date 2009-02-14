@@ -11,7 +11,7 @@ use Class::MOP::Method::Wrapped;
 use Carp         'confess';
 use Scalar::Util 'blessed', 'weaken';
 
-our $VERSION   = '0.76';
+our $VERSION   = '0.77';
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
 
@@ -103,7 +103,7 @@ sub _new {
 
     bless {
         # inherited from Class::MOP::Package
-        'package'             => $options->{package},
+        'package' => $options->{package},
 
         # NOTE:
         # since the following attributes will
@@ -113,18 +113,25 @@ sub _new {
         # listed here for reference, because they
         # should not actually have a value associated
         # with the slot.
-        'namespace'           => \undef,
+        'namespace' => \undef,
+
         # inherited from Class::MOP::Module
-        'version'             => \undef,
-        'authority'           => \undef,
+        'version'   => \undef,
+        'authority' => \undef,
+
         # defined in Class::MOP::Class
-        'superclasses'        => \undef,
+        'superclasses' => \undef,
 
         'methods'             => {},
         'attributes'          => {},
-        'attribute_metaclass' => $options->{'attribute_metaclass'} || 'Class::MOP::Attribute',
-        'method_metaclass'    => $options->{'method_metaclass'}    || 'Class::MOP::Method',
-        'instance_metaclass'  => $options->{'instance_metaclass'}  || 'Class::MOP::Instance',
+        'attribute_metaclass' => $options->{'attribute_metaclass'}
+            || 'Class::MOP::Attribute',
+        'method_metaclass' => $options->{'method_metaclass'}
+            || 'Class::MOP::Method',
+        'wrapped_method_metaclass' => $options->{'wrapped_method_metaclass'}
+            || 'Class::MOP::Method::Wrapped',
+        'instance_metaclass' => $options->{'instance_metaclass'}
+            || 'Class::MOP::Instance',
     }, $class;
 }
 
@@ -306,10 +313,11 @@ sub create {
 # all these attribute readers will be bootstrapped
 # away in the Class::MOP bootstrap section
 
-sub get_attribute_map   { $_[0]->{'attributes'}          }
-sub attribute_metaclass { $_[0]->{'attribute_metaclass'} }
-sub method_metaclass    { $_[0]->{'method_metaclass'}    }
-sub instance_metaclass  { $_[0]->{'instance_metaclass'}  }
+sub get_attribute_map        { $_[0]->{'attributes'}                  }
+sub attribute_metaclass      { $_[0]->{'attribute_metaclass'}         }
+sub method_metaclass         { $_[0]->{'method_metaclass'}            }
+sub wrapped_method_metaclass { $_[0]->{'wrapped_method_metaclass'}    }
+sub instance_metaclass       { $_[0]->{'instance_metaclass'}          }
 
 sub get_method_map {
     my $self = shift;
@@ -658,6 +666,7 @@ sub add_method {
 {
     my $fetch_and_prepare_method = sub {
         my ($self, $method_name) = @_;
+        my $wrapped_metaclass = $self->wrapped_method_metaclass;
         # fetch it locally
         my $method = $self->get_method($method_name);
         # if we dont have local ...
@@ -670,12 +679,12 @@ sub add_method {
             # and now make sure to wrap it
             # even if it is already wrapped
             # because we need a new sub ref
-            $method = Class::MOP::Method::Wrapped->wrap($method);
+            $method = $wrapped_metaclass->wrap($method);
         }
         else {
             # now make sure we wrap it properly
-            $method = Class::MOP::Method::Wrapped->wrap($method)
-                unless $method->isa('Class::MOP::Method::Wrapped');
+            $method = $wrapped_metaclass->wrap($method)
+                unless $method->isa($wrapped_metaclass);
         }
         $self->add_method($method_name => $method);
         return $method;
@@ -798,6 +807,12 @@ sub compute_all_applicable_methods {
             code  => $_, # sigh, overloading
         },
     } shift->get_all_methods(@_);
+}
+
+sub get_all_method_names {
+    my $self = shift;
+    my %uniq;
+    grep { $uniq{$_}++ == 0 } map { $_->name } $self->get_all_methods;
 }
 
 sub find_all_methods_by_name {
@@ -1100,6 +1115,7 @@ sub create_immutable_transformer {
            class_precedence_list             => 'ARRAY',
            linearized_isa                    => 'ARRAY', # FIXME perl 5.10 memoizes this on its own, no need?
            get_all_methods                   => 'ARRAY',
+           get_all_method_names              => 'ARRAY',
            #get_all_attributes               => 'ARRAY', # it's an alias, no need, but maybe in the future
            compute_all_applicable_attributes => 'ARRAY',
            get_meta_instance                 => 'SCALAR',
@@ -1243,8 +1259,9 @@ as we use a special reserved slot (C<__MOP__>) to store this.
 
 =item B<initialize ($package_name, %options)>
 
-This initializes and returns returns a B<Class::MOP::Class> object
-for a given a C<$package_name>.
+This initializes and returns returns a B<Class::MOP::Class> object for
+a given a C<$package_name>. If a metaclass already exists for the
+package, it simply returns it instead of creating a new one.
 
 =item B<construct_class_instance (%options)>
 
@@ -1553,6 +1570,12 @@ class.
 
 Use L<get_all_methods>, which is easier/better/faster. This method predates
 L<Class::MOP::Method>.
+
+=item B<get_all_method_names>
+
+This will traverse the inheritance heirachy and return a list of all the
+applicable method names for this class. Duplicate names are removed, but the
+order the methods come out is not defined.
 
 =item B<find_all_methods_by_name ($method_name)>
 

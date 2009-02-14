@@ -344,6 +344,9 @@ get_code_info(coderef)
             PUSHs(newSVpv(name, 0));
         }
 
+# This is some pretty grotty logic. It _should_ be parallel to the
+# pure Perl version in lib/Class/MOP.pm, so if you want to understand
+# it we suggest you start there.
 void
 is_class_loaded(klass=&PL_sv_undef)
     SV *klass
@@ -351,7 +354,7 @@ is_class_loaded(klass=&PL_sv_undef)
         HV *stash;
         char *key;
         I32 keylen;
-        GV *gv;
+        SV *gv;
     PPCODE:
         if (!SvPOK(klass) || !SvCUR(klass)) {
             XSRETURN_NO;
@@ -364,8 +367,18 @@ is_class_loaded(klass=&PL_sv_undef)
 
         if (hv_exists_ent (stash, key_VERSION, hash_VERSION)) {
             HE *version = hv_fetch_ent(stash, key_VERSION, 0, hash_VERSION);
-            if (version && HeVAL(version) && GvSV(HeVAL(version))) {
-                XSRETURN_YES;
+            SV *version_sv;
+            if (version && HeVAL(version) && (version_sv = GvSV(HeVAL(version)))) {
+                if (SvROK(version_sv)) {
+                    SV *version_sv_ref = SvRV(version_sv);
+
+                    if (SvOK(version_sv_ref)) {
+                        XSRETURN_YES;
+                    }
+                }
+                else if (SvOK(version_sv)) {
+                    XSRETURN_YES;
+                }
             }
         }
 
@@ -377,7 +390,7 @@ is_class_loaded(klass=&PL_sv_undef)
         }
 
         (void)hv_iterinit(stash);
-        while ((gv = (GV *)hv_iternextsv(stash, &key, &keylen))) {
+        while ((gv = hv_iternextsv(stash, &key, &keylen))) {
             if (keylen <= 0) {
                 continue;
             }
@@ -386,8 +399,7 @@ is_class_loaded(klass=&PL_sv_undef)
                 continue;
             }
 
-            if (!isGV(gv) || GvCV(gv) || GvSV(gv) || GvAV(gv)
-                || GvHV(gv) || GvIO(gv) || GvFORM(gv)) {
+            if (!isGV(gv) || GvCV(gv)) {
                 XSRETURN_YES;
             }
         }
@@ -413,7 +425,6 @@ get_all_package_symbols(self, filter=TYPE_FILTER_NONE)
             XSRETURN_EMPTY;
         }
 
-
         PUTBACK;
 
         if ( (he = hv_fetch_ent((HV *)SvRV(self), key_package, 0, hash_package)) ) {
@@ -422,34 +433,11 @@ get_all_package_symbols(self, filter=TYPE_FILTER_NONE)
 
 
         if (!stash) {
-            switch (GIMME_V) {
-                case G_SCALAR: XSRETURN_UNDEF; break;
-                case G_ARRAY:  XSRETURN_EMPTY; break;
-            }
+            XSRETURN_UNDEF;
         }
 
         symbols = get_all_package_symbols(stash, filter);
-
-        switch (GIMME_V) {
-            case G_SCALAR:
-                PUSHs(sv_2mortal(newRV_inc((SV *)symbols)));
-                break;
-            case G_ARRAY:
-                warn("Class::MOP::Package::get_all_package_symbols in list context is deprecated. use scalar context instead.");
-
-                EXTEND(SP, HvKEYS(symbols) * 2);
-
-                while ((he = hv_iternext(symbols))) {
-                    PUSHs(hv_iterkeysv(he));
-                    PUSHs(sv_2mortal(SvREFCNT_inc(HeVAL(he))));
-                }
-
-                break;
-            default:
-                break;
-        }
-
-        SvREFCNT_dec((SV *)symbols);
+        PUSHs(sv_2mortal(newRV_noinc((SV *)symbols)));
 
 void
 name(self)

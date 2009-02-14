@@ -88,7 +88,6 @@ t/302_modify_parent_method.t
 t/303_RT_39001_fix.t
 t/304_constant_codeinfo.t
 t/305_RT_41255.t
-t/306_is_class_loaded.t
 t/header_pp.inc
 t/lib/BinaryTree.pm
 t/lib/MyMetaClass.pm
@@ -98,5 +97,8 @@ t/lib/MyMetaClass/Method.pm
 t/lib/MyMetaClass/Random.pm
 t/lib/SyntaxError.pm
 t/lib/TestClassLoaded.pm
+t/lib/TestClassLoaded/Sub.pm
+t/lib/TestClassLoaded2.pm
+t/lib/TestClassLoaded3.pm
 typemap
 META.yml                                 Module meta-data (added by MakeMaker)
