@@ -9,7 +9,7 @@ use Class::MOP::Method::Accessor;
 use Carp         'confess';
 use Scalar::Util 'blessed', 'weaken';
 
-our $VERSION   = '0.77';
+our $VERSION   = '0.77_01';
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
 
@@ -150,8 +150,6 @@ sub _set_initial_slot_value {
 # NOTE:
 # the next bunch of methods will get bootstrapped
 # away in the Class::MOP bootstrapping section
-
-sub name { $_[0]->{'name'} }
 
 sub associated_class   { $_[0]->{'associated_class'}   }
 sub associated_methods { $_[0]->{'associated_methods'} }

@@ -11,7 +11,7 @@ use Class::MOP::Method::Wrapped;
 use Carp         'confess';
 use Scalar::Util 'blessed', 'weaken';
 
-our $VERSION   = '0.77';
+our $VERSION   = '0.77_01';
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
 
@@ -157,28 +157,29 @@ sub check_metaclass_compatibility {
     my @class_list = $self->linearized_isa;
     shift @class_list; # shift off $self->name
 
-    foreach my $class_name (@class_list) {
-        my $meta = Class::MOP::get_metaclass_by_name($class_name) || next;
+    foreach my $superclass_name (@class_list) {
+        my $super_meta = Class::MOP::get_metaclass_by_name($superclass_name) || next;
 
         # NOTE:
         # we need to deal with the possibility
         # of class immutability here, and then
         # get the name of the class appropriately
-        my $meta_type = ($meta->is_immutable
-                            ? $meta->get_mutable_metaclass_name()
-                            : ref($meta));
+        my $super_meta_type
+            = $super_meta->is_immutable
+            ? $super_meta->get_mutable_metaclass_name()
+            : ref($super_meta);
 
-        ($self->isa($meta_type))
+        ($self->isa($super_meta_type))
             || confess $self->name . "->meta => (" . (ref($self)) . ")" .
                        " is not compatible with the " .
-                       $class_name . "->meta => (" . ($meta_type)     . ")";
+                       $superclass_name . "->meta => (" . ($super_meta_type)     . ")";
         # NOTE:
         # we also need to check that instance metaclasses
         # are compatibile in the same the class.
-        ($self->instance_metaclass->isa($meta->instance_metaclass))
+        ($self->instance_metaclass->isa($super_meta->instance_metaclass))
             || confess $self->name . "->meta->instance_metaclass => (" . ($self->instance_metaclass) . ")" .
                        " is not compatible with the " .
-                       $class_name . "->meta->instance_metaclass => (" . ($meta->instance_metaclass) . ")";
+                       $superclass_name . "->meta->instance_metaclass => (" . ($super_meta->instance_metaclass) . ")";
     }
 }
 
@@ -318,57 +319,6 @@ sub attribute_metaclass      { $_[0]->{'attribute_metaclass'}         }
 sub method_metaclass         { $_[0]->{'method_metaclass'}            }
 sub wrapped_method_metaclass { $_[0]->{'wrapped_method_metaclass'}    }
 sub instance_metaclass       { $_[0]->{'instance_metaclass'}          }
-
-sub get_method_map {
-    my $self = shift;
-
-    my $class_name = $self->name;
-
-    my $current = Class::MOP::check_package_cache_flag($class_name);
-
-    if (defined $self->{'_package_cache_flag'} && $self->{'_package_cache_flag'} == $current) {
-        return $self->{'methods'} ||= {};
-    }
-
-    $self->{_package_cache_flag} = $current;
-
-    my $map = $self->{'methods'} ||= {};
-
-    my $method_metaclass = $self->method_metaclass;
-
-    my $all_code = $self->get_all_package_symbols('CODE');
-
-    foreach my $symbol (keys %{ $all_code }) {
-        my $code = $all_code->{$symbol};
-
-        next if exists  $map->{$symbol} &&
-                defined $map->{$symbol} &&
-                        $map->{$symbol}->body == $code;
-
-        my ($pkg, $name) = Class::MOP::get_code_info($code);
-        
-        # NOTE:
-        # in 5.10 constant.pm the constants show up 
-        # as being in the right package, but in pre-5.10
-        # they show up as constant::__ANON__ so we 
-        # make an exception here to be sure that things
-        # work as expected in both.
-        # - SL
-        unless ($pkg eq 'constant' && $name eq '__ANON__') {
-            next if ($pkg  || '') ne $class_name ||
-                    (($name || '') ne '__ANON__' && ($pkg  || '') ne $class_name);
-        }
-
-        $map->{$symbol} = $method_metaclass->wrap(
-            $code,
-            associated_metaclass => $self,
-            package_name         => $class_name,
-            name                 => $symbol,
-        );
-    }
-
-    return $map;
-}
 
 # Instance Construction & Cloning
 
@@ -675,7 +625,7 @@ sub add_method {
             $method = $self->find_next_method_by_name($method_name);
             # die if it does not exist
             (defined $method)
-                || confess "The method '$method_name' is not found in the inheritance hierarchy for class " . $self->name;
+                || confess "The method '$method_name' was not found in the inheritance hierarchy for " . $self->name;
             # and now make sure to wrap it
             # even if it is already wrapped
             # because we need a new sub ref
@@ -1558,7 +1508,7 @@ methods, use the C<compute_all_applicable_methods> method.
 
 =item B<get_all_methods>
 
-This will traverse the inheritance heirachy and return a list of all
+This will traverse the inheritance hierarchy and return a list of all
 the applicable L<Class::MOP::Method> objects for this class.
 
 =item B<compute_all_applicable_methods>
@@ -1573,7 +1523,7 @@ L<Class::MOP::Method>.
 
 =item B<get_all_method_names>
 
-This will traverse the inheritance heirachy and return a list of all the
+This will traverse the inheritance hierarchy and return a list of all the
 applicable method names for this class. Duplicate names are removed, but the
 order the methods come out is not defined.
 
@@ -1779,14 +1729,14 @@ use the C<compute_all_applicable_attributes> method.
 
 =item B<get_all_attributes>
 
-This will traverse the inheritance heirachy and return a list of all
+This will traverse the inheritance hierarchy and return a list of all
 the applicable L<Class::MOP::Attribute> objects for this class.
 
 C<get_all_attributes> is an alias for consistency with C<get_all_methods>.
 
 =item B<find_attribute_by_name ($attr_name)>
 
-This method will traverse the inheritance heirachy and find the
+This method will traverse the inheritance hierarchy and find the
 first attribute whose name matches C<$attr_name>, then return it.
 It will return undef if nothing is found.
 

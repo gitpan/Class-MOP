@@ -7,7 +7,7 @@ use warnings;
 use Carp         'confess';
 use Scalar::Util 'blessed', 'weaken', 'looks_like_number';
 
-our $VERSION   = '0.77';
+our $VERSION   = '0.77_01';
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
 
@@ -107,18 +107,12 @@ sub generate_constructor_method_inline {
     $source .= ";\n" . '}';
     warn $source if $self->options->{debug};
 
-    my $code;
-    {
-        # NOTE:
-        # create the nessecary lexicals
-        # to be picked up in the eval
+    my $code = $self->_eval_closure(
+        $close_over,
+        $source
+    );
+    confess "Could not eval the constructor :\n\n$source\n\nbecause :\n\n$@" if $@;
 
-        $code = $self->_eval_closure(
-            $close_over,
-            $source
-        );
-        confess "Could not eval the constructor :\n\n$source\n\nbecause :\n\n$@" if $@;
-    }
     return $code;
 }
 
@@ -158,12 +152,12 @@ sub _generate_slot_initializer {
           'if(exists $params->{\'' . $attr->init_arg . '\'}){' . "\n" .
                 $self->meta_instance->inline_set_slot_value(
                     '$instance',
-                    ("'" . $attr->name . "'"),
+                    $attr->name,
                     '$params->{\'' . $attr->init_arg . '\'}' ) . "\n" .
            '} ' . (!defined $default ? '' : 'else {' . "\n" .
                 $self->meta_instance->inline_set_slot_value(
                     '$instance',
-                    ("'" . $attr->name . "'"),
+                    $attr->name,
                      $default ) . "\n" .
            '}')
         );
@@ -171,7 +165,7 @@ sub _generate_slot_initializer {
         return (
             $self->meta_instance->inline_set_slot_value(
                 '$instance',
-                ("'" . $attr->name . "'"),
+                $attr->name,
                  $default ) . "\n"
         );
     } else { return '' }

@@ -1,30 +1,32 @@
---- #YAML:1.0
-name:               Class-MOP
-version:            0.77
-abstract:           A Meta Object Protocol for Perl 5
+---
+abstract: 'A Meta Object Protocol for Perl 5'
 author:
-    - Stevan Little <stevan@iinteractive.com>
-license:            perl
-distribution_type:  module
-configure_requires:
-    ExtUtils::MakeMaker:  0
-requires:
-    B:                    0
-    Carp:                 0
-    Devel::GlobalDestruction:  0
-    File::Spec:           0
-    MRO::Compat:          0.05
-    Scalar::Util:         1.18
-    Sub::Identify:        0.03
-    Sub::Name:            0.04
-    Task::Weaken:         0
-    Test::Exception:      0
-    Test::More:           0
-no_index:
-    directory:
-        - t
-        - inc
-generated_by:       ExtUtils::MakeMaker version 6.48
+  - 'Stevan Little <stevan@iinteractive.com>'
+build_requires:
+  File::Spec: 0
+  Test::Exception: 0.21
+  Test::More: 0.77
+distribution_type: module
+generated_by: 'Module::Install version 0.79'
+license: perl
 meta-spec:
-    url:      http://module-build.sourceforge.net/META-spec-v1.4.html
-    version:  1.4
+  url: http://module-build.sourceforge.net/META-spec-v1.4.html
+  version: 1.4
+name: Class-MOP
+no_index:
+  directory:
+    - examples
+    - inc
+    - t
+requires:
+  Carp: 0
+  Devel::GlobalDestruction: 0
+  MRO::Compat: 0.05
+  Scalar::Util: 1.18
+  Sub::Identify: 0.03
+  Sub::Name: 0.04
+  Task::Weaken: 0
+  perl: 5.8.1
+resources:
+  license: http://dev.perl.org/licenses/
+version: 0.77_01

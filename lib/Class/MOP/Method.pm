@@ -7,7 +7,7 @@ use warnings;
 use Carp         'confess';
 use Scalar::Util 'weaken';
 
-our $VERSION   = '0.77';
+our $VERSION   = '0.77_01';
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
 
@@ -64,8 +64,6 @@ sub _new {
 
 ## accessors
 
-sub body { (shift)->{'body'} }
-
 sub associated_metaclass { shift->{'associated_metaclass'} }
 
 sub attach_to_class {
@@ -78,10 +76,6 @@ sub detach_from_class {
     my $self = shift;
     delete $self->{associated_metaclass};
 }
-
-sub package_name { (shift)->{'package_name'} }
-
-sub name { (shift)->{'name'} }
 
 sub fully_qualified_name {
     my $self = shift;

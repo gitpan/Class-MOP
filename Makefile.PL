@@ -1,169 +1,71 @@
-# The perl/C checking voodoo is mostly stolen from Graham Barr's
-# Scalar-List-Utils distribution.
 use strict;
 use warnings;
+use inc::Module::Install;
+use 5.008001;
 
-use ExtUtils::MakeMaker;
-use Config qw(%Config);
-use File::Spec;
+check_conflicts();
 
-use 5.008;
+name 'Class-MOP';
+perl_version '5.008001';
+all_from 'lib/Class/MOP.pm';
+license 'perl';
 
-# If undefined, try our best, if true, require XS, if false, never do
-# XS
-my $force_xs;
 
-for (@ARGV) {
-    /^--pm/ and $force_xs = 0;
-    /^--xs/ and $force_xs = 1;
-}
+my $ccflags = -d '.svn' || -d '.git' || $ENV{MAINTAINER_MODE} ? '-Wall' : '';
 
-our $has_compiler = $force_xs;
-unless ( defined $force_xs ) {
-    $has_compiler = check_for_compiler()
-        or no_cc();
-}
+requires 'Carp';
+requires 'Devel::GlobalDestruction';
+requires 'MRO::Compat' => '0.05';
+requires 'Scalar::Util'     => '1.18';
+requires 'Sub::Identify'    => '0.03';
+requires 'Sub::Name' => '0.04';
+requires 'Task::Weaken';
 
-my %prereqs = (
-    'Scalar::Util'             => '1.18',
-    'Sub::Name'                => '0.04',
-    'Sub::Identify'            => '0.03',
-    'MRO::Compat'              => '0.05',
-    'Test::More'               => '0',
-    'Test::Exception'          => '0',
-    'File::Spec'               => '0',
-    'Carp'                     => '0',
-    'Devel::GlobalDestruction' => '0',
-    'Task::Weaken'             => '0',
-    'B'                        => '0',
-);
+test_requires 'File::Spec';
+test_requires 'Test::More'      => '0.77';
+test_requires 'Test::Exception' => '0.21';
 
-delete @prereqs{qw(Sub::Name Devel::GlobalDestruction)}
-    unless $has_compiler;
+makemaker_args( CCFLAGS => $ccflags );
 
-write_makefile();
+WriteAll();
 
-sub write_makefile {
-    my $ccflags = -d '.svn' || $ENV{MAINTAINER_MODE} ? '-Wall' : '';
-
-    WriteMakefile(
-        VERSION_FROM  => 'lib/Class/MOP.pm',
-        NAME          => 'Class::MOP',
-        PREREQ_PM     => \%prereqs,
-        CONFIGURE     => \&init,
-        CCFLAGS       => $ccflags,
-        clean         => { FILES => 'test.c test.o t/pp*' },
-        ABSTRACT_FROM => 'lib/Class/MOP.pm',
-        AUTHOR        => 'Stevan Little <stevan@iinteractive.com>',
-        LICENSE       => 'perl',
+# Use the cpan-smolder-stable script in the Moose svn root to figure
+# out what on CPAN will break with the latest Moose, then update this
+# before a release.
+sub check_conflicts {
+    my %conflicts = (
+        'Moose' => '0.71',
     );
-}
 
-sub no_cc {
-    print <<'EOF';
+    my $found = 0;
+    for my $mod ( sort keys %conflicts ) {
+        eval "require $mod";
+        next if $@;
 
- I cannot determine if you have a C compiler
- so I will install a perl-only implementation
+        my $installed = $mod->VERSION();
+        if ( $installed le $conflicts{$mod} ) {
 
- You can force installation of the XS version with
+            print <<"EOF";
 
-    perl Makefile.PL --xs
+***
+    This version of Class::MOP conflicts with the version of
+    $mod ($installed) you have installed.
+
+    You will need to upgrade $mod after installing
+    this version of Class::MOP.
+***
 
 EOF
-}
 
-sub check_for_compiler {
-    print "Testing if you have a C compiler\n";
-
-    eval { require ExtUtils::CBuilder };
-    if ($@) {
-        return _check_for_compiler_manually();
-    }
-    else {
-        return _check_for_compiler_with_cbuilder();
-    }
-}
-
-sub _check_for_compiler_with_cbuilder {
-    my $cb = ExtUtils::CBuilder->new( quiet => 1 );
-
-    return $cb->have_compiler();
-}
-
-sub _check_for_compiler_manually {
-    unless ( open F, '>', 'test.c' ) {
-        warn
-            "Cannot write test.c, skipping test compilation and installing pure Perl version.\n";
-        return 0;
+            $found = 1;
+        }
     }
 
-    print F <<'EOF';
-int main() { return 0; }
-EOF
+    return unless $found;
 
-    close F or return 0;
+    # More or less copied from Module::Build
+    return if  $ENV{PERL_MM_USE_DEFAULT};
+    return unless -t STDIN && (-t STDOUT || !(-f STDOUT || -c STDOUT));
 
-    my $cc = $Config{cc};
-    if ( $cc =~ /cl(\.exe)?$/ ) {
-
-        # stupid stupid MSVC compiler hack tacken from version.pm's
-        # Makefile.PL
-        $cc .= ' -c';    # prevent it from calling the linker
-    }
-
-    system("$cc -o test$Config{obj_ext} test.c") and return 0;
-
-    unlink $_ for grep {-f} 'test.c', "test$Config{obj_ext}";
-
-    return 1;
-}
-
-# This sucks, but it's the best guess we can make. Since we just use
-# it to run two sets of tests, it's not big deal if it ends up true
-# for a non-maintainer.
-sub is_maintainer {
-    return 0 if $ENV{PERL5_CPAN_IS_RUNNING} || $ENV{PERL5_CPANPLUS_IS_RUNNING};
-
-    return 1;
-}
-
-sub get_pp_tests {
-    opendir my $dh, 't' or die "Cannot read t: $!";
-
-    return grep { $_ !~ /^99/ } grep {/^\d.+\.t$/} readdir $dh;
-}
-
-# This is EUMM voodoo
-sub init {
-    my $hash = $_[1];
-
-    unless ($has_compiler) {
-        @{$hash}{ 'XS', 'C' } = ( {}, [] );
-    }
-
-    $hash;
-}
-
-package MY;
-
-sub postamble {
-    my @test_files = ::get_pp_tests();
-    my $pp_tests = join q{ }, map { File::Spec->catfile('t', "pp_${_}") } @test_files;
-    my @pp_test_targets = join qq{\n}, map {
-        my $source = File::Spec->catfile('t', ${_});
-        File::Spec->catfile('t', "pp_${_}") . q{: }
-        . qq{$source t/header_pp.inc\n\t}
-        . q{$(NOECHO) $(ABSPERLRUN) "-MExtUtils::Command" -e cat t/header_pp.inc }
-        . $source . q{ > $@} . qq{\n}
-    } @test_files;
-    my $test_dep = $::has_compiler && (::is_maintainer() || $ENV{AUTOMATED_TESTING})
-        ? qq{pure_all :: pp_tests\n} . join qq{\n}, @pp_test_targets
-        : '';
-
-    return <<"EOM"
-pp_tests: ${pp_tests}
-
-${test_dep}
-
-EOM
+    sleep 4;
 }
