@@ -23,10 +23,9 @@ requires:
   Devel::GlobalDestruction: 0
   MRO::Compat: 0.05
   Scalar::Util: 1.18
-  Sub::Identify: 0.03
   Sub::Name: 0.04
   Task::Weaken: 0
   perl: 5.8.1
 resources:
   license: http://dev.perl.org/licenses/
-version: 0.78
+version: 0.78_01

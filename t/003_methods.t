@@ -1,19 +1,11 @@
 use strict;
 use warnings;
 
-use Test::More;
+use Test::More tests => 67;
 use Test::Exception;
 
 use Scalar::Util qw/reftype/;
-
-BEGIN {
-    if ( eval 'use Sub::Name (); 1;' ) {
-        plan tests => 66;
-    }
-    else {
-        plan skip_all => 'These tests require Sub::Name';
-    }
-}
+use Sub::Name;
 
 use Class::MOP;
 use Class::MOP::Class;
@@ -189,6 +181,7 @@ is_deeply(
 
 is($Foo->remove_method('foo')->body, $foo, '... removed the foo method');
 ok(!$Foo->has_method('foo'), '... !Foo->has_method(foo) we just removed it');
+ok(!$Foo->get_method_map->{foo}, 'foo is not in the method map');
 dies_ok { Foo->foo } '... cannot call Foo->foo because it is not there';
 
 is_deeply(

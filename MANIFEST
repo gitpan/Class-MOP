@@ -33,7 +33,8 @@ Makefile.PL
 MANIFEST			This list of files
 MANIFEST.SKIP
 META.yml
-MOP.xs
+mop.c
+mop.h
 ppport.h
 README
 scripts/class_browser.pl
@@ -82,6 +83,7 @@ t/081_meta_package_extension.t
 t/082_get_code_info.t
 t/083_load_class.t
 t/084_get_method_map.t
+t/085_load_class_gvstash_detect_bug.t
 t/100_BinaryTree_test.t
 t/101_InstanceCountingClass_test.t
 t/102_InsideOutClass_test.t
@@ -98,6 +100,7 @@ t/302_modify_parent_method.t
 t/303_RT_39001_fix.t
 t/304_constant_codeinfo.t
 t/305_RT_41255.t
+t/306_rebless_overload.t
 t/lib/BinaryTree.pm
 t/lib/MyMetaClass.pm
 t/lib/MyMetaClass/Attribute.pm
@@ -109,4 +112,10 @@ t/lib/TestClassLoaded.pm
 t/lib/TestClassLoaded/Sub.pm
 t/lib/TestClassLoaded2.pm
 t/lib/TestClassLoaded3.pm
-typemap
+xs/Attribute.xs
+xs/Class.xs
+xs/Method.xs
+xs/MOP.xs
+xs/Package.xs
+xs/typemap
+xt/pod_spell.t

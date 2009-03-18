@@ -1,7 +1,51 @@
 Revision history for Perl extension Class-MOP.
 
+0.78_01 Wed, March 18, 2009
+    * Class::MOP::*
+      - Revised and reorganized all of the API documentation.
+
+    * Class::MOP::Class
+    * Class::MOP::Instance
+      - Reblessing into a package that supports overloading wasn't
+        properly adding overload magic to the object due to a bug
+        in (at least) 5.8.8. We now use $_[1] directly which seems
+        to set the magic properly. (Sartak)
+
+    * Class::MOP::Attribute
+      - The process_accessors method is now private. A public alias
+        exists (and will stick around for a few releases), but it
+        warns that calling the public method is deprecated.
+
+    * Class::MOP::Method::Generated
+      - Removed the new and _new methods, since this is an abstract
+        base class, and all existing subclasses implement their own
+        constructors.
+
+    * MOP.xs
+      - Stop is_class_loaded from thinking a class is loaded if it
+        only has an empty GV (Florian Ragwitz).
+        - Add a test for this (Yappo).
+      - Refactor get_all_package_symbols to allow short-circuiting
+        (Florian Ragwitz).
+        - Use this in is_class_loaded (Florian Ragwitz).
+      - Stop segfaulting when trying to get the name from a sub that's
+        still being compiled (Florian Ragwitz).
+        - Add tests for this (Florian Ragwitz).
+      - Prefix all public symbols with "mop_" (Florian Ragwitz).
+      - Clean up and simplify prehashing of hash keys (Florian Ragwitz).
+      - Simplify creating simple xs reader methods (Florian Ragwitz).
+      - Make everything compile with c++ compilers (Florian Ragwitz).
+      - Upgrade ppport.h from 3.14 to 3.17 (Florian Ragwitz).
+
+    * Tests
+      - Remove optional test plans for tests depending on Sub::Name as
+        we have a hard dependency on Sub::Name anyway (Florian Ragwitz).
+
+    * Makefile.PL
+      - Rebuild all c code if mop.h has changed (Florian Ragwitz)
+
 0.78 Mon, February 23, 2009
-    * No changes from 0.78
+    * No changes from 0.77_01
 
 0.77_01 Sun, February 22, 2009
     * Everything
@@ -10,7 +54,7 @@ Revision history for Perl extension Class-MOP.
         Perl version of the code. A Moose test would fail when run
         against the pure Perl version of this code.
 
-    * Moose::Meta::Instance
+    * Class::MOP::Instance
       - The inline_* methods now quote attribute names themselves, and
         don't expect to receive a quoted value.
 
