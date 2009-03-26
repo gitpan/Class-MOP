@@ -84,6 +84,7 @@ t/082_get_code_info.t
 t/083_load_class.t
 t/084_get_method_map.t
 t/085_load_class_gvstash_detect_bug.t
+t/086_rebless_instance_away.t
 t/100_BinaryTree_test.t
 t/101_InstanceCountingClass_test.t
 t/102_InsideOutClass_test.t
