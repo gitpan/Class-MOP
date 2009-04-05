@@ -9,7 +9,7 @@ use Class::MOP::Method::Accessor;
 use Carp         'confess';
 use Scalar::Util 'blessed', 'weaken';
 
-our $VERSION   = '0.80';
+our $VERSION   = '0.80_01';
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
 
@@ -331,7 +331,7 @@ sub accessor_metaclass { 'Class::MOP::Method::Accessor' }
 sub process_accessors {
     warn 'The process_accessors method has been made private.'
         . " The public version is deprecated and will be removed in a future release.\n";
-    goto &_process_accessors;
+    shift->_process_accessors;
 }
 
 sub _process_accessors {
@@ -501,7 +501,7 @@ This is a string value representing the expected key in an
 initialization hash. For instance, if we have an C<init_arg> value of
 C<-foo>, then the following code will Just Work.
 
-  MyClass->meta->construct_instance( -foo => 'Hello There' );
+  MyClass->meta->new_object( -foo => 'Hello There' );
 
 If an init_arg is not assigned, it will automatically use the
 attribute's name. If C<init_arg> is explicitly set to C<undef>, the

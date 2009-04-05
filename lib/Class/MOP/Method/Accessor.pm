@@ -7,7 +7,7 @@ use warnings;
 use Carp         'confess';
 use Scalar::Util 'blessed', 'weaken';
 
-our $VERSION   = '0.80';
+our $VERSION   = '0.80_01';
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
 
@@ -36,7 +36,7 @@ sub new {
     # needed
     weaken($self->{'attribute'});
 
-    $self->initialize_body;
+    $self->_initialize_body;
 
     return $self;
 }
@@ -58,10 +58,16 @@ sub accessor_type        { (shift)->{'accessor_type'} }
 ## factory
 
 sub initialize_body {
+    warn 'The initialize_body method has been made private.'
+        . " The public version is deprecated and will be removed in a future release.\n";
+    shift->_initialize_body;
+}
+
+sub _initialize_body {
     my $self = shift;
 
     my $method_name = join "_" => (
-        'generate',
+        '_generate',
         $self->accessor_type,
         'method',
         ($self->is_inline ? 'inline' : ())
@@ -74,6 +80,12 @@ sub initialize_body {
 ## generators
 
 sub generate_accessor_method {
+    warn 'The generate_accessor_method method has been made private.'
+        . " The public version is deprecated and will be removed in a future release.\n";
+    shift->_generate_accessor_method;
+}
+
+sub _generate_accessor_method {
     my $attr = (shift)->associated_attribute;
     return sub {
         $attr->set_value($_[0], $_[1]) if scalar(@_) == 2;
@@ -82,6 +94,12 @@ sub generate_accessor_method {
 }
 
 sub generate_reader_method {
+    warn 'The generate_reader_method method has been made private.'
+        . " The public version is deprecated and will be removed in a future release.\n";
+    shift->_generate_reader_method;
+}
+
+sub _generate_reader_method {
     my $attr = (shift)->associated_attribute;
     return sub {
         confess "Cannot assign a value to a read-only accessor" if @_ > 1;
@@ -90,6 +108,12 @@ sub generate_reader_method {
 }
 
 sub generate_writer_method {
+    warn 'The generate_writer_method method has been made private.'
+        . " The public version is deprecated and will be removed in a future release.\n";
+    shift->_generate_writer_method;
+}
+
+sub _generate_writer_method {
     my $attr = (shift)->associated_attribute;
     return sub {
         $attr->set_value($_[0], $_[1]);
@@ -97,6 +121,12 @@ sub generate_writer_method {
 }
 
 sub generate_predicate_method {
+    warn 'The generate_predicate_method method has been made private.'
+        . " The public version is deprecated and will be removed in a future release.\n";
+    shift->_generate_predicate_method;
+}
+
+sub _generate_predicate_method {
     my $attr = (shift)->associated_attribute;
     return sub {
         $attr->has_value($_[0])
@@ -104,6 +134,12 @@ sub generate_predicate_method {
 }
 
 sub generate_clearer_method {
+    warn 'The generate_clearer_method method has been made private.'
+        . " The public version is deprecated and will be removed in a future release.\n";
+    shift->_generate_clearer_method;
+}
+
+sub _generate_clearer_method {
     my $attr = (shift)->associated_attribute;
     return sub {
         $attr->clear_value($_[0])
@@ -112,8 +148,13 @@ sub generate_clearer_method {
 
 ## Inline methods
 
-
 sub generate_accessor_method_inline {
+    warn 'The generate_accessor_method_inline method has been made private.'
+        . " The public version is deprecated and will be removed in a future release.\n";
+    shift->_generate_accessor_method_inline;
+}
+
+sub _generate_accessor_method_inline {
     my $self          = shift;
     my $attr          = $self->associated_attribute;
     my $attr_name     = $attr->name;
@@ -133,6 +174,12 @@ sub generate_accessor_method_inline {
 }
 
 sub generate_reader_method_inline {
+    warn 'The generate_reader_method_inline method has been made private.'
+        . " The public version is deprecated and will be removed in a future release.\n";
+    shift->_generate_reader_method_inline;
+}
+
+sub _generate_reader_method_inline {
     my $self          = shift;
     my $attr          = $self->associated_attribute;
     my $attr_name     = $attr->name;
@@ -151,6 +198,12 @@ sub generate_reader_method_inline {
 }
 
 sub generate_writer_method_inline {
+    warn 'The generate_writer_method_inline method has been made private.'
+        . " The public version is deprecated and will be removed in a future release.\n";
+    shift->_generate_writer_method_inline;
+}
+
+sub _generate_writer_method_inline {
     my $self          = shift;
     my $attr          = $self->associated_attribute;
     my $attr_name     = $attr->name;
@@ -167,8 +220,13 @@ sub generate_writer_method_inline {
     return $code;
 }
 
-
 sub generate_predicate_method_inline {
+    warn 'The generate_predicate_method_inline method has been made private.'
+        . " The public version is deprecated and will be removed in a future release.\n";
+    shift->_generate_predicate_method_inline;
+}
+
+sub _generate_predicate_method_inline {
     my $self          = shift;
     my $attr          = $self->associated_attribute;
     my $attr_name     = $attr->name;
@@ -186,6 +244,12 @@ sub generate_predicate_method_inline {
 }
 
 sub generate_clearer_method_inline {
+    warn 'The generate_clearer_method_inline method has been made private.'
+        . " The public version is deprecated and will be removed in a future release.\n";
+    shift->_generate_clearer_method_inline;
+}
+
+sub _generate_clearer_method_inline {
     my $self          = shift;
     my $attr          = $self->associated_attribute;
     my $attr_name     = $attr->name;

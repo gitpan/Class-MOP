@@ -11,7 +11,7 @@ use Class::MOP::Method::Wrapped;
 use Carp         'confess';
 use Scalar::Util 'blessed', 'weaken';
 
-our $VERSION   = '0.80';
+our $VERSION   = '0.80_01';
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
 
@@ -35,16 +35,22 @@ sub initialize {
         || confess "You must pass a package name and it cannot be blessed";
 
     return Class::MOP::get_metaclass_by_name($package_name)
-        || $class->construct_class_instance(package => $package_name, @_);
+        || $class->_construct_class_instance(package => $package_name, @_);
+}
+
+sub construct_class_instance {
+    warn 'The construct_class_instance method has been made private.'
+        . " The public version is deprecated and will be removed in a future release.\n";
+    shift->_construct_class_instance;
 }
 
 # NOTE: (meta-circularity)
-# this is a special form of &construct_instance
+# this is a special form of _construct_instance
 # (see below), which is used to construct class
 # meta-object instances for any Class::MOP::*
 # class. All other classes will use the more
 # normal &construct_instance.
-sub construct_class_instance {
+sub _construct_class_instance {
     my $class        = shift;
     my $options      = @_ == 1 ? $_[0] : {@_};
     my $package_name = $options->{package};
@@ -80,11 +86,11 @@ sub construct_class_instance {
         # it is safe to use meta here because
         # class will always be a subclass of
         # Class::MOP::Class, which defines meta
-        $meta = $class->meta->construct_instance($options)
+        $meta = $class->meta->_construct_instance($options)
     }
 
     # and check the metaclass compatibility
-    $meta->check_metaclass_compatibility();  
+    $meta->_check_metaclass_compatibility();  
 
     Class::MOP::store_metaclass_by_name($package_name, $meta);
 
@@ -146,7 +152,14 @@ sub update_package_cache_flag {
     $self->{'_package_cache_flag'} = Class::MOP::check_package_cache_flag($self->name);    
 }
 
+
 sub check_metaclass_compatibility {
+    warn 'The check_metaclass_compatibility method has been made private.'
+        . " The public version is deprecated and will be removed in a future release.\n";
+    shift->_check_metaclass_compatibility;
+}
+
+sub _check_metaclass_compatibility {
     my $self = shift;
 
     # this is always okay ...
@@ -264,8 +277,6 @@ sub create {
         || confess "You must pass a HASH ref of methods"
             if exists $options{methods};                  
 
-    $class->SUPER::create(%options);
-
     my (%initialize_options) = @args;
     delete @initialize_options{qw(
         package
@@ -276,6 +287,8 @@ sub create {
         authority
     )};
     my $meta = $class->initialize( $package_name => %initialize_options );
+
+    $meta->_instantiate_module( $options{version}, $options{authority} );
 
     # FIXME totally lame
     $meta->add_method('meta' => sub {
@@ -324,17 +337,23 @@ sub new_object {
     # Class::MOP::Class singletons here, so we
     # delegate this to &construct_class_instance
     # which will deal with the singletons
-    return $class->construct_class_instance(@_)
+    return $class->_construct_class_instance(@_)
         if $class->name->isa('Class::MOP::Class');
-    return $class->construct_instance(@_);
+    return $class->_construct_instance(@_);
 }
 
 sub construct_instance {
+    warn 'The construct_instance method has been made private.'
+        . " The public version is deprecated and will be removed in a future release.\n";
+    shift->_construct_instance;
+}
+
+sub _construct_instance {
     my $class = shift;
     my $params = @_ == 1 ? $_[0] : {@_};
     my $meta_instance = $class->get_meta_instance();
     my $instance = $meta_instance->create_instance();
-    foreach my $attr ($class->compute_all_applicable_attributes()) {
+    foreach my $attr ($class->get_all_attributes()) {
         $attr->initialize_instance_slot($meta_instance, $instance, $params);
     }
     # NOTE:
@@ -355,15 +374,21 @@ sub construct_instance {
 
 sub get_meta_instance {
     my $self = shift;
-    $self->{'_meta_instance'} ||= $self->create_meta_instance();
+    $self->{'_meta_instance'} ||= $self->_create_meta_instance();
 }
 
 sub create_meta_instance {
+    warn 'The create_meta_instance method has been made private.'
+        . " The public version is deprecated and will be removed in a future release.\n";
+    shift->_create_meta_instance;
+}
+
+sub _create_meta_instance {
     my $self = shift;
     
     my $instance = $self->instance_metaclass->new(
         associated_metaclass => $self,
-        attributes => [ $self->compute_all_applicable_attributes() ],
+        attributes => [ $self->get_all_attributes() ],
     );
 
     $self->add_meta_instance_dependencies()
@@ -383,16 +408,22 @@ sub clone_object {
     # Class::MOP::Class singletons here, they
     # should not be cloned.
     return $instance if $instance->isa('Class::MOP::Class');
-    $class->clone_instance($instance, @_);
+    $class->_clone_instance($instance, @_);
 }
 
 sub clone_instance {
+    warn 'The clone_instance method has been made private.'
+        . " The public version is deprecated and will be removed in a future release.\n";
+    shift->_clone_instance;
+}
+
+sub _clone_instance {
     my ($class, $instance, %params) = @_;
     (blessed($instance))
         || confess "You can only clone instances, ($instance) is not a blessed instance";
     my $meta_instance = $class->get_meta_instance();
     my $clone = $meta_instance->clone_instance($instance);
-    foreach my $attr ($class->compute_all_applicable_attributes()) {
+    foreach my $attr ($class->get_all_attributes()) {
         if ( defined( my $init_arg = $attr->init_arg ) ) {
             if (exists $params{$init_arg}) {
                 $attr->set_value($clone, $params{$init_arg});
@@ -420,7 +451,7 @@ sub rebless_instance {
     # we use $_[1] here because of t/306_rebless_overload.t regressions on 5.8.8
     $meta_instance->rebless_instance_structure($_[1], $self);
 
-    foreach my $attr ( $self->compute_all_applicable_attributes ) {
+    foreach my $attr ( $self->get_all_attributes ) {
         if ( $attr->has_value($instance) ) {
             if ( defined( my $init_arg = $attr->init_arg ) ) {
                 $params{$init_arg} = $attr->get_value($instance)
@@ -432,7 +463,7 @@ sub rebless_instance {
         }
     }
 
-    foreach my $attr ($self->compute_all_applicable_attributes) {
+    foreach my $attr ($self->get_all_attributes) {
         $attr->initialize_instance_slot($meta_instance, $instance, \%params);
     }
     
@@ -466,7 +497,7 @@ sub superclasses {
         # not potentially creating an issues
         # we don't know about
 
-        $self->check_metaclass_compatibility();
+        $self->_check_metaclass_compatibility();
         $self->update_meta_instance_dependencies();
     }
     @{$self->get_package_symbol($var_spec)};
@@ -638,9 +669,9 @@ sub add_method {
 }
 
 sub alias_method {
-    my $self = shift;
+    warn "The alias_method method is deprecated. Use add_method instead.\n";
 
-    $self->add_method(@_);
+    shift->add_method;
 }
 
 sub has_method {
@@ -701,8 +732,10 @@ sub get_all_methods {
     return values %methods;
 }
 
-# compatibility
 sub compute_all_applicable_methods {
+    warn 'The compute_all_applicable_methods method is deprecated.'
+        . " Use get_all_methods instead.\n";
+
     return map {
         {
             name  => $_->name,
@@ -802,7 +835,7 @@ sub add_meta_instance_dependencies {
 
     $self->remove_meta_instance_dependencies;
 
-    my @attrs = $self->compute_all_applicable_attributes();
+    my @attrs = $self->get_all_attributes();
 
     my %seen;
     my @classes = grep { not $seen{$_->name}++ } map { $_->associated_class } @attrs;
@@ -887,13 +920,16 @@ sub get_attribute_list {
 }
 
 sub get_all_attributes {
-    shift->compute_all_applicable_attributes(@_);
-}
-
-sub compute_all_applicable_attributes {
     my $self = shift;
     my %attrs = map { %{ $self->initialize($_)->get_attribute_map } } reverse $self->linearized_isa;
     return values %attrs;
+}
+
+sub compute_all_applicable_attributes {
+    warn 'The compute_all_applicable_attributes method has been deprecated.'
+        . " Use get_all_attributes instead.\n";
+
+    shift->get_all_attributes;
 }
 
 sub find_attribute_by_name {
@@ -963,12 +999,12 @@ sub make_immutable {
         memoize => {
             class_precedence_list => 'ARRAY',
             # FIXME perl 5.10 memoizes this on its own, no need?
-            linearized_isa                    => 'ARRAY',
-            get_all_methods                   => 'ARRAY',
-            get_all_method_names              => 'ARRAY',
-            compute_all_applicable_attributes => 'ARRAY',
-            get_meta_instance                 => 'SCALAR',
-            get_method_map                    => 'SCALAR',
+            linearized_isa       => 'ARRAY',
+            get_all_methods      => 'ARRAY',
+            get_all_method_names => 'ARRAY',
+            get_all_attributes   => 'ARRAY',
+            get_meta_instance    => 'SCALAR',
+            get_method_map       => 'SCALAR',
         },
 
         # NOTE:
@@ -1422,8 +1458,6 @@ defined in this class.
 
 This will traverse the inheritance hierarchy and return a list of all
 the L<Class::MOP::Attribute> objects for this class and its parents.
-
-This method can also be called as C<compute_all_applicable_attributes>.
 
 =item B<< $metaclass->find_attribute_by_name($attribute_name) >>
 

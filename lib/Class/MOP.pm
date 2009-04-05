@@ -33,7 +33,7 @@ BEGIN {
     *check_package_cache_flag = \&mro::get_pkg_gen;
 }
 
-our $VERSION   = '0.80';
+our $VERSION   = '0.80_01';
 our $XS_VERSION = $VERSION;
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';    
@@ -62,6 +62,7 @@ XSLoader::load( __PACKAGE__, $XS_VERSION );
 
     # This handles instances as well as class names
     sub class_of {
+        return unless defined $_[0];
         my $class = blessed($_[0]) || $_[0];
         return $METAS{$class};
     }
@@ -178,7 +179,7 @@ sub _is_valid_class_name {
 
 # We need to add in the meta-attributes here so that
 # any subclass of Class::MOP::* will be able to
-# inherit them using &construct_instance
+# inherit them using _construct_instance
 
 ## --------------------------------------------------------
 ## Class::MOP::Package
@@ -364,7 +365,7 @@ Class::MOP::Class->meta->add_attribute(
 # we don't actually need to tie the knot with
 # Class::MOP::Class here, it is actually handled
 # within Class::MOP::Class itself in the
-# construct_class_instance method.
+# _construct_class_instance method.
 
 ## --------------------------------------------------------
 ## Class::MOP::Attribute
