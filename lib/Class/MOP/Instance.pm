@@ -6,7 +6,7 @@ use warnings;
 
 use Scalar::Util 'weaken', 'blessed';
 
-our $VERSION   = '0.80_01';
+our $VERSION   = '0.81';
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
 
@@ -75,8 +75,8 @@ sub create_instance {
 
 # for compatibility
 sub bless_instance_structure {
-    warn 'The bless_instance_structure method is deprecated.'
-        . " It will be removed in a future release.\n";
+    Carp::cluck('The bless_instance_structure method is deprecated.'
+        . " It will be removed in a future release.\n");
 
     my ($self, $instance_structure) = @_;
     bless $instance_structure, $self->_class_name;

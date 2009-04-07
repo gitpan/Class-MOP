@@ -6,7 +6,7 @@ use warnings;
 
 use Carp 'confess';
 
-our $VERSION   = '0.80_01';
+our $VERSION   = '0.81';
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
 
@@ -22,7 +22,7 @@ sub is_inline { $_[0]{is_inline} }
 
 sub definition_context { $_[0]{definition_context} }
 
-sub initialize_body {
+sub _initialize_body {
     confess "No body to initialize, " . __PACKAGE__ . " is an abstract base class";
 }
 

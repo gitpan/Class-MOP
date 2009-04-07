@@ -20,12 +20,12 @@ use Class::MOP::Method;
 use Class::MOP::Immutable;
 
 BEGIN {
-    *IS_RUNNING_ON_5_10 = ($] < 5.009_005) 
+    *IS_RUNNING_ON_5_10 = ($] < 5.009_005)
         ? sub () { 0 }
-        : sub () { 1 };    
+        : sub () { 1 };
 
     sub HAVE_ISAREV () {
-        warn "Class::MOP::HAVE_ISAREV is deprecated and will be removed in a future release. It has always returned 1 anyway.";
+        Carp::cluck("Class::MOP::HAVE_ISAREV is deprecated and will be removed in a future release. It has always returned 1 anyway.");
         return 1;
     }
 
@@ -33,10 +33,10 @@ BEGIN {
     *check_package_cache_flag = \&mro::get_pkg_gen;
 }
 
-our $VERSION   = '0.80_01';
+our $VERSION   = '0.81';
 our $XS_VERSION = $VERSION;
 $VERSION = eval $VERSION;
-our $AUTHORITY = 'cpan:STEVAN';    
+our $AUTHORITY = 'cpan:STEVAN';
 
 require XSLoader;
 XSLoader::load( __PACKAGE__, $XS_VERSION );
