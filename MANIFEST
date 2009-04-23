@@ -18,12 +18,14 @@ inc/Module/Install/WriteAll.pm
 lib/Class/MOP.pm
 lib/Class/MOP/Attribute.pm
 lib/Class/MOP/Class.pm
-lib/Class/MOP/Immutable.pm
+lib/Class/MOP/Class/Immutable/Class/MOP/Class.pm
+lib/Class/MOP/Class/Immutable/Trait.pm
 lib/Class/MOP/Instance.pm
 lib/Class/MOP/Method.pm
 lib/Class/MOP/Method/Accessor.pm
 lib/Class/MOP/Method/Constructor.pm
 lib/Class/MOP/Method/Generated.pm
+lib/Class/MOP/Method/Inlined.pm
 lib/Class/MOP/Method/Wrapped.pm
 lib/Class/MOP/Module.pm
 lib/Class/MOP/Object.pm

@@ -7,11 +7,11 @@ use warnings;
 use Carp         'confess';
 use Scalar::Util 'blessed', 'weaken', 'looks_like_number';
 
-our $VERSION   = '0.82';
+our $VERSION   = '0.82_01';
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
 
-use base 'Class::MOP::Method::Generated';
+use base 'Class::MOP::Method::Inlined';
 
 sub new {
     my $class   = shift;
@@ -51,8 +51,6 @@ sub _new {
         'is_inline'            => ($options->{is_inline} || 0),
     }, $class;
 }
-
-sub can_be_inlined { 1 }
 
 ## accessors
 
@@ -267,12 +265,6 @@ inlined.
 =item B<< $metamethod->associated_metaclass >>
 
 This returns the L<Class::MOP::Class> object for the method.
-
-=item B<< $metamethod->can_be_inlined >>
-
-This method always returns true in this class. It exists so that
-subclasses (as in Moose) can do some sort of checking to determine
-whether or not inlining the constructor is safe.
 
 =back
 
