@@ -6,7 +6,7 @@ use warnings;
 use Carp         'confess';
 use Scalar::Util 'blessed', 'weaken', 'looks_like_number', 'refaddr';
 
-our $VERSION   = '0.82_01';
+our $VERSION   = '0.82_02';
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
 
@@ -41,6 +41,16 @@ sub can_be_inlined {
     # compatible with the definition we are replacing it with
     my $expected_method = $expected_class->can( $self->name );
 
+    if ( ! $expected_method ) {
+        warn "Not inlining '"
+            . $self->name
+            . "' for $class since ${expected_class}::"
+            . $self->name
+            . " is not defined\n";
+
+        return 0;
+    }
+
     my $actual_method = $class->can( $self->name )
         or return 1;
 
@@ -53,9 +63,9 @@ sub can_be_inlined {
     # though we're expecting one to be there
     #
     # this returns 1 for backwards compatibility for now
-     my $inherited_method
-         = $metaclass->find_next_method_by_name( $self->name )
-             or return 1;
+    my $inherited_method
+        = $metaclass->find_next_method_by_name( $self->name )
+            or return 1;
 
     # otherwise we have to check that the actual method is an inlined
     # version of what we're expecting
