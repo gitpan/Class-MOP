@@ -9,9 +9,7 @@ use 5.008;
 use MRO::Compat;
 
 use Carp          'confess';
-use Devel::GlobalDestruction qw( in_global_destruction );
 use Scalar::Util  'weaken', 'reftype', 'blessed';
-use Sub::Name qw( subname );
 
 use Class::MOP::Class;
 use Class::MOP::Attribute;
@@ -31,7 +29,7 @@ BEGIN {
     *check_package_cache_flag = \&mro::get_pkg_gen;
 }
 
-our $VERSION   = '0.83';
+our $VERSION   = '0.84';
 our $XS_VERSION = $VERSION;
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
@@ -153,6 +151,18 @@ sub _is_valid_class_name {
     return 1 if $class =~ /^\w+(?:::\w+)*$/;
 
     return 0;
+}
+
+sub subname {
+    require Sub::Name;
+    Carp::carp("Class::MOP::subname is deprecated. Please use Sub::Name directly.");
+    goto \&Sub::Name::subname;
+}
+
+sub in_global_destruction {
+    require Devel::GlobalDestruction;
+    Carp::carp("Class::MOP::in_global_destruction is deprecated. Please use Devel::GlobalDestruction directly.");
+    goto \&Devel::GlobalDestruction::in_global_destruction;
 }
 
 ## ----------------------------------------------------------------------------
@@ -494,6 +504,14 @@ Class::MOP::Attribute->meta->add_attribute(
     Class::MOP::Attribute->new('associated_methods' => (
         reader   => { 'associated_methods' => \&Class::MOP::Attribute::associated_methods },
         default  => sub { [] }
+    ))
+);
+
+Class::MOP::Attribute->meta->add_attribute(
+    Class::MOP::Attribute->new('insertion_order' => (
+        reader      => { 'insertion_order' => \&Class::MOP::Attribute::insertion_order },
+        writer      => { '_set_insertion_order' => \&Class::MOP::Attribute::_set_insertion_order },
+        predicate   => { 'has_insertion_order' => \&Class::MOP::Attribute::has_insertion_order },
     ))
 );
 
@@ -913,9 +931,11 @@ Note that these are all called as B<functions, not methods>.
 
 =item B<Class::MOP::load_class($class_name)>
 
-This will load the specified C<$class_name>. This function can be used
+This will load the specified C<$class_name>, if it is not already
+loaded (as reported by C<is_class_loaded>). This function can be used
 in place of tricks like C<eval "use $module"> or using C<require>
-unconditionally. This will return the metaclass of C<$class_name>.
+unconditionally. This will return the metaclass of C<$class_name> if
+one exists, otherwise it will return C<$class_name>.
 
 =item B<Class::MOP::is_class_loaded($class_name)>
 
@@ -925,7 +945,9 @@ loaded.
 This does a basic check of the symbol table to try and determine as
 best it can if the C<$class_name> is loaded, it is probably correct
 about 99% of the time, but it can be fooled into reporting false
-positives.
+positives. In particular, loading any of the core L<IO> modules will
+cause most of the rest of the core L<IO> modules to falsely report
+having been loaded, due to the way the base L<IO> module works.
 
 =item B<Class::MOP::get_code_info($code)>
 
@@ -936,9 +958,9 @@ from.
 
 =item B<Class::MOP::class_of($instance_or_class_name)>
 
-This will return the metaclass of the given instance or class name.
-Even if the class lacks a metaclass, no metaclass will be initialized
-and C<undef> will be returned.
+This will return the metaclass of the given instance or class name.  If the
+class lacks a metaclass, no metaclass will be initialized, and C<undef> will be
+returned.
 
 =item B<Class::MOP::check_package_cache_flag($pkg)>
 

@@ -12,8 +12,10 @@ use Class::MOP::Class::Immutable::Class::MOP::Class;
 
 use Carp         'confess';
 use Scalar::Util 'blessed', 'weaken';
+use Sub::Name 'subname';
+use Devel::GlobalDestruction 'in_global_destruction';
 
-our $VERSION   = '0.83';
+our $VERSION   = '0.84';
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
 
@@ -246,7 +248,7 @@ sub _check_metaclass_compatibility {
     sub DESTROY {
         my $self = shift;
 
-        return if Class::MOP::in_global_destruction(); # it'll happen soon anyway and this just makes things more complicated
+        return if in_global_destruction(); # it'll happen soon anyway and this just makes things more complicated
 
         no warnings 'uninitialized';
         return unless $self->name =~ /^$ANON_CLASS_PREFIX/;
@@ -610,7 +612,7 @@ sub add_method {
     my $full_method_name = ($self->name . '::' . $method_name);    
     $self->add_package_symbol(
         { sigil => '&', type => 'CODE', name => $method_name }, 
-        Class::MOP::subname($full_method_name => $body)
+        subname($full_method_name => $body)
     );
 }
 
@@ -647,7 +649,7 @@ sub add_method {
             || confess "You must pass in a method name";
         my $method = $fetch_and_prepare_method->($self, $method_name);
         $method->add_before_modifier(
-            Class::MOP::subname(':before' => $method_modifier)
+            subname(':before' => $method_modifier)
         );
     }
 
@@ -657,7 +659,7 @@ sub add_method {
             || confess "You must pass in a method name";
         my $method = $fetch_and_prepare_method->($self, $method_name);
         $method->add_after_modifier(
-            Class::MOP::subname(':after' => $method_modifier)
+            subname(':after' => $method_modifier)
         );
     }
 
@@ -667,7 +669,7 @@ sub add_method {
             || confess "You must pass in a method name";
         my $method = $fetch_and_prepare_method->($self, $method_name);
         $method->add_around_modifier(
-            Class::MOP::subname(':around' => $method_modifier)
+            subname(':around' => $method_modifier)
         );
     }
 
@@ -825,6 +827,11 @@ sub add_attribute {
     } else {
         $self->invalidate_meta_instances();
     }
+    
+    # get our count of previously inserted attributes and
+    # increment by one so this attribute knows its order
+    my $order = (scalar keys %{$self->get_attribute_map}) - 1; 
+    $attribute->_set_insertion_order($order + 1);
 
     # then onto installing the new accessors
     $self->get_attribute_map->{$attribute->name} = $attribute;
@@ -1214,12 +1221,12 @@ Class::MOP::Class - Class Meta Object
   # add a method to Foo ...
   Foo->meta->add_method( 'bar' => sub {...} )
 
-      # get a list of all the classes searched
-      # the method dispatcher in the correct order
-      Foo->meta->class_precedence_list()
+  # get a list of all the classes searched
+  # the method dispatcher in the correct order
+  Foo->meta->class_precedence_list()
 
-      # remove a method from Foo
-      Foo->meta->remove_method('bar');
+  # remove a method from Foo
+  Foo->meta->remove_method('bar');
 
   # or use this to actually create classes ...
 
@@ -1228,8 +1235,8 @@ Class::MOP::Class - Class Meta Object
           version      => '0.01',
           superclasses => ['Foo'],
           attributes   => [
-              Class::MOP:: : Attribute->new('$bar'),
-              Class::MOP:: : Attribute->new('$baz'),
+              Class::MOP::Attribute->new('$bar'),
+              Class::MOP::Attribute->new('$baz'),
           ],
           methods => {
               calculate_bar => sub {...},

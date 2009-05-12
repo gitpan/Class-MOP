@@ -10,6 +10,7 @@ examples/Perl6Attribute.pod
 inc/Module/Install.pm
 inc/Module/Install/Base.pm
 inc/Module/Install/Can.pm
+inc/Module/Install/ExtraTests.pm
 inc/Module/Install/Fetch.pm
 inc/Module/Install/Makefile.pm
 inc/Module/Install/Metadata.pm
@@ -105,6 +106,7 @@ t/304_constant_codeinfo.t
 t/305_RT_41255.t
 t/306_rebless_overload.t
 t/307_null_stash.t
+t/308_insertion_order.t
 t/lib/BinaryTree.pm
 t/lib/MyMetaClass.pm
 t/lib/MyMetaClass/Attribute.pm
@@ -122,4 +124,7 @@ xs/Method.xs
 xs/MOP.xs
 xs/Package.xs
 xs/typemap
-xt/pod_spell.t
+xt/author/pod.t
+xt/author/pod_coverage.t
+xt/author/pod_spell.t
+xt/author/version_numbers.t

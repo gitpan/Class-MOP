@@ -9,7 +9,7 @@ use Class::MOP::Method::Accessor;
 use Carp         'confess';
 use Scalar::Util 'blessed', 'weaken';
 
-our $VERSION   = '0.83';
+our $VERSION   = '0.84';
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
 
@@ -77,6 +77,10 @@ sub _new {
         # and a list of the methods
         # associated with this attr
         'associated_methods' => [],
+        # this let's us keep track of
+        # our order inside the associated
+        # class
+        'insertion_order'    => undef,
     }, $class;
 }
 
@@ -163,6 +167,7 @@ sub has_builder     { defined($_[0]->{'builder'}) }
 sub has_init_arg    { defined($_[0]->{'init_arg'}) }
 sub has_default     { defined($_[0]->{'default'}) }
 sub has_initializer { defined($_[0]->{'initializer'}) }
+sub has_insertion_order { defined($_[0]->{'insertion_order'}) }
 
 sub accessor           { $_[0]->{'accessor'}    }
 sub reader             { $_[0]->{'reader'}      }
@@ -173,6 +178,8 @@ sub builder            { $_[0]->{'builder'}     }
 sub init_arg           { $_[0]->{'init_arg'}    }
 sub initializer        { $_[0]->{'initializer'} }
 sub definition_context { $_[0]->{'definition_context'} }
+sub insertion_order    { $_[0]->{'insertion_order'} }
+sub _set_insertion_order { $_[0]->{'insertion_order'} = $_[1] }
 
 # end bootstrapped away method section.
 # (all methods below here are kept intact)
@@ -753,6 +760,11 @@ writing the attribute's value in the associated class. These methods
 always return a subroutine reference, regardless of whether or not the
 attribute is read- or write-only.
 
+=item B<< $attr->insertion_order >>
+
+If this attribute has been inserted into a class, this returns a zero
+based index regarding the order of insertion.
+
 =back
 
 =head2 Informational predicates
@@ -783,6 +795,10 @@ This will be I<false> if the C<default> was set to C<undef>, since
 C<undef> is the default C<default> anyway.
 
 =item B<< $attr->has_builder >>
+
+=item B<< $attr->has_insertion_order >>
+
+This will be I<false> if this attribute has not be inserted into a class
 
 =back
 

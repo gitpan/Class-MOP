@@ -1,7 +1,7 @@
 use strict;
 use warnings;
 
-use Test::More tests => 65;
+use Test::More tests => 69;
 use Test::Exception;
 
 use Class::MOP;
@@ -34,6 +34,7 @@ use Class::MOP;
         has_init_arg      init_arg
         has_default       default           is_default_a_coderef
         has_initializer   initializer
+        has_insertion_order insertion_order _set_insertion_order
 
         definition_context
 
@@ -84,6 +85,7 @@ use Class::MOP;
         'default',
         'associated_class',
         'associated_methods',
+        'insertion_order',
     );
 
     is_deeply(
