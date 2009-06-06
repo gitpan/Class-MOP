@@ -65,6 +65,7 @@ t/023_attribute_get_read_write.t
 t/024_attribute_initializer.t
 t/030_method.t
 t/031_method_modifiers.t
+t/032_universal_methods.t
 t/040_metaclass.t
 t/041_metaclass_incompatibility.t
 t/042_metaclass_incompatibility_dyn.t
@@ -88,6 +89,7 @@ t/083_load_class.t
 t/084_get_method_map.t
 t/085_load_class_gvstash_detect_bug.t
 t/086_rebless_instance_away.t
+t/087_subclasses.t
 t/100_BinaryTree_test.t
 t/101_InstanceCountingClass_test.t
 t/102_InsideOutClass_test.t
@@ -107,6 +109,7 @@ t/305_RT_41255.t
 t/306_rebless_overload.t
 t/307_null_stash.t
 t/308_insertion_order.t
+t/309_subname.t
 t/lib/BinaryTree.pm
 t/lib/MyMetaClass.pm
 t/lib/MyMetaClass/Attribute.pm

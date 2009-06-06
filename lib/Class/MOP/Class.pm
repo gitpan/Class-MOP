@@ -15,7 +15,7 @@ use Scalar::Util 'blessed', 'weaken';
 use Sub::Name 'subname';
 use Devel::GlobalDestruction 'in_global_destruction';
 
-our $VERSION   = '0.84';
+our $VERSION   = '0.85';
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
 
@@ -517,9 +517,14 @@ sub superclasses {
         # we don't know about
 
         $self->_check_metaclass_compatibility();
-        $self->update_meta_instance_dependencies();
+        $self->_superclasses_updated();
     }
     @{$self->get_package_symbol($var_spec)};
+}
+
+sub _superclasses_updated {
+    my $self = shift;
+    $self->update_meta_instance_dependencies();
 }
 
 sub subclasses {
@@ -529,6 +534,16 @@ sub subclasses {
     return @{ $super_class->mro::get_isarev() };
 }
 
+sub direct_subclasses {
+    my $self = shift;
+    my $super_class = $self->name;
+
+    return grep {
+        grep {
+            $_ eq $super_class
+        } Class::MOP::Class->initialize($_)->superclasses
+    } $self->subclasses;
+}
 
 sub linearized_isa {
     return @{ mro::get_linear_isa( (shift)->name ) };
@@ -609,10 +624,16 @@ sub add_method {
     # method. This is hackier, but quicker too.
     $self->{methods}{$method_name} = $method;
     
-    my $full_method_name = ($self->name . '::' . $method_name);    
+    my ( $current_package, $current_name ) = Class::MOP::get_code_info($body);
+
+    if ( $current_name eq '__ANON__' ) {
+        my $full_method_name = ($self->name . '::' . $method_name);
+        subname($full_method_name => $body);
+    }
+
     $self->add_package_symbol(
-        { sigil => '&', type => 'CODE', name => $method_name }, 
-        subname($full_method_name => $body)
+        { sigil => '&', type => 'CODE', name => $method_name },
+        $body,
     );
 }
 
@@ -1454,7 +1475,13 @@ duplicates removed.
 
 =item B<< $metaclass->subclasses >>
 
-This returns a list of subclasses for this class.
+This returns a list of all subclasses for this class, even indirect
+subclasses.
+
+=item B<< $metaclass->direct_subclasses >>
+
+This returns a list of immediate subclasses for this class, which does not
+include indirect subclasses.
 
 =back
 

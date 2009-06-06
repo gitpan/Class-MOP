@@ -29,7 +29,7 @@ BEGIN {
     *check_package_cache_flag = \&mro::get_pkg_gen;
 }
 
-our $VERSION   = '0.84';
+our $VERSION   = '0.85';
 our $XS_VERSION = $VERSION;
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
@@ -131,6 +131,7 @@ sub _try_load_one_class {
 
     return do {
         local $@;
+        local $SIG{__DIE__};
         eval { require($file) };
         $@;
     };
