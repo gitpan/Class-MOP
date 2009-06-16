@@ -110,6 +110,7 @@ t/306_rebless_overload.t
 t/307_null_stash.t
 t/308_insertion_order.t
 t/309_subname.t
+t/310_immutable_destroy.t
 t/lib/BinaryTree.pm
 t/lib/MyMetaClass.pm
 t/lib/MyMetaClass/Attribute.pm

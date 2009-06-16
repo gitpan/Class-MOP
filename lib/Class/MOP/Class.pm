@@ -15,7 +15,7 @@ use Scalar::Util 'blessed', 'weaken';
 use Sub::Name 'subname';
 use Devel::GlobalDestruction 'in_global_destruction';
 
-our $VERSION   = '0.85';
+our $VERSION   = '0.86';
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
 
@@ -619,11 +619,8 @@ sub add_method {
 
     $method->attach_to_class($self);
 
-    # This used to call get_method_map, which meant we would build all
-    # the method objects for the class just because we added one
-    # method. This is hackier, but quicker too.
-    $self->{methods}{$method_name} = $method;
-    
+    $self->get_method_map->{$method_name} = $method;
+
     my ( $current_package, $current_name ) = Class::MOP::get_code_info($body);
 
     if ( $current_name eq '__ANON__' ) {
@@ -719,7 +716,7 @@ sub has_method {
     (defined $method_name && $method_name)
         || confess "You must define a method name";
 
-    exists $self->{methods}{$method_name} || exists $self->get_method_map->{$method_name};
+    exists $self->get_method_map->{$method_name};
 }
 
 sub get_method {
@@ -727,7 +724,7 @@ sub get_method {
     (defined $method_name && $method_name)
         || confess "You must define a method name";
 
-    return $self->{methods}{$method_name} || $self->get_method_map->{$method_name};
+    return $self->get_method_map->{$method_name};
 }
 
 sub remove_method {
@@ -1165,11 +1162,7 @@ sub _inline_constructor {
 
     my $name = $args{constructor_name};
 
-    #if ( my $existing = $self->name->can($args{constructor_name}) ) {
-    #    if ( refaddr($existing) == refaddr(\&Moose::Object::new) ) {
-
-    unless ( $args{replace_constructor}
-        or !$self->has_method($name) ) {
+    if ( $self->has_method($name) && !$args{replace_constructor} ) {
         my $class = $self->name;
         warn "Not inlining a constructor for $class since it defines"
             . " its own constructor.\n"
@@ -1203,6 +1196,13 @@ sub _inline_destructor {
     ( exists $args{destructor_class} )
         || confess "The 'inline_destructor' option is present, but "
         . "no destructor class was specified";
+
+    if ( $self->has_method('DESTROY') ) {
+        my $class = $self->name;
+        warn "Not inlining a destructor for $class since it defines"
+            . " its own destructor.\n";
+        return;
+    }
 
     my $destructor_class = $args{destructor_class};
 
@@ -1613,7 +1613,10 @@ attributes which are defined in terms of "regular" Perl 5 methods.
 
 This will return a L<Class::MOP::Attribute> for the specified
 C<$attribute_name>. If the class does not have the specified
-attribute, it returns C<undef>
+attribute, it returns C<undef>.  
+
+NOTE that get_attribute does not search superclasses, for 
+that you need to use C<find_attribute_by_name>.
 
 =item B<< $metaclass->has_attribute($attribute_name) >>
 
