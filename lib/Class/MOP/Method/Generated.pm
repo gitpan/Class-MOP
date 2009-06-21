@@ -6,7 +6,7 @@ use warnings;
 
 use Carp 'confess';
 
-our $VERSION   = '0.86';
+our $VERSION   = '0.87';
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
 
@@ -29,22 +29,29 @@ sub _initialize_body {
 sub _eval_closure {
     # my ($self, $captures, $sub_body) = @_;
     my $__captures = $_[1];
-    eval join(
-        "\n",
-        (
+
+    my $code;
+
+    my $e = do {
+        local $@;
+        local $SIG{__DIE__};
+        $code = eval join
+            "\n", (
             map {
                 /^([\@\%\$])/
                     or die "capture key should start with \@, \% or \$: $_";
-                q[my ]
-                . $_ . q[ = ]
-                . $1
-                . q[{$__captures->{']
-                . $_
-                . q['}};];
-            } keys %$__captures
-        ),
-        $_[2]
-    );
+                q[my ] 
+                    . $_ . q[ = ] 
+                    . $1
+                    . q[{$__captures->{']
+                    . $_ . q['}};];
+                } keys %$__captures
+            ),
+            $_[2];
+        $@;
+    };
+
+    return ( $code, $e );
 }
 
 sub _add_line_directive {
@@ -77,7 +84,7 @@ sub _compile_code {
 
     my $code = $self->_add_line_directive(%args);
 
-    $self->_eval_closure($args{environment}, $code);
+    return $self->_eval_closure($args{environment}, $code);
 }
 
 1;

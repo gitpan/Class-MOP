@@ -7,7 +7,7 @@ use warnings;
 use Carp         'confess';
 use Scalar::Util 'blessed', 'weaken', 'looks_like_number';
 
-our $VERSION   = '0.86';
+our $VERSION   = '0.87';
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
 
@@ -136,11 +136,11 @@ sub _generate_constructor_method_inline {
     $source .= ";\n" . '}';
     warn $source if $self->options->{debug};
 
-    my $code = $self->_eval_closure(
+    my ( $code, $e ) = $self->_eval_closure(
         $close_over,
         $source
     );
-    confess "Could not eval the constructor :\n\n$source\n\nbecause :\n\n$@" if $@;
+    confess "Could not eval the constructor :\n\n$source\n\nbecause :\n\n$e" if $e;
 
     return $code;
 }

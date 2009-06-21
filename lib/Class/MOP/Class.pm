@@ -15,7 +15,7 @@ use Scalar::Util 'blessed', 'weaken';
 use Sub::Name 'subname';
 use Devel::GlobalDestruction 'in_global_destruction';
 
-our $VERSION   = '0.86';
+our $VERSION   = '0.87';
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
 
@@ -623,7 +623,7 @@ sub add_method {
 
     my ( $current_package, $current_name ) = Class::MOP::get_code_info($body);
 
-    if ( $current_name eq '__ANON__' ) {
+    if ( !defined $current_name || $current_name eq '__ANON__' ) {
         my $full_method_name = ($self->name . '::' . $method_name);
         subname($full_method_name => $body);
     }
@@ -855,7 +855,12 @@ sub add_attribute {
     $self->get_attribute_map->{$attribute->name} = $attribute;
 
     # invalidate package flag here
-    my $e = do { local $@; eval { $attribute->install_accessors() }; $@ };
+    my $e = do {
+        local $@;
+        local $SIG{__DIE__};
+        eval { $attribute->install_accessors() };
+        $@;
+    };
     if ( $e ) {
         $self->remove_attribute($attribute->name);
         die $e;
@@ -1008,7 +1013,6 @@ sub is_pristine {
 
 sub is_mutable   { 1 }
 sub is_immutable { 0 }
-sub immutable_transformer { return }
 
 sub _immutable_options {
     my ( $self, @args ) = @_;
@@ -1077,15 +1081,13 @@ sub _immutable_metaclass {
     my $class_name;
 
     if ( $meta_attr and $trait eq $meta_attr->default ) {
-
-       # if the trait is the same as the default we try and pick a predictable
-       # name for the immutable metaclass
-        $class_name = "Class::MOP::Class::Immutable::" . ref($self);
+        # if the trait is the same as the default we try and pick a
+        # predictable name for the immutable metaclass
+        $class_name = 'Class::MOP::Class::Immutable::' . ref($self);
     }
     else {
-        $class_name
-            = join( "::", "Class::MOP::Class::Immutable::CustomTrait", $trait,
-                    "ForMetaClass", ref($self) );
+        $class_name = join '::', 'Class::MOP::Class::Immutable::CustomTrait',
+            $trait, 'ForMetaClass', ref($self);
     }
 
     if ( Class::MOP::is_class_loaded($class_name) ) {
@@ -1193,11 +1195,11 @@ sub _inline_constructor {
 sub _inline_destructor {
     my ( $self, %args ) = @_;
 
-    ( exists $args{destructor_class} )
+    ( exists $args{destructor_class} && defined $args{destructor_class} )
         || confess "The 'inline_destructor' option is present, but "
         . "no destructor class was specified";
 
-    if ( $self->has_method('DESTROY') ) {
+    if ( $self->has_method('DESTROY') && ! $args{replace_destructor} ) {
         my $class = $self->name;
         warn "Not inlining a destructor for $class since it defines"
             . " its own destructor.\n";
@@ -1217,9 +1219,10 @@ sub _inline_destructor {
         name         => 'DESTROY'
     );
 
-    $self->add_method( 'DESTROY' => $destructor );
-
-    $self->_add_inlined_method($destructor);
+    if ( $args{replace_destructor} or $destructor->can_be_inlined ) {
+        $self->add_method( 'DESTROY' => $destructor );
+        $self->_add_inlined_method($destructor);
+    }
 }
 
 1;
@@ -1613,10 +1616,10 @@ attributes which are defined in terms of "regular" Perl 5 methods.
 
 This will return a L<Class::MOP::Attribute> for the specified
 C<$attribute_name>. If the class does not have the specified
-attribute, it returns C<undef>.  
+attribute, it returns C<undef>.
 
-NOTE that get_attribute does not search superclasses, for 
-that you need to use C<find_attribute_by_name>.
+NOTE that get_attribute does not search superclasses, for that you
+need to use C<find_attribute_by_name>.
 
 =item B<< $metaclass->has_attribute($attribute_name) >>
 
@@ -1691,6 +1694,12 @@ Making a class immutable lets us optimize the class by inlining some
 methods, and also allows us to optimize some methods on the metaclass
 object itself.
 
+After immutabilization, the metaclass object will cache most
+informational methods such as C<get_method_map> and
+C<get_all_attributes>. Methods which would alter the class, such as
+C<add_attribute>, C<add_method>, and so on will throw an error on an
+immutable metaclass object.
+
 The immutabilization system in L<Moose> takes much greater advantage
 of the inlining features than Class::MOP itself does.
 
@@ -1701,20 +1710,62 @@ of the inlining features than Class::MOP itself does.
 This method will create an immutable transformer and uses it to make
 the class and its metaclass object immutable.
 
-Details of how immutabilization works are in L<Class::MOP::Immutable>
-documentation.
+This method accepts the following options:
+
+=over 8
+
+=item * inline_accessors
+
+=item * inline_constructor
+
+=item * inline_destructor
+
+These are all booleans indicating whether the specified method(s)
+should be inlined.
+
+By default, accessors and the constructor are inlined, but not the
+destructor.
+
+=item * immutable_trait
+
+The name of a class which will be used as a parent class for the
+metaclass object being made immutable. This "trait" implements the
+post-immutability functionality of the metaclass (but not the
+transformation itself).
+
+This defaults to L<Class::MOP::Class::Immutable::Trait>.
+
+=item * constructor_name
+
+This is the constructor method name. This defaults to "new".
+
+=item * constructor_class
+
+The name of the method metaclass for constructors. It will be used to
+generate the inlined constructor. This defaults to
+"Class::MOP::Method::Constructor".
+
+=item * replace_constructor
+
+This is a boolean indicating whether an existing constructor should be
+replaced when inlining a constructor. This defaults to false.
+
+=item * destructor_class
+
+The name of the method metaclass for destructors. It will be used to
+generate the inlined destructor. This defaults to
+"Class::MOP::Method::Denstructor".
+
+=item * replace_destructor
+
+This is a boolean indicating whether an existing destructor should be
+replaced when inlining a destructor. This defaults to false.
+
+=back
 
 =item B<< $metaclass->make_mutable >>
 
 Calling this method reverse the immutabilization transformation.
-
-=item B<< $metaclass->immutable_transformer >>
-
-If the class has been made immutable previously, this returns the
-L<Class::MOP::Immutable> object that was created to do the
-transformation.
-
-If the class was never made immutable, this method will die.
 
 =back
 
