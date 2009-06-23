@@ -29,7 +29,7 @@ BEGIN {
     *check_package_cache_flag = \&mro::get_pkg_gen;
 }
 
-our $VERSION   = '0.87';
+our $VERSION   = '0.88';
 our $XS_VERSION = $VERSION;
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
@@ -704,7 +704,6 @@ $_->meta->make_immutable(
     Class::MOP::Package
     Class::MOP::Module
     Class::MOP::Class
-    Class::MOP::Class::Immutable::Trait
     Class::MOP::Class::Immutable::Class::MOP::Class
 
     Class::MOP::Attribute

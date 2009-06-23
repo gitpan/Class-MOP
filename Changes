@@ -1,5 +1,12 @@
 Revision history for Perl extension Class-MOP.
 
+0.88 Tue, Jun 23, 2009
+    * Class::MOP::Class
+      - Moved the __INSTANCE__ parameter to _construct_instance from
+        Moose to here. (doy)
+      - Fixed some issues involving metaclasses of metaclasses and
+        immutability. (doy)
+
 0.87 Sun, Jun 21, 2009
     * Various
       - Made sure to always local-ize $@ and $SIG{__DIE__} before

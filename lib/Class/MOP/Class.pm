@@ -15,7 +15,7 @@ use Scalar::Util 'blessed', 'weaken';
 use Sub::Name 'subname';
 use Devel::GlobalDestruction 'in_global_destruction';
 
-our $VERSION   = '0.87';
+our $VERSION   = '0.88';
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
 
@@ -371,7 +371,11 @@ sub _construct_instance {
     my $class = shift;
     my $params = @_ == 1 ? $_[0] : {@_};
     my $meta_instance = $class->get_meta_instance();
-    my $instance = $meta_instance->create_instance();
+    # FIXME:
+    # the code below is almost certainly incorrect
+    # but this is foreign inheritance, so we might
+    # have to kludge it in the end.
+    my $instance = $params->{__INSTANCE__} || $meta_instance->create_instance();
     foreach my $attr ($class->get_all_attributes()) {
         $attr->initialize_instance_slot($meta_instance, $instance, $params);
     }
@@ -1102,7 +1106,7 @@ sub _immutable_metaclass {
     else {
         my @super = ( $trait, ref($self) );
 
-        my $meta = Class::MOP::Class->initialize($class_name);
+        my $meta = $self->initialize($class_name);
         $meta->superclasses(@super);
 
         $meta->make_immutable;
@@ -1413,7 +1417,11 @@ does nothing; it is merely a hook.
 
 This method is used to create a new object of the metaclass's
 class. Any parameters you provide are used to initialize the
-instance's attributes.
+instance's attributes. A special C<__INSTANCE__> key can be passed to
+provide an already generated instance, rather than having Class::MOP
+generate it for you. This is mostly useful for using Class::MOP with
+foreign classes, which generally generate instances using their own
+constructor.
 
 =item B<< $metaclass->instance_metaclass >>
 
