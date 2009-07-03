@@ -19,7 +19,6 @@ inc/Module/Install/WriteAll.pm
 lib/Class/MOP.pm
 lib/Class/MOP/Attribute.pm
 lib/Class/MOP/Class.pm
-lib/Class/MOP/Class/Immutable/Class/MOP/Class.pm
 lib/Class/MOP/Class/Immutable/Trait.pm
 lib/Class/MOP/Instance.pm
 lib/Class/MOP/Method.pm
@@ -82,6 +81,7 @@ t/070_immutable_metaclass.t
 t/071_immutable_w_custom_metaclass.t
 t/072_immutable_w_constructors.t
 t/073_make_mutable.t
+t/074_immutable_custom_trait.t
 t/080_meta_package.t
 t/081_meta_package_extension.t
 t/082_get_code_info.t

@@ -6,7 +6,7 @@ use warnings;
 
 use Scalar::Util 'weaken', 'blessed';
 
-our $VERSION   = '0.88';
+our $VERSION   = '0.89';
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
 
@@ -177,7 +177,7 @@ sub inline_create_instance {
 
 sub inline_slot_access {
     my ($self, $instance, $slot_name) = @_;
-    sprintf q[%s->{"%s"}], $instance, quotemeta($slot_name);
+    sprintf q[%s->{'%s'}], $instance, quotemeta($slot_name);
 }
 
 sub inline_get_slot_value {
@@ -212,6 +212,11 @@ sub inline_weaken_slot_value {
 sub inline_strengthen_slot_value {
     my ($self, $instance, $slot_name) = @_;
     $self->inline_set_slot_value($instance, $slot_name, $self->inline_slot_access($instance, $slot_name));
+}
+
+sub inline_rebless_instance_structure {
+    my ($self, $instance, $class_variable) = @_;
+    "bless $instance => $class_variable";
 }
 
 1;
@@ -384,6 +389,12 @@ The second argument is a slot name.
 
 The method returns a snippet of code that, when inlined, performs some
 operation on the instance.
+
+=item B<< $metainstance->inline_rebless_instance_structure($instance_variable, $class_variable) >>
+
+This takes the name of a variable that will, when inlined, represent the object
+instance, and the name of a variable that will represent the class to rebless
+into, and returns code to rebless an instance into a class.
 
 =back
 

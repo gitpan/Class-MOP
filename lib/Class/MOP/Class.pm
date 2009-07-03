@@ -8,14 +8,13 @@ use Class::MOP::Instance;
 use Class::MOP::Method::Wrapped;
 use Class::MOP::Method::Accessor;
 use Class::MOP::Method::Constructor;
-use Class::MOP::Class::Immutable::Class::MOP::Class;
 
 use Carp         'confess';
 use Scalar::Util 'blessed', 'weaken';
 use Sub::Name 'subname';
 use Devel::GlobalDestruction 'in_global_destruction';
 
-our $VERSION   = '0.88';
+our $VERSION   = '0.89';
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
 
@@ -197,17 +196,17 @@ sub _check_metaclass_compatibility {
             : ref($super_meta);
 
         ($self->isa($super_meta_type))
-            || confess "Class::MOP::class_of(" . $self->name . ") => ("
+            || confess "The metaclass of " . $self->name . " ("
                        . (ref($self)) . ")" .  " is not compatible with the " .
-                       "Class::MOP::class_of(".$superclass_name . ") => ("
+                       "metaclass of its superclass, ".$superclass_name . " ("
                        . ($super_meta_type) . ")";
         # NOTE:
         # we also need to check that instance metaclasses
         # are compatibile in the same the class.
         ($self->instance_metaclass->isa($super_meta->instance_metaclass))
-            || confess "Class::MOP::class_of(" . $self->name . ")->instance_metaclass => (" . ($self->instance_metaclass) . ")" .
+            || confess "The instance metaclass for " . $self->name . " (" . ($self->instance_metaclass) . ")" .
                        " is not compatible with the " .
-                       "Class::MOP::class_of(" . $superclass_name . ")->instance_metaclass => (" . ($super_meta->instance_metaclass) . ")";
+                       "instance metaclass of its superclass, " . $superclass_name . " (" . ($super_meta->instance_metaclass) . ")";
     }
 }
 
@@ -1094,25 +1093,38 @@ sub _immutable_metaclass {
             $trait, 'ForMetaClass', ref($self);
     }
 
-    if ( Class::MOP::is_class_loaded($class_name) ) {
-        if ( $class_name->isa($trait) ) {
-            return $class_name;
+    return $class_name
+        if Class::MOP::is_class_loaded($class_name);
+
+    # If the metaclass is a subclass of CMOP::Class which has had
+    # metaclass roles applied (via Moose), then we want to make sure
+    # that we preserve that anonymous class (see Fey::ORM for an
+    # example of where this matters).
+    my $meta_name
+        = $self->meta->is_immutable
+        ? $self->meta->get_mutable_metaclass_name
+        : ref $self->meta;
+
+    my $meta = $meta_name->create(
+        $class_name,
+        superclasses => [ ref $self ],
+    );
+
+    Class::MOP::load_class($trait);
+    for my $meth ( Class::MOP::Class->initialize($trait)->get_all_methods ) {
+        next if $meta->has_method( $meth->name );
+
+        if ( $meta->find_method_by_name( $meth->name ) ) {
+            $meta->add_around_method_modifier( $meth->name, $meth->body );
         }
         else {
-            confess
-                "$class_name is already defined but does not inherit $trait";
+            $meta->add_method( $meth->name, $meth->clone );
         }
     }
-    else {
-        my @super = ( $trait, ref($self) );
 
-        my $meta = $self->initialize($class_name);
-        $meta->superclasses(@super);
+    $meta->make_immutable( inline_constructor => 0 );
 
-        $meta->make_immutable;
-
-        return $class_name;
-    }
+    return $class_name;
 }
 
 sub _remove_inlined_code {

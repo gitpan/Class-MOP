@@ -5,9 +5,9 @@ use strict;
 use warnings;
 
 use Carp         'confess';
-use Scalar::Util 'weaken';
+use Scalar::Util 'weaken', 'reftype';
 
-our $VERSION   = '0.88';
+our $VERSION   = '0.89';
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
 
@@ -28,7 +28,7 @@ sub wrap {
     my %params = @args;
     my $code = $params{body};
 
-    ('CODE' eq ref($code))
+    (ref $code && 'CODE' eq reftype($code))
         || confess "You must supply a CODE reference to bless, not (" . ($code || 'undef') . ")";
 
     ($params{package_name} && $params{name})

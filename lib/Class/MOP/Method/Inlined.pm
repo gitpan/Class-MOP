@@ -6,7 +6,7 @@ use warnings;
 use Carp         'confess';
 use Scalar::Util 'blessed', 'weaken', 'looks_like_number', 'refaddr';
 
-our $VERSION   = '0.88';
+our $VERSION   = '0.89';
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
 
@@ -77,7 +77,8 @@ sub can_be_inlined {
     # otherwise we have to check that the actual method is an inlined
     # version of what we're expecting
     if ( $inherited_method->isa(__PACKAGE__) ) {
-        if ( refaddr( $inherited_method->_uninlined_body )
+        if ( $inherited_method->_uninlined_body
+             && refaddr( $inherited_method->_uninlined_body )
              == refaddr($expected_method) ) {
             return 1;
         }

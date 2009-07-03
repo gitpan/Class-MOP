@@ -1,7 +1,7 @@
 use strict;
 use warnings;
 
-use Test::More tests => 75;
+use Test::More tests => 73;
 use Test::Exception;
 
 use Class::MOP;
@@ -44,18 +44,14 @@ use Class::MOP;
 
     my $immutable_metaclass = $meta->_immutable_metaclass->meta;
 
-    my $obj = $immutable_metaclass->name;
+    my $immutable_class_name = $immutable_metaclass->name;
 
-    ok( !$obj->is_mutable,  '... immutable_metaclass is not mutable' );
-    ok( $obj->is_immutable, '... immutable_metaclass is immutable' );
-    ok( !$obj->make_immutable,
-        '... immutable_metaclass make_mutable is noop' );
-    is( $obj->meta, $immutable_metaclass,
+    ok( !$immutable_class_name->is_mutable,  '... immutable_metaclass is not mutable' );
+    ok( $immutable_class_name->is_immutable, '... immutable_metaclass is immutable' );
+    is( $immutable_class_name->meta, $immutable_metaclass,
         '... immutable_metaclass meta hack works' );
 
-    isa_ok( $meta, "Class::MOP::Class::Immutable::Trait" );
     isa_ok( $meta, "Class::MOP::Class" );
-
 }
 
 {

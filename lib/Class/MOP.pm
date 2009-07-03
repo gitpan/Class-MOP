@@ -29,7 +29,7 @@ BEGIN {
     *check_package_cache_flag = \&mro::get_pkg_gen;
 }
 
-our $VERSION   = '0.88';
+our $VERSION   = '0.89';
 our $XS_VERSION = $VERSION;
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
@@ -43,10 +43,9 @@ XSLoader::load( __PACKAGE__, $XS_VERSION );
     # there is no need to worry about destruction though
     # because they should die only when the program dies.
     # After all, do package definitions even get reaped?
+    # Anonymous classes manage their own destruction.
     my %METAS;
 
-    # means of accessing all the metaclasses that have
-    # been initialized thus far (for mugwumps obj browser)
     sub get_all_metaclasses         {        %METAS         }
     sub get_all_metaclass_instances { values %METAS         }
     sub get_all_metaclass_names     { keys   %METAS         }
@@ -691,10 +690,6 @@ undef Class::MOP::Instance->meta->{_package_cache_flag};
 # NOTE: we don't need to inline the the accessors this only lengthens
 # the compile time of the MOP, and gives us no actual benefits.
 
-# this is just nitpicking to ensure Class::MOP::Class->meta == ->meta->meta
-Class::MOP::Class->meta->_immutable_metaclass;
-$Class::MOP::Class::immutable_metaclass_cache{"Class::MOP::Class"}{"Class::MOP::Class::Immutable::Trait"} = Class::MOP::Class::Immutable::Class::MOP::Class->meta;
-
 $_->meta->make_immutable(
     inline_constructor  => 1,
     replace_constructor => 1,
@@ -704,7 +699,6 @@ $_->meta->make_immutable(
     Class::MOP::Package
     Class::MOP::Module
     Class::MOP::Class
-    Class::MOP::Class::Immutable::Class::MOP::Class
 
     Class::MOP::Attribute
     Class::MOP::Method
