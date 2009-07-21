@@ -112,6 +112,8 @@ t/308_insertion_order.t
 t/309_subname.t
 t/310_inline_structor.t
 t/311_inline_and_dollar_at.t
+t/312_anon_class_leak.t
+t/313_before_after_dollar_under.t
 t/lib/BinaryTree.pm
 t/lib/MyMetaClass.pm
 t/lib/MyMetaClass/Attribute.pm
@@ -132,4 +134,5 @@ xs/typemap
 xt/author/pod.t
 xt/author/pod_coverage.t
 xt/author/pod_spell.t
+xt/author/tabs.t
 xt/author/version_numbers.t

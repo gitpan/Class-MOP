@@ -96,7 +96,8 @@ mop_get_code_info (SV *coderef, char **pkg, char **name)
 #ifdef isGV_with_GP
     if ( isGV_with_GP(CvGV(coderef)) ) {
 #endif
-        *pkg     = HvNAME( GvSTASH(CvGV(coderef)) );
+        GV *gv   = CvGV(coderef);
+        *pkg     = HvNAME( GvSTASH(gv) ? GvSTASH(gv) : CvSTASH(coderef) );
         *name    = GvNAME( CvGV(coderef) );
 #ifdef isGV_with_GP
     } else {
@@ -149,7 +150,7 @@ mop_get_package_symbols (HV *stash, type_filter_t filter, get_package_symbols_cb
                            but that's the API */
                         key = HePV(he, keylen);
                         package = HvNAME(stash);
-                        fq = newSVpvf("%s::%s", package, key);
+                        fq = sv_2mortal(newSVpvf("%s::%s", package, key));
                         sv = (SV *)get_cv(SvPV_nolen(fq), 0);
                         break;
                     }
