@@ -126,7 +126,6 @@ t/lib/TestClassLoaded/Sub.pm
 t/lib/TestClassLoaded2.pm
 t/lib/TestClassLoaded3.pm
 xs/Attribute.xs
-xs/Class.xs
 xs/Method.xs
 xs/MOP.xs
 xs/Package.xs
