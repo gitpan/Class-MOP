@@ -6,7 +6,7 @@ use warnings;
 
 use Scalar::Util 'weaken', 'blessed';
 
-our $VERSION   = '0.92';
+our $VERSION   = '0.92_01';
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
 
@@ -75,15 +75,6 @@ sub associated_metaclass { $_[0]{'associated_metaclass'} }
 sub create_instance {
     my $self = shift;
     bless {}, $self->_class_name;
-}
-
-# for compatibility
-sub bless_instance_structure {
-    Carp::cluck('The bless_instance_structure method is deprecated.'
-        . " It will be removed in a future release.\n");
-
-    my ($self, $instance_structure) = @_;
-    bless $instance_structure, $self->_class_name;
 }
 
 sub clone_instance {

@@ -20,16 +20,11 @@ BEGIN {
         ? sub () { 0 }
         : sub () { 1 };
 
-    sub HAVE_ISAREV () {
-        Carp::cluck("Class::MOP::HAVE_ISAREV is deprecated and will be removed in a future release. It has always returned 1 anyway.");
-        return 1;
-    }
-
     # this is either part of core or set up appropriately by MRO::Compat
     *check_package_cache_flag = \&mro::get_pkg_gen;
 }
 
-our $VERSION   = '0.92';
+our $VERSION   = '0.92_01';
 our $XS_VERSION = $VERSION;
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
@@ -151,18 +146,6 @@ sub _is_valid_class_name {
     return 1 if $class =~ /^\w+(?:::\w+)*$/;
 
     return 0;
-}
-
-sub subname {
-    require Sub::Name;
-    Carp::carp("Class::MOP::subname is deprecated. Please use Sub::Name directly.");
-    goto \&Sub::Name::subname;
-}
-
-sub in_global_destruction {
-    require Devel::GlobalDestruction;
-    Carp::carp("Class::MOP::in_global_destruction is deprecated. Please use Devel::GlobalDestruction directly.");
-    goto \&Devel::GlobalDestruction::in_global_destruction;
 }
 
 ## ----------------------------------------------------------------------------
@@ -676,6 +659,7 @@ Class::MOP::Instance->meta->add_attribute(
     ),
 );
 
+require Class::MOP::Deprecated unless our $no_deprecated;
 
 # we need the meta instance of the meta instance to be created now, in order
 # for the constructor to be able to use it
@@ -1081,7 +1065,7 @@ L<http://citeseer.ist.psu.edu/37617.html>
 
 =over 4
 
-=item L<http://svn.openfoundry.org/pugs/perl5/Perl6-MetaModel>
+=item L<http://svn.openfoundry.org/pugs/misc/Perl-MetaModel/>
 
 =item L<http://svn.openfoundry.org/pugs/perl5/Perl6-ObjectSpace>
 

@@ -9,7 +9,7 @@ use Class::MOP::Method::Accessor;
 use Carp         'confess';
 use Scalar::Util 'blessed', 'weaken';
 
-our $VERSION   = '0.92';
+our $VERSION   = '0.92_01';
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
 
@@ -340,12 +340,6 @@ sub clear_value {
 ## load em up ...
 
 sub accessor_metaclass { 'Class::MOP::Method::Accessor' }
-
-sub process_accessors {
-    Carp::cluck('The process_accessors method has been made private.'
-        . " The public version is deprecated and will be removed in a future release.\n");
-    shift->_process_accessors(@_);
-}
 
 sub _process_accessors {
     my ($self, $type, $accessor, $generate_as_inline_methods) = @_;

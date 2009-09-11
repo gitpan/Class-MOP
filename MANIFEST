@@ -20,6 +20,7 @@ lib/Class/MOP.pm
 lib/Class/MOP/Attribute.pm
 lib/Class/MOP/Class.pm
 lib/Class/MOP/Class/Immutable/Trait.pm
+lib/Class/MOP/Deprecated.pm
 lib/Class/MOP/Instance.pm
 lib/Class/MOP/Method.pm
 lib/Class/MOP/Method/Accessor.pm
@@ -74,6 +75,7 @@ t/045_metaclass_loads_classes.t
 t/046_rebless_instance.t
 t/047_rebless_with_extra_params.t
 t/048_anon_class_create_init.t
+t/049_metaclass_reinitialize.t
 t/050_scala_style_mixin_composition.t
 t/060_instance.t
 t/061_instance_inline.t
@@ -114,6 +116,8 @@ t/310_inline_structor.t
 t/311_inline_and_dollar_at.t
 t/312_anon_class_leak.t
 t/313_before_after_dollar_under.t
+t/315_magic.t
+t/500_deprecated.t
 t/lib/BinaryTree.pm
 t/lib/MyMetaClass.pm
 t/lib/MyMetaClass/Attribute.pm

@@ -8,14 +8,12 @@ use MRO::Compat;
 use Carp 'confess';
 use Scalar::Util 'blessed', 'weaken';
 
-our $VERSION   = '0.92';
+our $VERSION   = '0.92_01';
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
 
 # the original class of the metaclass instance
-sub get_mutable_metaclass_name { $_[0]{__immutable}{original_class} }
-
-sub immutable_options { %{ $_[0]{__immutable}{options} } }
+sub _get_mutable_metaclass_name { $_[0]{__immutable}{original_class} }
 
 sub is_mutable   { 0 }
 sub is_immutable { 1 }

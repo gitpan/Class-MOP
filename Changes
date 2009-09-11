@@ -1,5 +1,21 @@
 Revision history for Perl extension Class-MOP.
 
+0.92_01 Thu, Sep 10, 2009
+    * Class::MOP::Package
+      - Backwards compatibility tweaks to XS for 5.8.1. (Goro Fuji)
+
+    * Class::MOP
+      - Make sure XS code handles magical scalars correctly. (Goro Fuji)
+
+    * Class::MOP::Class
+      - Documented the immutable_options method, which is useful if you need
+        to make a class mutable temporarily, and then nede to restore
+        immutability. (Dave Rolsky)
+
+    * Many modules
+      - Deprecated features have been moved to their own module,
+        Class::MOP::Deprecated, for easier deprecation management. (Goro Fuji)
+
 0.92 Thu Aug 13, 2009
     * Class::MOP::Class
     * Class::MOP::Package
