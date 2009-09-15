@@ -8,7 +8,7 @@ use Scalar::Util 'blessed', 'reftype';
 use Carp         'confess';
 use Sub::Name    'subname';
 
-our $VERSION   = '0.92_01';
+our $VERSION   = '0.93';
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
 
@@ -34,7 +34,6 @@ sub initialize {
             'package'   => $package_name,
             %options,
         });
-
         Class::MOP::store_metaclass_by_name($package_name, $meta);
 
         return $meta;
@@ -106,7 +105,11 @@ sub namespace {
 sub method_metaclass         { $_[0]->{'method_metaclass'}            }
 sub wrapped_method_metaclass { $_[0]->{'wrapped_method_metaclass'}    }
 
-sub _method_map              { $_[0]->{'methods'}                     }
+# This doesn't always get initialized in a constructor because there is a
+# weird object construction path for subclasses of Class::MOP::Class. At one
+# point, this always got initialized by calling into the XS code first, but
+# that is no longer guaranteed to happen.
+sub _method_map { $_[0]->{'methods'} ||= {} }
 
 # utility methods
 
@@ -322,7 +325,6 @@ sub add_method {
         }
 
         $method->attach_to_class($self);
-        $self->_method_map->{$method_name} = $method;
     }
     else {
         # If a raw code reference is supplied, its method object is not created.
@@ -330,6 +332,7 @@ sub add_method {
         $body = $method;
     }
 
+    $self->_method_map->{$method_name} = $method;
 
     my ( $current_package, $current_name ) = Class::MOP::get_code_info($body);
 
@@ -362,34 +365,39 @@ sub has_method {
 }
 
 sub get_method {
-    my ($self, $method_name) = @_;
-    (defined $method_name && $method_name)
+    my ( $self, $method_name ) = @_;
+    ( defined $method_name && $method_name )
         || confess "You must define a method name";
 
-    my $method_map    = $self->_method_map;
-    my $method_object = $method_map->{$method_name};
-    my $code = $self->get_package_symbol({
-        name  => $method_name,
-        sigil => '&',
-        type  => 'CODE',
-    });
+    my $method_map = $self->_method_map;
+    my $map_entry  = $method_map->{$method_name};
+    my $code = $self->get_package_symbol(
+        {
+            name  => $method_name,
+            sigil => '&',
+            type  => 'CODE',
+        }
+    );
 
-    unless ( $method_object && $method_object->body == ( $code || 0 ) ) {
-        if ( $code && $self->_code_is_mine($code) ) {
-            $method_object = $method_map->{$method_name}
-                = $self->wrap_method_body(
-                body                 => $code,
-                name                 => $method_name,
-                associated_metaclass => $self,
-                );
-        }
-        else {
-            delete $method_map->{$method_name};
-            return undef;
-        }
+    # This seems to happen in some weird cases where methods modifiers are
+    # added via roles or some other such bizareness. Honestly, I don't totally
+    # understand this, but returning the entry works, and keeps various MX
+    # modules from blowing up. - DR
+    return $map_entry if blessed $map_entry && !$code;
+
+    return $map_entry if blessed $map_entry && $map_entry->body == $code;
+
+    unless ($map_entry) {
+        return unless $code && $self->_code_is_mine($code);
     }
 
-    return $method_object;
+    $code ||= $map_entry;
+
+    return $method_map->{$method_name} = $self->wrap_method_body(
+        body                 => $code,
+        name                 => $method_name,
+        associated_metaclass => $self,
+    );
 }
 
 sub remove_method {
@@ -397,13 +405,13 @@ sub remove_method {
     (defined $method_name && $method_name)
         || confess "You must define a method name";
 
-    my $removed_method = delete $self->get_method_map->{$method_name};
+    my $removed_method = delete $self->_full_method_map->{$method_name};
     
     $self->remove_package_symbol(
         { sigil => '&', type => 'CODE', name => $method_name }
     );
 
-    $removed_method->detach_from_class if $removed_method;
+    $removed_method->detach_from_class if $removed_method && blessed $removed_method;
 
     $self->update_package_cache_flag; # still valid, since we just removed the method from the map
 
@@ -538,12 +546,6 @@ returns C<undef>
 Returns a boolean indicating whether or not the class defines the
 named method. It does not include methods inherited from parent
 classes.
-
-=item B<< $metapackage->get_method_map >>
-
-Returns a hash reference representing the methods defined in this
-class. The keys are method names and the values are
-L<Class::MOP::Method> objects.
 
 =item B<< $metapackage->get_method_list >>
 

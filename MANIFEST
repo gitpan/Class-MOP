@@ -88,7 +88,6 @@ t/080_meta_package.t
 t/081_meta_package_extension.t
 t/082_get_code_info.t
 t/083_load_class.t
-t/084_get_method_map.t
 t/085_load_class_gvstash_detect_bug.t
 t/086_rebless_instance_away.t
 t/087_subclasses.t
@@ -116,6 +115,7 @@ t/310_inline_structor.t
 t/311_inline_and_dollar_at.t
 t/312_anon_class_leak.t
 t/313_before_after_dollar_under.t
+t/314_class_is_pristine.t
 t/315_magic.t
 t/500_deprecated.t
 t/lib/BinaryTree.pm

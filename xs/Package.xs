@@ -34,7 +34,15 @@ mop_update_method_map(pTHX_ SV *const self, SV *const class_name, HV *const stas
 
         method_slot = *hv_fetch(map, method_name, method_name_len, TRUE);
         if ( SvOK(method_slot) ) {
-            SV *const body = mop_call0(aTHX_ method_slot, KEY_FOR(body)); /* $method_object->body() */
+            SV *body;
+
+            if ( sv_isobject(method_slot) ) {
+                body = mop_call0(aTHX_ method_slot, KEY_FOR(body)); /* $method_object->body() */
+            }
+            else {
+                body = method_slot;
+            }
+
             if ( SvROK(body) && ((CV *) SvRV(body)) == cv ) {
                 continue;
             }
@@ -113,7 +121,7 @@ get_all_package_symbols(self, filter=TYPE_FILTER_NONE)
         PUSHs(sv_2mortal(newRV_noinc((SV *)symbols)));
 
 void
-get_method_map(self)
+_full_method_map(self)
     SV *self
     PREINIT:
         HV *const obj        = (HV *)SvRV(self);

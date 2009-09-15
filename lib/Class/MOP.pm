@@ -24,7 +24,7 @@ BEGIN {
     *check_package_cache_flag = \&mro::get_pkg_gen;
 }
 
-our $VERSION   = '0.92_01';
+our $VERSION   = '0.93';
 our $XS_VERSION = $VERSION;
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
@@ -132,8 +132,12 @@ sub _try_load_one_class {
 }
 
 sub load_class {
-    my $class = load_first_existing_class($_[0]);
-    return get_metaclass_by_name($class) || $class;
+    load_first_existing_class($_[0]);
+
+    # This is done to avoid breaking code which checked the return value. Said
+    # code is dumb. The return value was _always_ true, since it dies on
+    # failure!
+    return 1;
 }
 
 sub _is_valid_class_name {
@@ -203,12 +207,12 @@ Class::MOP::Package->meta->add_attribute(
 );
 
 Class::MOP::Package->meta->add_attribute(
-    Class::MOP::Attribute->new('methods' => (
+    Class::MOP::Attribute->new('_methods' => (
         reader   => {
             # NOTE:
             # we just alias the original method
             # rather than re-produce it here
-            'get_method_map' => \&Class::MOP::Package::get_method_map
+            '_full_method_map' => \&Class::MOP::Package::_full_method_map
         },
         default => sub { {} }
     ))
@@ -911,8 +915,11 @@ Note that these are all called as B<functions, not methods>.
 This will load the specified C<$class_name>, if it is not already
 loaded (as reported by C<is_class_loaded>). This function can be used
 in place of tricks like C<eval "use $module"> or using C<require>
-unconditionally. This will return the metaclass of C<$class_name> if
-one exists, otherwise it will return C<$class_name>.
+unconditionally.
+
+If the module cannot be loaded, an exception is thrown.
+
+For historical reasons, this function returns explicitly returns a true value.
 
 =item B<Class::MOP::is_class_loaded($class_name)>
 

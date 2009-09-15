@@ -2,9 +2,11 @@ package Class::MOP::Deprecated;
 
 use strict;
 use warnings;
-use Carp qw(cluck);
 
-our $VERSION = '0.92_01';
+use Carp qw( cluck );
+use Scalar::Util qw( blessed );
+
+our $VERSION = '0.93';
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
 
@@ -14,6 +16,8 @@ my %DeprecatedAt = (
     'Class::MOP::HAVE_ISAREV'           => 0.93,
     'Class::MOP::subname'               => 0.93,
     'Class::MOP::in_global_destruction' => 0.93,
+
+    'Class::MOP::Package::get_method_map' => 0.93,
 
     'Class::MOP::Class::construct_class_instance'          => 0.93,
     'Class::MOP::Class::check_metaclass_compatibility'     => 0.93,
@@ -110,6 +114,21 @@ sub in_global_destruction {
 
 package
     Class::MOP::Package;
+
+sub get_method_map {
+    Class::MOP::Deprecated::warn(
+              'The get_method_map method has been made private.'
+            . " The public version is deprecated and will be removed in a future release.\n"
+    );
+    my $self = shift;
+
+    my $map = $self->_full_method_map;
+
+    $map->{$_} = $self->get_method($_)
+        for grep { !blessed( $map->{$_} ) } keys %{$map};
+
+    return $map;
+}
 
 package
     Class::MOP::Module;
@@ -360,20 +379,12 @@ Class::MOP::Deprecated - List of deprecated methods
 
 =head1 FUNCTIONS
 
-This class provides methods that have been deprecated but remain for backward compatibility.
+This class provides methods that have been deprecated but remain for backward
+compatibility.
 
-If you specify C<< -compatible => $version >>, you can use deprecated features without warnings.
-Note that this special treatment is package-scoped.
-
-=over 4
-
-=item B<Class::MOP::Deprecated::warn($message)>
-
-Checks compatibility for the caller feature, and produces warnings if needed.
-
-This function is used in internals.
-
-=back
+If you specify C<< -compatible => $version >>, you can use deprecated features
+without warnings. Note that this special treatment is limited to the package
+that loads C<Class::MOP::Deprecated>.
 
 =head1 AUTHORS
 

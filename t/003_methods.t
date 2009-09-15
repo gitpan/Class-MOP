@@ -1,7 +1,7 @@
 use strict;
 use warnings;
 
-use Test::More tests => 67;
+use Test::More tests => 69;
 use Test::Exception;
 
 use Scalar::Util qw/reftype/;
@@ -207,7 +207,6 @@ is_deeply(
 is( $Foo->remove_method('foo')->body, $foo, '... removed the foo method' );
 ok( !$Foo->has_method('foo'),
     '... !Foo->has_method(foo) we just removed it' );
-ok( !$Foo->get_method_map->{foo}, 'foo is not in the method map' );
 dies_ok { Foo->foo } '... cannot call Foo->foo because it is not there';
 
 is_deeply(
@@ -320,7 +319,9 @@ is( $new_method->original_method, $method,
         }
     );
 
-    $meta->add_method( 'new', sub { return bless {}, shift } );
+    sub new {
+        return bless {}, shift;
+    }
 }
 
 {
@@ -331,6 +332,22 @@ is( $new_method->original_method, $method,
 
     is(
         $o->{custom_store}, $str,
-        'Custom glob-assignment-created accessor is still method modifier is added'
+        'Custom glob-assignment-created accessor still has method modifier'
     );
+}
+
+{
+    # Since the sub reference below is not a closure, Perl caches it and uses
+    # the same reference each time through the loop. See RT #48985 for the
+    # bug.
+    foreach my $ns ( qw( Foo2 Bar2 Baz2 ) ) {
+        my $meta = Class::MOP::Class->create($ns);
+
+        my $sub = sub { };
+
+        $meta->add_method( 'foo', $sub );
+
+        my $method = $meta->get_method('foo');
+        ok( $method, 'Got the foo method back' );
+    }
 }

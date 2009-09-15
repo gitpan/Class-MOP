@@ -14,7 +14,7 @@ use Scalar::Util 'blessed', 'reftype', 'weaken';
 use Sub::Name    'subname';
 use Devel::GlobalDestruction 'in_global_destruction';
 
-our $VERSION   = '0.92_01';
+our $VERSION   = '0.93';
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
 
@@ -120,6 +120,7 @@ sub _new {
         # should not actually have a value associated
         # with the slot.
         'namespace' => \undef,
+        'methods'   => {},
 
         # inherited from Class::MOP::Module
         'version'   => \undef,
@@ -128,7 +129,6 @@ sub _new {
         # defined in Class::MOP::Class
         'superclasses' => \undef,
 
-        'methods'    => {},
         'attributes' => {},
         'attribute_metaclass' =>
             ( $options->{'attribute_metaclass'} || 'Class::MOP::Attribute' ),
@@ -650,7 +650,15 @@ sub find_method_by_name {
 
 sub get_all_methods {
     my $self = shift;
-    my %methods = map { %{ $self->initialize($_)->get_method_map } } reverse $self->linearized_isa;
+
+    my %methods;
+    for my $class ( reverse $self->linearized_isa ) {
+        my $meta = $self->initialize($class);
+
+        $methods{$_} = $meta->get_method($_)
+            for $meta->get_method_list;
+    }
+
     return values %methods;
 }
 
@@ -863,12 +871,9 @@ sub is_pristine {
     return if $self->get_attribute_list;
 
     # or any non-declared methods
-    if ( my @methods = values %{ $self->get_method_map } ) {
-        my $metaclass = $self->method_metaclass;
-        foreach my $method ( @methods ) {
-            return if $method->isa("Class::MOP::Method::Generated");
-            # FIXME do we need to enforce this too? return unless $method->isa($metaclass);
-        }
+    for my $method ( map { $self->get_method($_) } $self->get_method_list ) {
+        return if $method->isa("Class::MOP::Method::Generated");
+        # FIXME do we need to enforce this too? return unless $method->isa( $self->method_metaclass );
     }
 
     return 1;
@@ -1510,11 +1515,10 @@ Making a class immutable lets us optimize the class by inlining some
 methods, and also allows us to optimize some methods on the metaclass
 object itself.
 
-After immutabilization, the metaclass object will cache most
-informational methods such as C<get_method_map> and
-C<get_all_attributes>. Methods which would alter the class, such as
-C<add_attribute>, C<add_method>, and so on will throw an error on an
-immutable metaclass object.
+After immutabilization, the metaclass object will cache most informational
+methods that returns information about methods or attributes.. Methods which
+would alter the class, such as C<add_attribute>, C<add_method>, and so on will
+throw an error on an immutable metaclass object.
 
 The immutabilization system in L<Moose> takes much greater advantage
 of the inlining features than Class::MOP itself does.

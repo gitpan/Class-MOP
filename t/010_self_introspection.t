@@ -1,7 +1,7 @@
 use strict;
 use warnings;
 
-use Test::More tests => 302;
+use Test::More tests => 304;
 use Test::Exception;
 
 use Class::MOP;
@@ -39,9 +39,11 @@ my @class_mop_package_methods = qw(
     _method_map
     _code_is_mine
     has_method get_method add_method remove_method wrap_method_body
-    get_method_list get_method_map
+    get_method_list _full_method_map
 
     _deconstruct_variable_name
+
+    get_method_map
 );
 
 my @class_mop_module_methods = qw(
@@ -162,9 +164,9 @@ foreach my $non_method_name (qw(
 my @class_mop_package_attributes = (
     'package',
     'namespace',
-    'methods',
     'method_metaclass',
     'wrapped_method_metaclass',
+    '_methods',
 );
 
 my @class_mop_module_attributes = (
