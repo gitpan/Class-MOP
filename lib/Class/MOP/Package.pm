@@ -8,7 +8,7 @@ use Scalar::Util 'blessed', 'reftype';
 use Carp         'confess';
 use Sub::Name    'subname';
 
-our $VERSION   = '0.94';
+our $VERSION   = '0.95';
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
 
@@ -311,7 +311,7 @@ sub wrap_method_body {
 
 sub add_method {
     my ($self, $method_name, $method) = @_;
-    (defined $method_name && $method_name)
+    (defined $method_name && length $method_name)
         || confess "You must define a method name";
 
     my $body;
@@ -320,7 +320,7 @@ sub add_method {
         if ($method->package_name ne $self->name) {
             $method = $method->clone(
                 package_name => $self->name,
-                name         => $method_name            
+                name         => $method_name,
             ) if $method->can('clone');
         }
 
@@ -336,7 +336,7 @@ sub add_method {
 
     my ( $current_package, $current_name ) = Class::MOP::get_code_info($body);
 
-    if ( !defined $current_name || $current_name eq '__ANON__' ) {
+    if ( !defined $current_name || $current_name =~ /^__ANON__/ ) {
         my $full_method_name = ($self->name . '::' . $method_name);
         subname($full_method_name => $body);
     }
@@ -358,7 +358,8 @@ sub _code_is_mine {
 
 sub has_method {
     my ($self, $method_name) = @_;
-    (defined $method_name && $method_name)
+
+    (defined $method_name && length $method_name)
         || confess "You must define a method name";
 
     return defined($self->get_method($method_name));
@@ -366,7 +367,8 @@ sub has_method {
 
 sub get_method {
     my ( $self, $method_name ) = @_;
-    ( defined $method_name && $method_name )
+
+    (defined $method_name && length $method_name)
         || confess "You must define a method name";
 
     my $method_map = $self->_method_map;
@@ -402,7 +404,7 @@ sub get_method {
 
 sub remove_method {
     my ($self, $method_name) = @_;
-    (defined $method_name && $method_name)
+    (defined $method_name && length $method_name)
         || confess "You must define a method name";
 
     my $removed_method = delete $self->_full_method_map->{$method_name};

@@ -10,6 +10,7 @@ use MRO::Compat;
 
 use Carp          'confess';
 use Scalar::Util  'weaken', 'reftype', 'blessed';
+use Try::Tiny;
 
 use Class::MOP::Class;
 use Class::MOP::Attribute;
@@ -24,7 +25,7 @@ BEGIN {
     *check_package_cache_flag = \&mro::get_pkg_gen;
 }
 
-our $VERSION   = '0.94';
+our $VERSION   = '0.95';
 our $XS_VERSION = $VERSION;
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
@@ -75,7 +76,7 @@ sub _class_to_pmfile {
 
 sub load_first_existing_class {
     my @classes = @_
-        or return;
+      or return;
 
     foreach my $class (@classes) {
         unless ( _is_valid_class_name($class) ) {
@@ -86,49 +87,31 @@ sub load_first_existing_class {
 
     my $found;
     my %exceptions;
-    for my $class (@classes) {
-        my $e = _try_load_one_class($class);
 
-        if ($e) {
-            my $pmfile = _class_to_pmfile($class);
-            $exceptions{$class} = $e;
-            last if $e !~ /^Can't locate \Q$pmfile\E in \@INC/;
+    for my $class (@classes) {
+        my $file = _class_to_pmfile($class);
+
+        return $class if is_class_loaded($class);;
+
+        return $class if try {
+            local $SIG{__DIE__};
+            require $file;
+            return 1;
         }
-        else {
-            $found = $class;
-            last;
-        }
+        catch {
+            unless (/^Can't locate \Q$file\E in \@INC/) {
+                confess "Couldn't load class ($class) because: $_";
+            }
+
+            return;
+        };
     }
 
-    return $found if $found;
-
-    confess join(
-        "\n",
-        map {
-            sprintf(
-                "Could not load class (%s) because : %s", $_,
-                $exceptions{$_}
-                )
-            }
-        grep {
-            exists $exceptions{$_}
-            } @classes
-    );
-}
-
-sub _try_load_one_class {
-    my $class = shift;
-
-    return if is_class_loaded($class);
-
-    my $file = _class_to_pmfile($class);
-
-    return do {
-        local $@;
-        local $SIG{__DIE__};
-        eval { require($file) };
-        $@;
-    };
+    if ( @classes > 1 ) {
+        confess "Can't locate any of @classes in \@INC (\@INC contains: @INC).";
+    } else {
+        confess "Can't locate " . _class_to_pmfile($classes[0]) . " in \@INC (\@INC contains: @INC).";
+    }
 }
 
 sub load_class {
@@ -299,7 +282,7 @@ Class::MOP::Class->meta->add_attribute(
             #
             # we just alias the original method
             # rather than re-produce it here
-            'get_attribute_map' => \&Class::MOP::Class::get_attribute_map
+            '_attribute_map' => \&Class::MOP::Class::_attribute_map
         },
         default  => sub { {} }
     ))
@@ -919,7 +902,7 @@ unconditionally.
 
 If the module cannot be loaded, an exception is thrown.
 
-For historical reasons, this function returns explicitly returns a true value.
+For historical reasons, this function explicitly returns a true value.
 
 =item B<Class::MOP::is_class_loaded($class_name)>
 

@@ -29,7 +29,8 @@ requires:
   Scalar::Util: 1.18
   Sub::Name: 0.04
   Task::Weaken: 0
+  Try::Tiny: 0.02
   perl: 5.8.1
 resources:
   license: http://dev.perl.org/licenses/
-version: 0.94
+version: 0.95

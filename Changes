@@ -1,11 +1,33 @@
 Revision history for Perl extension Class-MOP.
 
+0.95 Wed, Nov 19, 2009
+    * Class::MOP
+      - Make is_class_loaded without any arguments fail loudly
+        (Florian Ragwitz).
+      - Make load_class throw more standard error messages when loading single
+        modules (nothingmuch).
+
+    * Class::MOP::Package
+      - Stop add_method from behaving differently under the debugger
+        (Florian Ragwitz).
+
+    * Class::MOP::Class
+    * Class::MOP::Package
+      - Any method which takes a method name as an argument now allows names
+        which are false (like "0"), but the name must be defined and not be an
+        empty string. (Dave Rolsky)
+
+    * Class::MOP::Class
+      - Deprecated get_attribute_map as a public method. You can use a
+        combination of get_attribute_list and get_attribute instead. (Dave
+        Rolsky)
+
 0.94 Tue, Sep 22, 2009
     * Class::MOP::Attribute
-        - Introduce set_raw_value and get_raw_value, side effect free variants
-          of {get,set}_value. These don't do anything useful in Class::MOP but
-          have different behavior that set_value and get_value for Moose
-          attributes. (nothingmuch)
+      - Introduce set_raw_value and get_raw_value, side effect free variants
+        of {get,set}_value. These don't do anything useful in Class::MOP but
+        have different behavior that set_value and get_value for Moose
+        attributes. (nothingmuch)
 
 0.93 Tue, Sep 15, 2009
     * Class::MOP
@@ -241,7 +263,7 @@ Revision history for Perl extension Class-MOP.
 
     * Many methods have been renamed with a leading underscore, and a
       few have been deprecated entirely. The methods with a leading
-      underscore are consider "internals only". People writing
+      underscore are considered "internals only". People writing
       subclasses or extensions to Class::MOP should feel free to
       override them, but they are not for "public" use.
 
