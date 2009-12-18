@@ -1,7 +1,7 @@
 use strict;
 use warnings;
 
-use Test::More tests => 5;
+use Test::More;
 use Sub::Name 'subname';
 
 BEGIN {
@@ -35,9 +35,18 @@ code_name_is( \&Class::MOP::Method::name, "Class::MOP::Method", "name" );
 
     sub MODIFY_CODE_ATTRIBUTES {
         my ($class, $code) = @_;
-        ::ok(!Class::MOP::get_code_info($code), "no name for a coderef that's still compiling");
+        my @info = Class::MOP::get_code_info($code);
+
+        if ( $] >= 5.011 ) {
+            ::is_deeply(\@info, ['Foo', 'foo'], "got a name for a code ref in an attr handler");
+        }
+        else {
+            ::is_deeply(\@info, [], "no name for a coderef that's still compiling");
+        }
         return ();
     }
 
     sub foo : Bar {}
 }
+
+done_testing;
