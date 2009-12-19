@@ -1,4 +1,3 @@
-.prove
 Changes
 examples/ArrayBasedStorage.pod
 examples/AttributesWithHistory.pod
@@ -131,8 +130,6 @@ t/lib/TestClassLoaded/Sub.pm
 t/lib/TestClassLoaded2.pm
 t/lib/TestClassLoaded3.pm
 xs/Attribute.xs
-xs/Class.c
-xs/Class.o
 xs/Method.xs
 xs/MOP.xs
 xs/Package.xs
