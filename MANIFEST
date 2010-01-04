@@ -28,6 +28,10 @@ lib/Class/MOP/Method/Constructor.pm
 lib/Class/MOP/Method/Generated.pm
 lib/Class/MOP/Method/Inlined.pm
 lib/Class/MOP/Method/Wrapped.pm
+lib/Class/MOP/Mixin.pm
+lib/Class/MOP/Mixin/AttributeCore.pm
+lib/Class/MOP/Mixin/HasAttributes.pm
+lib/Class/MOP/Mixin/HasMethods.pm
 lib/Class/MOP/Module.pm
 lib/Class/MOP/Object.pm
 lib/Class/MOP/Package.pm
@@ -129,7 +133,8 @@ t/lib/TestClassLoaded.pm
 t/lib/TestClassLoaded/Sub.pm
 t/lib/TestClassLoaded2.pm
 t/lib/TestClassLoaded3.pm
-xs/Attribute.xs
+xs/AttributeBase.xs
+xs/HasMethods.xs
 xs/Method.xs
 xs/MOP.xs
 xs/Package.xs

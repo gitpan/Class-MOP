@@ -11,6 +11,7 @@ for (<DATA>) {
 }
 
 add_stopwords(@stopwords);
+local $ENV{LC_ALL} = 'C';
 set_spell_cmd('aspell list -l en');
 all_pod_files_spelling_ok;
 
@@ -112,6 +113,8 @@ IRC
 isa
 login
 metadata
+mixin
+mixins
 munge
 namespace
 namespaced
