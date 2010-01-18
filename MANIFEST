@@ -67,6 +67,7 @@ t/021_attribute_errors_and_edge_cases.t
 t/022_attribute_duplication.t
 t/023_attribute_get_read_write.t
 t/024_attribute_initializer.t
+t/025_attribute_non_alpha_name.t
 t/030_method.t
 t/031_method_modifiers.t
 t/032_universal_methods.t
