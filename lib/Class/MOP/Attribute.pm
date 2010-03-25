@@ -10,7 +10,7 @@ use Carp         'confess';
 use Scalar::Util 'blessed', 'weaken';
 use Try::Tiny;
 
-our $VERSION   = '0.98';
+our $VERSION   = '0.99';
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
 
@@ -798,7 +798,7 @@ called when the instance is first being initialized.
 Returns the value without going through the accessor. Note that this
 works even with write-only accessors.
 
-=item B<< $sttr->get_raw_value($instance) >>
+=item B<< $attr->get_raw_value($instance) >>
 
 Returns the value without any side effects such as lazy attributes.
 
