@@ -20,6 +20,7 @@ if ( -d '.git' || $ENV{MAINTAINER_MODE} ) {
 requires 'Carp';
 requires 'Data::OptList';
 requires 'Devel::GlobalDestruction';
+requires 'List::MoreUtils' => '0.12';
 requires 'MRO::Compat'  => '0.05';
 requires 'Scalar::Util' => '1.18';
 requires 'Sub::Name'    => '0.04';
@@ -29,6 +30,8 @@ requires 'Task::Weaken';
 test_requires 'File::Spec';
 test_requires 'Test::More'      => '0.88';
 test_requires 'Test::Exception' => '0.27';
+
+repository 'git://git.moose.perl.org/Class-MOP.git';
 
 extra_tests();
 
@@ -70,7 +73,7 @@ WriteAll();
 # before a release.
 sub check_conflicts {
     my %conflicts = (
-        'Moose' => '0.85',
+        'Moose' => '1.04',
     );
 
     my $found = 0;

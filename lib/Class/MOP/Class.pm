@@ -14,12 +14,15 @@ use Scalar::Util 'blessed', 'reftype', 'weaken';
 use Sub::Name    'subname';
 use Devel::GlobalDestruction 'in_global_destruction';
 use Try::Tiny;
+use List::MoreUtils 'all';
 
-our $VERSION   = '1.01';
+our $VERSION   = '1.02';
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
 
-use base 'Class::MOP::Module', 'Class::MOP::Mixin::HasAttributes';
+use base 'Class::MOP::Module',
+         'Class::MOP::Mixin::HasAttributes',
+         'Class::MOP::Mixin::HasMethods';
 
 # Creation
 
@@ -64,15 +67,10 @@ sub _construct_class_instance {
         return $meta;
     }
 
-    # NOTE:
-    # we need to deal with the possibility
-    # of class immutability here, and then
-    # get the name of the class appropriately
-    $class = (ref($class)
-                    ? ($class->is_immutable
-                        ? $class->_get_mutable_metaclass_name()
-                        : ref($class))
-                    : $class);
+    $class
+        = ref $class
+        ? $class->_real_ref_name
+        : $class;
 
     # now create the metaclass
     my $meta;
@@ -98,6 +96,16 @@ sub _construct_class_instance {
     Class::MOP::weaken_metaclass($package_name) if $meta->is_anon_class;
 
     $meta;
+}
+
+sub _real_ref_name {
+    my $self = shift;
+
+    # NOTE: we need to deal with the possibility of class immutability here,
+    # and then get the name of the class appropriately
+    return $self->is_immutable
+        ? $self->_get_mutable_metaclass_name()
+        : ref $self;
 }
 
 sub _new {
@@ -165,40 +173,221 @@ sub update_package_cache_flag {
     $self->{'_package_cache_flag'} = Class::MOP::check_package_cache_flag($self->name);    
 }
 
+## Metaclass compatibility
+{
+    my %base_metaclass = (
+        attribute_metaclass      => 'Class::MOP::Attribute',
+        method_metaclass         => 'Class::MOP::Method',
+        wrapped_method_metaclass => 'Class::MOP::Method::Wrapped',
+        instance_metaclass       => 'Class::MOP::Instance',
+        constructor_class        => 'Class::MOP::Method::Constructor',
+        destructor_class         => 'Class::MOP::Method::Destructor',
+    );
+
+    sub _base_metaclasses { %base_metaclass }
+}
+
 sub _check_metaclass_compatibility {
     my $self = shift;
 
-    # this is always okay ...
-    return if ref($self)                eq 'Class::MOP::Class'   &&
-              $self->instance_metaclass eq 'Class::MOP::Instance';
+    if (my @superclasses = $self->superclasses) {
+        $self->_fix_metaclass_incompatibility(@superclasses);
 
-    my @class_list = $self->linearized_isa;
-    shift @class_list; # shift off $self->name
+        my %base_metaclass = $self->_base_metaclasses;
 
-    foreach my $superclass_name (@class_list) {
-        my $super_meta = Class::MOP::get_metaclass_by_name($superclass_name) || next;
+        # this is always okay ...
+        return if ref($self) eq 'Class::MOP::Class'
+            && all {
+                my $meta = $self->$_;
+                !defined($meta) || $meta eq $base_metaclass{$_}
+            } keys %base_metaclass;
 
-        # NOTE:
-        # we need to deal with the possibility
-        # of class immutability here, and then
-        # get the name of the class appropriately
-        my $super_meta_type
-            = $super_meta->is_immutable
-            ? $super_meta->_get_mutable_metaclass_name()
-            : ref($super_meta);
+        for my $superclass (@superclasses) {
+            $self->_check_class_metaclass_compatibility($superclass);
+        }
 
-        ($self->isa($super_meta_type))
-            || confess "The metaclass of " . $self->name . " ("
-                       . (ref($self)) . ")" .  " is not compatible with the " .
-                       "metaclass of its superclass, ".$superclass_name . " ("
-                       . ($super_meta_type) . ")";
-        # NOTE:
-        # we also need to check that instance metaclasses
-        # are compatibile in the same the class.
-        ($self->instance_metaclass->isa($super_meta->instance_metaclass))
-            || confess "The instance metaclass for " . $self->name . " (" . ($self->instance_metaclass) . ")" .
-                       " is not compatible with the " .
-                       "instance metaclass of its superclass, " . $superclass_name . " (" . ($super_meta->instance_metaclass) . ")";
+        for my $metaclass_type (keys %base_metaclass) {
+            next unless defined $self->$metaclass_type;
+            for my $superclass (@superclasses) {
+                $self->_check_single_metaclass_compatibility(
+                    $metaclass_type, $superclass
+                );
+            }
+        }
+    }
+}
+
+sub _class_metaclass_is_compatible {
+    my $self = shift;
+    my ( $superclass_name ) = @_;
+
+    my $super_meta = Class::MOP::get_metaclass_by_name($superclass_name)
+        || return 1;
+
+    my $super_meta_type = $super_meta->_real_ref_name;
+
+    return $self->isa($super_meta_type);
+}
+
+sub _check_class_metaclass_compatibility {
+    my $self = shift;
+    my ( $superclass_name ) = @_;
+
+    if (!$self->_class_metaclass_is_compatible($superclass_name)) {
+        my $super_meta = Class::MOP::get_metaclass_by_name($superclass_name);
+
+        my $super_meta_type = $super_meta->_real_ref_name;
+
+        confess "The metaclass of " . $self->name . " ("
+              . (ref($self)) . ")" .  " is not compatible with "
+              . "the metaclass of its superclass, "
+              . $superclass_name . " (" . ($super_meta_type) . ")";
+    }
+}
+
+sub _single_metaclass_is_compatible {
+    my $self = shift;
+    my ( $metaclass_type, $superclass_name ) = @_;
+
+    my $super_meta = Class::MOP::get_metaclass_by_name($superclass_name)
+        || return 1;
+
+    # for instance, Moose::Meta::Class has a error_class attribute, but
+    # Class::MOP::Class doesn't - this shouldn't be an error
+    return 1 unless $super_meta->can($metaclass_type);
+    # for instance, Moose::Meta::Class has a destructor_class, but
+    # Class::MOP::Class doesn't - this shouldn't be an error
+    return 1 unless defined $super_meta->$metaclass_type;
+    # if metaclass is defined in superclass but not here, it's not compatible
+    # this is a really odd case
+    return 0 unless defined $self->$metaclass_type;
+
+    return $self->$metaclass_type->isa($super_meta->$metaclass_type);
+}
+
+sub _check_single_metaclass_compatibility {
+    my $self = shift;
+    my ( $metaclass_type, $superclass_name ) = @_;
+
+    if (!$self->_single_metaclass_is_compatible($metaclass_type, $superclass_name)) {
+        my $super_meta = Class::MOP::get_metaclass_by_name($superclass_name);
+        my $metaclass_type_name = $metaclass_type;
+        $metaclass_type_name =~ s/_(?:meta)?class$//;
+        $metaclass_type_name =~ s/_/ /g;
+        confess "The $metaclass_type_name metaclass for "
+              . $self->name . " (" . ($self->$metaclass_type)
+              . ")" . " is not compatible with the "
+              . "$metaclass_type_name metaclass of its "
+              . "superclass, " . $superclass_name . " ("
+              . ($super_meta->$metaclass_type) . ")";
+    }
+}
+
+sub _can_fix_class_metaclass_incompatibility_by_subclassing {
+    my $self = shift;
+    my ($super_meta) = @_;
+
+    my $super_meta_type = $super_meta->_real_ref_name;
+
+    return $super_meta_type ne blessed($self)
+        && $super_meta->isa(blessed($self));
+}
+
+sub _can_fix_single_metaclass_incompatibility_by_subclassing {
+    my $self = shift;
+    my ($metaclass_type, $super_meta) = @_;
+
+    my $specific_meta = $self->$metaclass_type;
+    return unless $super_meta->can($metaclass_type);
+    my $super_specific_meta = $super_meta->$metaclass_type;
+
+    # for instance, Moose::Meta::Class has a destructor_class, but
+    # Class::MOP::Class doesn't - this shouldn't be an error
+    return unless defined $super_specific_meta;
+
+    # if metaclass is defined in superclass but not here, it's fixable
+    # this is a really odd case
+    return 1 unless defined $specific_meta;
+
+    return $specific_meta ne $super_specific_meta
+        && $super_specific_meta->isa($specific_meta);
+}
+
+sub _can_fix_metaclass_incompatibility_by_subclassing {
+    my $self = shift;
+    my ($super_meta) = @_;
+
+    return 1 if $self->_can_fix_class_metaclass_incompatibility_by_subclassing($super_meta);
+
+    my %base_metaclass = $self->_base_metaclasses;
+    for my $metaclass_type (keys %base_metaclass) {
+        return 1 if $self->_can_fix_single_metaclass_incompatibility_by_subclassing($metaclass_type, $super_meta);
+    }
+
+    return;
+}
+
+sub _can_fix_metaclass_incompatibility {
+    my $self = shift;
+    return $self->_can_fix_metaclass_incompatibility_by_subclassing(@_);
+}
+
+sub _fix_metaclass_incompatibility {
+    my $self = shift;
+    my @supers = map { Class::MOP::Class->initialize($_) } @_;
+
+    my $necessary = 0;
+    for my $super (@supers) {
+        $necessary = 1
+            if $self->_can_fix_metaclass_incompatibility($super);
+    }
+    return unless $necessary;
+
+    for my $super (@supers) {
+        if (!$self->_class_metaclass_is_compatible($super->name)) {
+            $self->_fix_class_metaclass_incompatibility($super);
+        }
+    }
+
+    my %base_metaclass = $self->_base_metaclasses;
+    for my $metaclass_type (keys %base_metaclass) {
+        for my $super (@supers) {
+            if (!$self->_single_metaclass_is_compatible($metaclass_type, $super->name)) {
+                $self->_fix_single_metaclass_incompatibility(
+                    $metaclass_type, $super
+                );
+            }
+        }
+    }
+}
+
+sub _fix_class_metaclass_incompatibility {
+    my $self = shift;
+    my ( $super_meta ) = @_;
+
+    if ($self->_can_fix_class_metaclass_incompatibility_by_subclassing($super_meta)) {
+        ($self->is_pristine)
+            || confess "Can't fix metaclass incompatibility for "
+                     . $self->name
+                     . " because it is not pristine.";
+
+        my $super_meta_name = $super_meta->_real_ref_name;
+
+        $super_meta_name->meta->rebless_instance($self);
+    }
+}
+
+sub _fix_single_metaclass_incompatibility {
+    my $self = shift;
+    my ( $metaclass_type, $super_meta ) = @_;
+
+    if ($self->_can_fix_single_metaclass_incompatibility_by_subclassing($metaclass_type, $super_meta)) {
+        ($self->is_pristine)
+            || confess "Can't fix metaclass incompatibility for "
+                     . $self->name
+                     . " because it is not pristine.";
+
+        $self->{$metaclass_type} = $super_meta->$metaclass_type;
     }
 }
 
@@ -552,7 +741,7 @@ sub find_attribute_by_name {
 
     foreach my $class ( $self->linearized_isa ) {
         # fetch the meta-class ...
-        my $meta = $self->initialize($class);
+        my $meta = Class::MOP::Class->initialize($class);
         return $meta->get_attribute($attr_name)
             if $meta->has_attribute($attr_name);
     }
@@ -562,7 +751,7 @@ sub find_attribute_by_name {
 
 sub get_all_attributes {
     my $self = shift;
-    my %attrs = map { %{ $self->initialize($_)->_attribute_map } }
+    my %attrs = map { %{ Class::MOP::Class->initialize($_)->_attribute_map } }
         reverse $self->linearized_isa;
     return values %attrs;
 }
@@ -651,7 +840,7 @@ sub class_precedence_list {
         return (
             $name,
             map {
-                $self->initialize($_)->class_precedence_list()
+                Class::MOP::Class->initialize($_)->class_precedence_list()
             } $self->superclasses()
         );
     }
@@ -740,7 +929,7 @@ sub find_method_by_name {
     (defined $method_name && length $method_name)
         || confess "You must define a method name to find";
     foreach my $class ($self->linearized_isa) {
-        my $method = $self->initialize($class)->get_method($method_name);
+        my $method = Class::MOP::Class->initialize($class)->get_method($method_name);
         return $method if defined $method;
     }
     return;
@@ -751,7 +940,7 @@ sub get_all_methods {
 
     my %methods;
     for my $class ( reverse $self->linearized_isa ) {
-        my $meta = $self->initialize($class);
+        my $meta = Class::MOP::Class->initialize($class);
 
         $methods{$_} = $meta->get_method($_)
             for $meta->get_method_list;
@@ -763,7 +952,7 @@ sub get_all_methods {
 sub get_all_method_names {
     my $self = shift;
     my %uniq;
-    return grep { !$uniq{$_}++ } map { $self->initialize($_)->get_method_list } $self->linearized_isa;
+    return grep { !$uniq{$_}++ } map { Class::MOP::Class->initialize($_)->get_method_list } $self->linearized_isa;
 }
 
 sub find_all_methods_by_name {
@@ -773,7 +962,7 @@ sub find_all_methods_by_name {
     my @methods;
     foreach my $class ($self->linearized_isa) {
         # fetch the meta-class ...
-        my $meta = $self->initialize($class);
+        my $meta = Class::MOP::Class->initialize($class);
         push @methods => {
             name  => $method_name,
             class => $class,
@@ -790,7 +979,7 @@ sub find_next_method_by_name {
     my @cpl = $self->linearized_isa;
     shift @cpl; # discard ourselves
     foreach my $class (@cpl) {
-        my $method = $self->initialize($class)->get_method($method_name);
+        my $method = Class::MOP::Class->initialize($class)->get_method($method_name);
         return $method if defined $method;
     }
     return;
@@ -967,10 +1156,7 @@ sub _immutable_metaclass {
     # metaclass roles applied (via Moose), then we want to make sure
     # that we preserve that anonymous class (see Fey::ORM for an
     # example of where this matters).
-    my $meta_name
-        = $meta->is_immutable
-        ? $meta->_get_mutable_metaclass_name
-        : ref $meta;
+    my $meta_name = $meta->_real_ref_name;
 
     my $immutable_meta = $meta_name->create(
         $class_name,
@@ -1384,13 +1570,75 @@ include indirect subclasses.
 
 =back
 
-=head2 Method introspection
+=head2 Method introspection and creation
 
-See L<Class::MOP::Package/Method introspection and creation> for
-methods that operate only on the current class.  Class::MOP::Class adds
-introspection capabilities that take inheritance into account.
+These methods allow you to introspect a class's methods, as well as
+add, remove, or change methods.
+
+Determining what is truly a method in a Perl 5 class requires some
+heuristics (aka guessing).
+
+Methods defined outside the package with a fully qualified name (C<sub
+Package::name { ... }>) will be included. Similarly, methods named
+with a fully qualified name using L<Sub::Name> are also included.
+
+However, we attempt to ignore imported functions.
+
+Ultimately, we are using heuristics to determine what truly is a
+method in a class, and these heuristics may get the wrong answer in
+some edge cases. However, for most "normal" cases the heuristics work
+correctly.
 
 =over 4
+
+=item B<< $metaclass->get_method($method_name) >>
+
+This will return a L<Class::MOP::Method> for the specified
+C<$method_name>. If the class does not have the specified method, it
+returns C<undef>
+
+=item B<< $metaclass->has_method($method_name) >>
+
+Returns a boolean indicating whether or not the class defines the
+named method. It does not include methods inherited from parent
+classes.
+
+=item B<< $metaclass->get_method_list >>
+
+This will return a list of method I<names> for all methods defined in
+this class.
+
+=item B<< $metaclass->add_method($method_name, $method) >>
+
+This method takes a method name and a subroutine reference, and adds
+the method to the class.
+
+The subroutine reference can be a L<Class::MOP::Method>, and you are
+strongly encouraged to pass a meta method object instead of a code
+reference. If you do so, that object gets stored as part of the
+class's method map directly. If not, the meta information will have to
+be recreated later, and may be incorrect.
+
+If you provide a method object, this method will clone that object if
+the object's package name does not match the class name. This lets us
+track the original source of any methods added from other classes
+(notably Moose roles).
+
+=item B<< $metaclass->remove_method($method_name) >>
+
+Remove the named method from the class. This method returns the
+L<Class::MOP::Method> object for the method.
+
+=item B<< $metaclass->method_metaclass >>
+
+Returns the class name of the method metaclass, see
+L<Class::MOP::Method> for more information on the method metaclass.
+
+=item B<< $metaclass->wrapped_method_metaclass >>
+
+Returns the class name of the wrapped method metaclass, see
+L<Class::MOP::Method::Wrapped> for more information on the wrapped
+method metaclass.
 
 =item B<< $metaclass->get_all_methods >>
 
