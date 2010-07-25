@@ -10,7 +10,7 @@ build_requires:
 configure_requires:
   ExtUtils::MakeMaker: 6.42
 distribution_type: module
-generated_by: 'Module::Install version 0.99'
+generated_by: 'Module::Install version 1.00'
 license: perl
 meta-spec:
   url: http://module-build.sourceforge.net/META-spec-v1.4.html
@@ -28,6 +28,7 @@ requires:
   Devel::GlobalDestruction: 0
   List::MoreUtils: 0.12
   MRO::Compat: 0.05
+  Package::DeprecationManager: 0.04
   Package::Stash: 0
   Scalar::Util: 1.18
   Sub::Name: 0.04
@@ -37,4 +38,5 @@ requires:
 resources:
   license: http://dev.perl.org/licenses/
   repository: git://git.moose.perl.org/Class-MOP.git
-version: 1.03
+version: 1.04
+x_authority: cpan:STEVAN

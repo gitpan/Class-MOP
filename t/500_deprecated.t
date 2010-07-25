@@ -20,7 +20,7 @@ $SIG{__WARN__} = \&croak;
 {
     package Bar;
 
-    use Class::MOP::Deprecated -compatible => 0.93;
+    use Class::MOP::Deprecated -api_version => 0.93;
 
     ::throws_ok{
         Class::MOP::in_global_destruction();
@@ -31,20 +31,12 @@ $SIG{__WARN__} = \&croak;
 {
     package Baz;
 
-    use Class::MOP::Deprecated -compatible => 0.92;
+    use Class::MOP::Deprecated -api_version => 0.92;
 
     ::lives_ok{
         Class::MOP::in_global_destruction();
         }
         'Class::MOP::in_global_destruction is not deprecated with 0.92 compatibility';
-}
-
-{
-    package Baz::Inner;
-
-    ::lives_ok{
-        Class::MOP::in_global_destruction();
-        } 'safe in an inner class';
 }
 
 {
@@ -60,7 +52,7 @@ $SIG{__WARN__} = \&croak;
 {
     package Quux;
 
-    use Class::MOP::Deprecated -compatible => 0.92;
+    use Class::MOP::Deprecated -api_version => 0.92;
     use Scalar::Util qw( blessed );
 
     use metaclass;

@@ -22,6 +22,7 @@ requires 'Data::OptList';
 requires 'Devel::GlobalDestruction';
 requires 'List::MoreUtils' => '0.12';
 requires 'MRO::Compat'  => '0.05';
+requires 'Package::DeprecationManager' => '0.04';
 requires 'Package::Stash';
 requires 'Scalar::Util' => '1.18';
 requires 'Sub::Name'    => '0.04';
@@ -33,6 +34,7 @@ test_requires 'Test::More'      => '0.88';
 test_requires 'Test::Exception' => '0.27';
 
 repository 'git://git.moose.perl.org/Class-MOP.git';
+add_metadata(x_authority => 'cpan:STEVAN');
 
 extra_tests();
 

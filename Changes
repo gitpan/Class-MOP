@@ -1,5 +1,16 @@
 Revision history for Perl extension Class-MOP.
 
+1.04 Tue, Jul 25, 2010
+
+  [ENHANCEMENTS]
+
+  * Class::MOP::Deprecated now uses Package::DeprecationManager
+    internally. Deprecation warnings are now only issued once for each calling
+    package, which cuts down on noise. When importing Class::MOP::Deprecated,
+    the request API version should now be passed in the "-api_version"
+    flag. However, the old "-compatible" flag will continue to work. (Dave
+    Rolsky).
+
 1.03 Sat, Jun 5, 2010
 
   [ENHANCEMENTS]
