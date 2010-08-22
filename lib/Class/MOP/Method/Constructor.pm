@@ -5,9 +5,9 @@ use strict;
 use warnings;
 
 use Carp         'confess';
-use Scalar::Util 'blessed', 'weaken', 'looks_like_number';
+use Scalar::Util 'blessed', 'weaken';
 
-our $VERSION   = '1.04';
+our $VERSION   = '1.05';
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
 
@@ -100,7 +100,11 @@ sub _generate_constructor_method {
 sub _generate_constructor_method_inline {
     my $self = shift;
 
-    my $close_over = {};
+    my $defaults = [map { $_->default } @{ $self->_attributes }];
+
+    my $close_over = {
+        '$defaults' => \$defaults,
+    };
 
     my $source = 'sub {';
     $source .= "\n" . 'my $class = shift;';
@@ -111,8 +115,9 @@ sub _generate_constructor_method_inline {
     $source .= "\n" . 'my $params = @_ == 1 ? $_[0] : {@_};';
 
     $source .= "\n" . 'my $instance = ' . $self->_meta_instance->inline_create_instance('$class');
+    my $idx = 0;
     $source .= ";\n" . (join ";\n" => map {
-        $self->_generate_slot_initializer($_, $close_over)
+        $self->_generate_slot_initializer($_, $idx++)
     } @{ $self->_attributes });
     $source .= ";\n" . 'return $instance';
     $source .= ";\n" . '}';
@@ -130,54 +135,68 @@ sub _generate_constructor_method_inline {
 sub _generate_slot_initializer {
     my $self  = shift;
     my $attr  = shift;
-    my $close = shift;
+    my $idx   = shift;
 
     my $default;
     if ($attr->has_default) {
-        # NOTE:
-        # default values can either be CODE refs
-        # in which case we need to call them. Or
-        # they can be scalars (strings/numbers)
-        # in which case we can just deal with them
-        # in the code we eval.
-        if ($attr->is_default_a_coderef) {
-            my $idx = @{$close->{'@defaults'}||=[]};
-            push(@{$close->{'@defaults'}}, $attr->default);
-            $default = '$defaults[' . $idx . ']->($instance)';
-        }
-        else {
-            $default = $attr->default;
-            # make sure to quote strings ...
-            unless (looks_like_number($default)) {
-                $default = "'$default'";
-            }
-        }
+        $default = $self->_generate_default_value($attr, $idx);
     } elsif( $attr->has_builder ) {
         $default = '$instance->'.$attr->builder;
     }
 
-    if ( defined(my $init_arg = $attr->init_arg) ) {
-      return (
-          'if(exists $params->{\'' . $init_arg . '\'}){' . "\n" .
-                $self->_meta_instance->inline_set_slot_value(
+    if ( defined( my $init_arg = $attr->init_arg ) ) {
+        my $mi        = $self->_meta_instance;
+        my $attr_name = $attr->name;
+
+        return (
+                  'if(exists $params->{\'' 
+                . $init_arg . '\'}){' . "\n"
+                . $mi->inline_set_slot_value(
+                '$instance',
+                $attr_name,
+                '$params->{\'' . $init_arg . '\'}'
+                )
+                . "\n" . '} '
+                . (
+                !defined $default ? '' : 'else {' . "\n"
+                    . $mi->inline_set_slot_value(
                     '$instance',
-                    $attr->name,
-                    '$params->{\'' . $init_arg . '\'}' ) . "\n" .
-           '} ' . (!defined $default ? '' : 'else {' . "\n" .
-                $self->_meta_instance->inline_set_slot_value(
-                    '$instance',
-                    $attr->name,
-                     $default ) . "\n" .
-           '}')
+                    $attr_name,
+                    $default
+                    )
+                    . "\n" . '}'
+                )
         );
-    } elsif ( defined $default ) {
+    }
+    elsif ( defined $default ) {
         return (
             $self->_meta_instance->inline_set_slot_value(
                 '$instance',
                 $attr->name,
-                 $default ) . "\n"
+                $default
+                )
+                . "\n"
         );
-    } else { return '' }
+    }
+    else {
+        return '';
+    }
+}
+
+sub _generate_default_value {
+    my ($self, $attr, $index) = @_;
+    # NOTE:
+    # default values can either be CODE refs
+    # in which case we need to call them. Or
+    # they can be scalars (strings/numbers)
+    # in which case we can just deal with them
+    # in the code we eval.
+    if ($attr->is_default_a_coderef) {
+        return '$defaults->[' . $index . ']->($instance)';
+    }
+    else {
+        return '$defaults->[' . $index . ']';
+    }
 }
 
 1;

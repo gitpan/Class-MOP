@@ -352,4 +352,30 @@ is( $new_method->original_method, $method,
     }
 }
 
+{
+    package HasConstants;
+
+    use constant FOO => 1;
+    use constant BAR => [];
+    use constant BAZ => {};
+
+    sub quux  {1}
+    sub thing {1}
+}
+
+my $HC = Class::MOP::Class->initialize('HasConstants');
+
+is_deeply(
+    [ sort $HC->get_method_list ],
+    [qw( quux thing )],
+    'get_method_list handles constants properly'
+);
+
+is_deeply(
+    [ sort map { $_->name } $HC->_get_local_methods ],
+    [qw( quux thing )],
+    '_get_local_methods handles constants properly'
+);
+
+
 done_testing;

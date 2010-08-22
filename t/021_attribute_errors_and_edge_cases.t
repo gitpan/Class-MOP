@@ -81,6 +81,34 @@ use Class::MOP::Attribute;
         ));
     } '... no default AND builder';
 
+    my $undef_attr;
+    lives_ok {
+        $undef_attr = Class::MOP::Attribute->new('$test' => (
+            default   => undef,
+            predicate => 'has_test',
+        ));
+    } '... undef as a default is okay';
+    ok($undef_attr->has_default, '... and it counts as an actual default');
+    ok(!Class::MOP::Attribute->new('$test')->has_default,
+       '... but attributes with no default have no default');
+
+    Class::MOP::Class->create(
+        'Foo',
+        attributes => [$undef_attr],
+    );
+    {
+        my $obj = Foo->meta->new_object;
+        ok($obj->has_test, '... and the default is populated');
+        is($obj->meta->get_attribute('$test')->get_value($obj), undef, '... with the right value');
+    }
+    lives_ok { Foo->meta->make_immutable }
+             '... and it can be inlined';
+    {
+        my $obj = Foo->new;
+        ok($obj->has_test, '... and the default is populated');
+        is($obj->meta->get_attribute('$test')->get_value($obj), undef, '... with the right value');
+    }
+
 }
 
 

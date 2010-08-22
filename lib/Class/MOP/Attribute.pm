@@ -10,7 +10,7 @@ use Carp         'confess';
 use Scalar::Util 'blessed', 'weaken';
 use Try::Tiny;
 
-our $VERSION   = '1.04';
+our $VERSION   = '1.05';
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
 
@@ -73,7 +73,9 @@ sub _new {
         'clearer'            => $options->{clearer},
         'builder'            => $options->{builder},
         'init_arg'           => $options->{init_arg},
-        'default'            => $options->{default},
+        exists $options->{default}
+            ? ('default'     => $options->{default})
+            : (),
         'initializer'        => $options->{initializer},
         'definition_context' => $options->{definition_context},
         # keep a weakened link to the
@@ -117,7 +119,7 @@ sub initialize_instance_slot {
             $params->{$init_arg},
         );
     } 
-    elsif (defined $self->{'default'}) {
+    elsif (exists $self->{'default'}) {
         $self->_set_initial_slot_value(
             $meta_instance, 
             $instance,

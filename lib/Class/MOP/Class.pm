@@ -16,7 +16,7 @@ use Devel::GlobalDestruction 'in_global_destruction';
 use Try::Tiny;
 use List::MoreUtils 'all';
 
-our $VERSION   = '1.04';
+our $VERSION   = '1.05';
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
 
@@ -190,29 +190,31 @@ sub update_package_cache_flag {
 sub _check_metaclass_compatibility {
     my $self = shift;
 
-    if (my @superclasses = $self->superclasses) {
-        $self->_fix_metaclass_incompatibility(@superclasses);
+    my @superclasses = $self->superclasses
+        or return;
 
-        my %base_metaclass = $self->_base_metaclasses;
+    $self->_fix_metaclass_incompatibility(@superclasses);
 
-        # this is always okay ...
-        return if ref($self) eq 'Class::MOP::Class'
+    my %base_metaclass = $self->_base_metaclasses;
+
+    # this is always okay ...
+    return
+        if ref($self) eq 'Class::MOP::Class'
             && all {
                 my $meta = $self->$_;
-                !defined($meta) || $meta eq $base_metaclass{$_}
-            } keys %base_metaclass;
-
-        for my $superclass (@superclasses) {
-            $self->_check_class_metaclass_compatibility($superclass);
+                !defined($meta) || $meta eq $base_metaclass{$_};
         }
+        keys %base_metaclass;
 
-        for my $metaclass_type (keys %base_metaclass) {
-            next unless defined $self->$metaclass_type;
-            for my $superclass (@superclasses) {
-                $self->_check_single_metaclass_compatibility(
-                    $metaclass_type, $superclass
-                );
-            }
+    for my $superclass (@superclasses) {
+        $self->_check_class_metaclass_compatibility($superclass);
+    }
+
+    for my $metaclass_type ( keys %base_metaclass ) {
+        next unless defined $self->$metaclass_type;
+        for my $superclass (@superclasses) {
+            $self->_check_single_metaclass_compatibility( $metaclass_type,
+                $superclass );
         }
     }
 }
@@ -760,10 +762,13 @@ sub get_all_attributes {
 
 sub superclasses {
     my $self     = shift;
-    my $var_spec = { sigil => '@', type => 'ARRAY', name => 'ISA' };
+
+    my $isa = $self->get_package_symbol(
+        { sigil => '@', type => 'ARRAY', name => 'ISA' } );
+
     if (@_) {
         my @supers = @_;
-        @{$self->get_package_symbol($var_spec)} = @supers;
+        @{$isa} = @supers;
 
         # NOTE:
         # on 5.8 and below, we need to call
@@ -782,7 +787,8 @@ sub superclasses {
         $self->_check_metaclass_compatibility();
         $self->_superclasses_updated();
     }
-    @{$self->get_package_symbol($var_spec)};
+
+    return @{$isa};
 }
 
 sub _superclasses_updated {
@@ -942,8 +948,7 @@ sub get_all_methods {
     for my $class ( reverse $self->linearized_isa ) {
         my $meta = Class::MOP::Class->initialize($class);
 
-        $methods{$_} = $meta->get_method($_)
-            for $meta->get_method_list;
+        $methods{ $_->name } = $_ for $meta->_get_local_methods;
     }
 
     return values %methods;
@@ -1706,7 +1711,8 @@ classes.
 =item B<< $metaclass->get_attribute_list >>
 
 This will return a list of attributes I<names> for all attributes
-defined in this class.
+defined in this class.  Note that this operates on the current class
+only, it does not traverse the inheritance hierarchy.
 
 =item B<< $metaclass->get_all_attributes >>
 

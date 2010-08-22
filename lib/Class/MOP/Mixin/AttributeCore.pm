@@ -3,7 +3,7 @@ package Class::MOP::Mixin::AttributeCore;
 use strict;
 use warnings;
 
-our $VERSION   = '1.04';
+our $VERSION   = '1.05';
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
 
@@ -18,7 +18,7 @@ sub has_predicate       { defined $_[0]->{'predicate'} }
 sub has_clearer         { defined $_[0]->{'clearer'} }
 sub has_builder         { defined $_[0]->{'builder'} }
 sub has_init_arg        { defined $_[0]->{'init_arg'} }
-sub has_default         { defined $_[0]->{'default'} }
+sub has_default         { exists  $_[0]->{'default'} }
 sub has_initializer     { defined $_[0]->{'initializer'} }
 sub has_insertion_order { defined $_[0]->{'insertion_order'} }
 

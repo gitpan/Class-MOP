@@ -3,7 +3,7 @@ package Class::MOP::Mixin::HasMethods;
 use strict;
 use warnings;
 
-our $VERSION   = '1.04';
+our $VERSION   = '1.05';
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
 
@@ -39,12 +39,14 @@ sub add_method {
     ( defined $method_name && length $method_name )
         || confess "You must define a method name";
 
+    my $package_name = $self->name;
+
     my $body;
     if ( blessed($method) ) {
         $body = $method->body;
-        if ( $method->package_name ne $self->name ) {
+        if ( $method->package_name ne $package_name ) {
             $method = $method->clone(
-                package_name => $self->name,
+                package_name => $package_name,
                 name         => $method_name,
             ) if $method->can('clone');
         }
@@ -62,7 +64,7 @@ sub add_method {
     my ( $current_package, $current_name ) = Class::MOP::get_code_info($body);
 
     if ( !defined $current_name || $current_name =~ /^__ANON__/ ) {
-        my $full_method_name = ( $self->name . '::' . $method_name );
+        my $full_method_name = ( $package_name . '::' . $method_name );
         subname( $full_method_name => $body );
     }
 
@@ -87,7 +89,7 @@ sub has_method {
     ( defined $method_name && length $method_name )
         || confess "You must define a method name";
 
-    return defined( $self->get_method($method_name) );
+    return defined( $self->_get_maybe_raw_method($method_name) );
 }
 
 sub get_method {
@@ -95,6 +97,21 @@ sub get_method {
 
     ( defined $method_name && length $method_name )
         || confess "You must define a method name";
+
+    my $method = $self->_get_maybe_raw_method($method_name)
+        or return;
+
+    return $method if blessed $method;
+
+    return $self->_method_map->{$method_name} = $self->wrap_method_body(
+        body                 => $method,
+        name                 => $method_name,
+        associated_metaclass => $self,
+    );
+}
+
+sub _get_maybe_raw_method {
+    my ( $self, $method_name ) = @_;
 
     my $method_map = $self->_method_map;
     my $map_entry  = $method_map->{$method_name};
@@ -106,25 +123,18 @@ sub get_method {
         }
     );
 
-    # This seems to happen in some weird cases where methods modifiers are
-    # added via roles or some other such bizareness. Honestly, I don't totally
-    # understand this, but returning the entry works, and keeps various MX
-    # modules from blowing up. - DR
-    return $map_entry if blessed $map_entry && !$code;
-
-    return $map_entry if blessed $map_entry && $map_entry->body == $code;
+    # The !$code case seems to happen in some weird cases where methods
+    # modifiers are added via roles or some other such bizareness. Honestly, I
+    # don't totally understand this, but returning the entry works, and keeps
+    # various MX modules from blowing up. - DR
+    return $map_entry
+        if blessed $map_entry && ( !$code || $map_entry->body == $code );
 
     unless ($map_entry) {
         return unless $code && $self->_code_is_mine($code);
     }
 
-    $code ||= $map_entry;
-
-    return $method_map->{$method_name} = $self->wrap_method_body(
-        body                 => $code,
-        name                 => $method_name,
-        associated_metaclass => $self,
-    );
+    return $code;
 }
 
 sub remove_method {
@@ -148,7 +158,30 @@ sub remove_method {
 
 sub get_method_list {
     my $self = shift;
-    return grep { $self->has_method($_) } keys %{ $self->namespace };
+
+    my $namespace = $self->namespace;
+
+    # Constants will show up as some sort of reference in the namespace hash
+    # ref.
+    return grep {
+               ! ref $namespace->{$_}
+            && *{ $namespace->{$_} }{CODE}
+            && $self->has_method($_)
+        }
+        keys %{$namespace};
+}
+
+# This should probably be what get_method_list actually does, instead of just
+# returning names. This was created as a much faster alternative to
+# $meta->get_method($_) for $meta->get_method_list
+sub _get_local_methods {
+    my $self = shift;
+
+    my $namespace = $self->namespace;
+
+    return map { $self->get_method($_) }
+        grep { ! ref $namespace->{$_} && *{ $namespace->{$_} }{CODE} }
+        keys %{$namespace};
 }
 
 1;

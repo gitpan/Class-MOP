@@ -29,14 +29,13 @@ BEGIN {
     *check_package_cache_flag = \&mro::get_pkg_gen;
 }
 
-our $VERSION   = '1.04';
+our $VERSION   = '1.05';
 our $XS_VERSION = $VERSION;
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
 
 require XSLoader;
 XSLoader::load( __PACKAGE__, $XS_VERSION );
-
 
 {
     # Metaclasses are singletons, so we cache them here.
@@ -548,13 +547,6 @@ Class::MOP::Method->meta->add_attribute(
         writer   => { '_set_original_method' => \&Class::MOP::Method::_set_original_method },
     ))
 );
-
-Class::MOP::Method->meta->add_method('clone' => sub {
-    my $self  = shift;
-    my $clone = $self->meta->clone_object($self, @_);
-    $clone->_set_original_method($self);
-    return $clone;
-});
 
 ## --------------------------------------------------------
 ## Class::MOP::Method::Wrapped

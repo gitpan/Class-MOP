@@ -7,7 +7,7 @@ use warnings;
 use Carp         'confess';
 use Scalar::Util 'weaken', 'reftype', 'blessed';
 
-our $VERSION   = '1.04';
+our $VERSION   = '1.05';
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
 
@@ -123,11 +123,19 @@ sub execute {
     $self->body->(@_);
 }
 
-# NOTE:
-# the Class::MOP bootstrap
-# will create this for us
-# - SL
-# sub clone { ... }
+# We used to go through use Class::MOP::Class->clone_instance to do this, but
+# this was awfully slow. This method may be called a number of times when
+# classes are loaded (especially during Moose role application), so it is
+# worth optimizing. - DR
+sub clone {
+    my $self = shift;
+
+    my $clone = bless { %{$self}, @_ }, blessed($self);
+
+    $clone->_set_original_method($self);
+
+    return $clone;
+}
 
 1;
 

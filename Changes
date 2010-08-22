@@ -1,5 +1,14 @@
 Revision history for Perl extension Class-MOP.
 
+1.05 Sun, Aug 22, 2010
+
+  [ENHANCEMENTS]
+
+  * Refactorings and improvements to how defaults are handled, particularly
+    for inlined code (doy).
+
+  * Optimizations that should help speed up compilation time (Dave Rolsky).
+
 1.04 Tue, Jul 25, 2010
 
   [ENHANCEMENTS]
@@ -9,7 +18,7 @@ Revision history for Perl extension Class-MOP.
     package, which cuts down on noise. When importing Class::MOP::Deprecated,
     the request API version should now be passed in the "-api_version"
     flag. However, the old "-compatible" flag will continue to work. (Dave
-    Rolsky).
+    Rolsky)
 
 1.03 Sat, Jun 5, 2010
 

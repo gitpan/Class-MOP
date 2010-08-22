@@ -123,6 +123,7 @@ t/312_anon_class_leak.t
 t/313_before_after_dollar_under.t
 t/314_class_is_pristine.t
 t/315_magic.t
+t/316_numeric_defaults.t
 t/500_deprecated.t
 t/lib/BinaryTree.pm
 t/lib/MyMetaClass.pm
