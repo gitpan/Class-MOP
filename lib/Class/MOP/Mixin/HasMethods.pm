@@ -3,7 +3,7 @@ package Class::MOP::Mixin::HasMethods;
 use strict;
 use warnings;
 
-our $VERSION   = '1.05';
+our $VERSION   = '1.06';
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
 
@@ -164,8 +164,7 @@ sub get_method_list {
     # Constants will show up as some sort of reference in the namespace hash
     # ref.
     return grep {
-               ! ref $namespace->{$_}
-            && *{ $namespace->{$_} }{CODE}
+        ( ref $namespace->{$_} || *{ $namespace->{$_} }{CODE} )
             && $self->has_method($_)
         }
         keys %{$namespace};
@@ -180,7 +179,7 @@ sub _get_local_methods {
     my $namespace = $self->namespace;
 
     return map { $self->get_method($_) }
-        grep { ! ref $namespace->{$_} && *{ $namespace->{$_} }{CODE} }
+        grep { ref $namespace->{$_} || *{ $namespace->{$_} }{CODE} }
         keys %{$namespace};
 }
 

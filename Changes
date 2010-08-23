@@ -1,5 +1,15 @@
 Revision history for Perl extension Class-MOP.
 
+1.06 Sun, Aug 23, 2010
+
+  [BUG FIXES]
+
+  * Version 1.05 no longer reported constants as methods, except with Perl
+    5.8.x, and doing so in 5.8.x caused test failures. Constants are now
+    _expected_ to be reported as methods, and this is tested for
+    explicit. (Dave Rolsky)
+
+
 1.05 Sun, Aug 22, 2010
 
   [ENHANCEMENTS]
