@@ -5,9 +5,11 @@ use Test::More;
 use File::Spec;
 use Class::MOP;
 
+use Test::Requires {
+    'Algorithm::C3' => '0.01', # skip all if not installed
+};
+
 BEGIN {
-    eval "use Algorithm::C3";
-    plan skip_all => "Algorithm::C3 required for this test" if $@;
     require_ok(File::Spec->catfile('examples', 'C3MethodDispatchOrder.pod'));
 }
 

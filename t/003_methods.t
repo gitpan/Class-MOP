@@ -63,6 +63,9 @@ use Class::MOP::Method;
 
 my $Foo = Class::MOP::Class->initialize('Foo');
 
+is join(' ', sort $Foo->get_method_list),
+    'FOO_CONSTANT baaz bang bar baz blah cake evaled_foo floob pie';
+
 ok( $Foo->has_method('pie'),  '... got the method stub pie' );
 ok( $Foo->has_method('cake'), '... got the constant method stub cake' );
 

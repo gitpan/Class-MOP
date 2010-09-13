@@ -3,10 +3,9 @@ use warnings;
 
 use Test::More;
 
-BEGIN {
-    eval "use SUPER 1.10";
-    plan skip_all => "SUPER 1.10 required for this test" if $@;
-}
+use Test::Requires {
+    'SUPER' => 1.10, # skip all if not installed
+};
 
 =pod
 

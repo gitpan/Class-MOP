@@ -1,5 +1,12 @@
 Revision history for Perl extension Class-MOP.
 
+1.08 Mon, Sep 13, 2010
+
+  [BUG FIXES]
+
+  * The get_method_list and _get_local_methods methods blew up in the face
+    of subroutine stubs. (Goro Fuji)  
+
 1.07 Tue, Aug 25, 2010
 
   [BUG FIXES]

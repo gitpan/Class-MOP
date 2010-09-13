@@ -3,7 +3,7 @@ package Class::MOP::Mixin::HasMethods;
 use strict;
 use warnings;
 
-our $VERSION   = '1.07';
+our $VERSION   = '1.08';
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
 
@@ -161,11 +161,12 @@ sub get_method_list {
 
     my $namespace = $self->namespace;
 
-    # Constants may show up as some sort of reference in the namespace hash
-    # ref, depending on the Perl version.
+    # Constants may show up as some sort of non-GLOB reference in the
+    # namespace hash ref, depending on the Perl version.
     return grep {
-               defined $namespace->{$_}
-            && ( ref $namespace->{$_} || *{ $namespace->{$_} }{CODE} )
+        defined $namespace->{$_}
+            && ( ref( \$namespace->{$_} ) ne 'GLOB'
+            || *{ $namespace->{$_} }{CODE} )
             && $self->has_method($_)
         }
         keys %{$namespace};

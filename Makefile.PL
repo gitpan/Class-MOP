@@ -1,6 +1,7 @@
 use strict;
 use warnings;
 use inc::Module::Install;
+use Module::Install::ExtraTests;
 use 5.008001;
 
 check_conflicts();
@@ -32,6 +33,7 @@ requires 'Task::Weaken';
 test_requires 'File::Spec';
 test_requires 'Test::More'      => '0.88';
 test_requires 'Test::Exception' => '0.27';
+test_requires 'Test::Requires'  => '0.05';
 
 repository 'git://git.moose.perl.org/Class-MOP.git';
 add_metadata(x_authority => 'cpan:STEVAN');
@@ -76,7 +78,8 @@ WriteAll();
 # before a release.
 sub check_conflicts {
     my %conflicts = (
-        'Moose' => '1.04',
+        'Moose'                         => '1.04',
+        'namespace::autoclean'          => '0.08',
     );
 
     my $found = 0;

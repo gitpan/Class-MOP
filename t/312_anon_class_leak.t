@@ -4,10 +4,9 @@ use warnings;
 use Class::MOP;
 use Test::More;
 
-BEGIN {
-    eval "use Test::LeakTrace;";
-    plan skip_all => "Test::LeakTrace is required for this test" if $@;
-}
+use Test::Requires {
+    'Test::LeakTrace' => '0.01', # skip all if not installed
+};
 
 # 5.10.0 has a bug on weaken($hash_ref) which leaks an AV.
 my $expected = ( $] == 5.010_000 ? 1 : 0 );

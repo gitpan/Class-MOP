@@ -5,8 +5,9 @@ use warnings;
 
 use Test::More;
 
-eval "use Test::NoTabs 0.8";
-plan skip_all => "Test::NoTabs 0.8 required for testing tabs" if $@;
+use Test::Requires {
+    'Test::NoTabs' => '0.8', # skip all if not installed
+};
 
 for my $file ( qw( mop.c mop.h ), glob "xs/*xs" ) {
     notabs_ok( $file, "$file is tab free" );
