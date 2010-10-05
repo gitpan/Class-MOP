@@ -8,6 +8,7 @@ use Class::MOP::Instance;
 use Class::MOP::Method::Wrapped;
 use Class::MOP::Method::Accessor;
 use Class::MOP::Method::Constructor;
+use Class::MOP::MiniTrait;
 
 use Carp         'confess';
 use Scalar::Util 'blessed', 'reftype', 'weaken';
@@ -16,7 +17,7 @@ use Devel::GlobalDestruction 'in_global_destruction';
 use Try::Tiny;
 use List::MoreUtils 'all';
 
-our $VERSION   = '1.08';
+our $VERSION   = '1.09';
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
 
@@ -43,6 +44,21 @@ sub initialize {
 
     return Class::MOP::get_metaclass_by_name($package_name)
         || $class->_construct_class_instance(package => $package_name, @_);
+}
+
+sub reinitialize {
+    my ( $class, @args ) = @_;
+    unshift @args, "package" if @args % 2;
+    my %options = @args;
+    my $old_metaclass = blessed($options{package})
+        ? $options{package}
+        : Class::MOP::get_metaclass_by_name($options{package});
+    $old_metaclass->_remove_generated_metaobjects
+        if $old_metaclass && $old_metaclass->isa('Class::MOP::Class');
+    my $new_metaclass = $class->SUPER::reinitialize(@args);
+    $new_metaclass->_restore_metaobjects_from($old_metaclass)
+        if $old_metaclass && $old_metaclass->isa('Class::MOP::Class');
+    return $new_metaclass;
 }
 
 # NOTE: (meta-circularity)
@@ -219,18 +235,6 @@ sub _check_metaclass_compatibility {
     }
 }
 
-sub _class_metaclass_is_compatible {
-    my $self = shift;
-    my ( $superclass_name ) = @_;
-
-    my $super_meta = Class::MOP::get_metaclass_by_name($superclass_name)
-        || return 1;
-
-    my $super_meta_type = $super_meta->_real_ref_name;
-
-    return $self->isa($super_meta_type);
-}
-
 sub _check_class_metaclass_compatibility {
     my $self = shift;
     my ( $superclass_name ) = @_;
@@ -244,6 +248,36 @@ sub _check_class_metaclass_compatibility {
               . (ref($self)) . ")" .  " is not compatible with "
               . "the metaclass of its superclass, "
               . $superclass_name . " (" . ($super_meta_type) . ")";
+    }
+}
+
+sub _class_metaclass_is_compatible {
+    my $self = shift;
+    my ( $superclass_name ) = @_;
+
+    my $super_meta = Class::MOP::get_metaclass_by_name($superclass_name)
+        || return 1;
+
+    my $super_meta_name = $super_meta->_real_ref_name;
+
+    return $self->_is_compatible_with($super_meta_name);
+}
+
+sub _check_single_metaclass_compatibility {
+    my $self = shift;
+    my ( $metaclass_type, $superclass_name ) = @_;
+
+    if (!$self->_single_metaclass_is_compatible($metaclass_type, $superclass_name)) {
+        my $super_meta = Class::MOP::get_metaclass_by_name($superclass_name);
+        my $metaclass_type_name = $metaclass_type;
+        $metaclass_type_name =~ s/_(?:meta)?class$//;
+        $metaclass_type_name =~ s/_/ /g;
+        confess "The $metaclass_type_name metaclass for "
+              . $self->name . " (" . ($self->$metaclass_type)
+              . ")" . " is not compatible with the "
+              . "$metaclass_type_name metaclass of its "
+              . "superclass, $superclass_name ("
+              . ($super_meta->$metaclass_type) . ")";
     }
 }
 
@@ -264,74 +298,7 @@ sub _single_metaclass_is_compatible {
     # this is a really odd case
     return 0 unless defined $self->$metaclass_type;
 
-    return $self->$metaclass_type->isa($super_meta->$metaclass_type);
-}
-
-sub _check_single_metaclass_compatibility {
-    my $self = shift;
-    my ( $metaclass_type, $superclass_name ) = @_;
-
-    if (!$self->_single_metaclass_is_compatible($metaclass_type, $superclass_name)) {
-        my $super_meta = Class::MOP::get_metaclass_by_name($superclass_name);
-        my $metaclass_type_name = $metaclass_type;
-        $metaclass_type_name =~ s/_(?:meta)?class$//;
-        $metaclass_type_name =~ s/_/ /g;
-        confess "The $metaclass_type_name metaclass for "
-              . $self->name . " (" . ($self->$metaclass_type)
-              . ")" . " is not compatible with the "
-              . "$metaclass_type_name metaclass of its "
-              . "superclass, " . $superclass_name . " ("
-              . ($super_meta->$metaclass_type) . ")";
-    }
-}
-
-sub _can_fix_class_metaclass_incompatibility_by_subclassing {
-    my $self = shift;
-    my ($super_meta) = @_;
-
-    my $super_meta_type = $super_meta->_real_ref_name;
-
-    return $super_meta_type ne blessed($self)
-        && $super_meta->isa(blessed($self));
-}
-
-sub _can_fix_single_metaclass_incompatibility_by_subclassing {
-    my $self = shift;
-    my ($metaclass_type, $super_meta) = @_;
-
-    my $specific_meta = $self->$metaclass_type;
-    return unless $super_meta->can($metaclass_type);
-    my $super_specific_meta = $super_meta->$metaclass_type;
-
-    # for instance, Moose::Meta::Class has a destructor_class, but
-    # Class::MOP::Class doesn't - this shouldn't be an error
-    return unless defined $super_specific_meta;
-
-    # if metaclass is defined in superclass but not here, it's fixable
-    # this is a really odd case
-    return 1 unless defined $specific_meta;
-
-    return $specific_meta ne $super_specific_meta
-        && $super_specific_meta->isa($specific_meta);
-}
-
-sub _can_fix_metaclass_incompatibility_by_subclassing {
-    my $self = shift;
-    my ($super_meta) = @_;
-
-    return 1 if $self->_can_fix_class_metaclass_incompatibility_by_subclassing($super_meta);
-
-    my %base_metaclass = $self->_base_metaclasses;
-    for my $metaclass_type (keys %base_metaclass) {
-        return 1 if $self->_can_fix_single_metaclass_incompatibility_by_subclassing($metaclass_type, $super_meta);
-    }
-
-    return;
-}
-
-sub _can_fix_metaclass_incompatibility {
-    my $self = shift;
-    return $self->_can_fix_metaclass_incompatibility_by_subclassing(@_);
+    return $self->$metaclass_type->_is_compatible_with($super_meta->$metaclass_type);
 }
 
 sub _fix_metaclass_incompatibility {
@@ -363,11 +330,52 @@ sub _fix_metaclass_incompatibility {
     }
 }
 
+sub _can_fix_metaclass_incompatibility {
+    my $self = shift;
+    my ($super_meta) = @_;
+
+    return 1 if $self->_class_metaclass_can_be_made_compatible($super_meta);
+
+    my %base_metaclass = $self->_base_metaclasses;
+    for my $metaclass_type (keys %base_metaclass) {
+        return 1 if $self->_single_metaclass_can_be_made_compatible($super_meta, $metaclass_type);
+    }
+
+    return;
+}
+
+sub _class_metaclass_can_be_made_compatible {
+    my $self = shift;
+    my ($super_meta) = @_;
+
+    return $self->_can_be_made_compatible_with($super_meta->_real_ref_name);
+}
+
+sub _single_metaclass_can_be_made_compatible {
+    my $self = shift;
+    my ($super_meta, $metaclass_type) = @_;
+
+    my $specific_meta = $self->$metaclass_type;
+
+    return unless $super_meta->can($metaclass_type);
+    my $super_specific_meta = $super_meta->$metaclass_type;
+
+    # for instance, Moose::Meta::Class has a destructor_class, but
+    # Class::MOP::Class doesn't - this shouldn't be an error
+    return unless defined $super_specific_meta;
+
+    # if metaclass is defined in superclass but not here, it's fixable
+    # this is a really odd case
+    return 1 unless defined $specific_meta;
+
+    return 1 if $specific_meta->_can_be_made_compatible_with($super_specific_meta);
+}
+
 sub _fix_class_metaclass_incompatibility {
     my $self = shift;
     my ( $super_meta ) = @_;
 
-    if ($self->_can_fix_class_metaclass_incompatibility_by_subclassing($super_meta)) {
+    if ($self->_class_metaclass_can_be_made_compatible($super_meta)) {
         ($self->is_pristine)
             || confess "Can't fix metaclass incompatibility for "
                      . $self->name
@@ -375,7 +383,7 @@ sub _fix_class_metaclass_incompatibility {
 
         my $super_meta_name = $super_meta->_real_ref_name;
 
-        $super_meta_name->meta->rebless_instance($self);
+        $self->_make_compatible_with($super_meta_name);
     }
 }
 
@@ -383,13 +391,32 @@ sub _fix_single_metaclass_incompatibility {
     my $self = shift;
     my ( $metaclass_type, $super_meta ) = @_;
 
-    if ($self->_can_fix_single_metaclass_incompatibility_by_subclassing($metaclass_type, $super_meta)) {
+    if ($self->_single_metaclass_can_be_made_compatible($super_meta, $metaclass_type)) {
         ($self->is_pristine)
             || confess "Can't fix metaclass incompatibility for "
                      . $self->name
                      . " because it is not pristine.";
 
-        $self->{$metaclass_type} = $super_meta->$metaclass_type;
+        my $new_metaclass = $self->$metaclass_type
+            ? $self->$metaclass_type->_get_compatible_metaclass($super_meta->$metaclass_type)
+            : $super_meta->$metaclass_type;
+        $self->{$metaclass_type} = $new_metaclass;
+    }
+}
+
+sub _restore_metaobjects_from {
+    my $self = shift;
+    my ($old_meta) = @_;
+
+    $self->_restore_metamethods_from($old_meta);
+    $self->_restore_metaattributes_from($old_meta);
+}
+
+sub _remove_generated_metaobjects {
+    my $self = shift;
+
+    for my $attr (map { $self->get_attribute($_) } $self->get_attribute_list) {
+        $attr->remove_accessors;
     }
 }
 
@@ -477,12 +504,16 @@ sub create {
         || confess "You must pass a HASH ref of methods"
             if exists $options{methods};                  
 
+    $options{meta_name} = 'meta'
+        unless exists $options{meta_name};
+
     my (%initialize_options) = @args;
     delete @initialize_options{qw(
         package
         superclasses
         attributes
         methods
+        meta_name
         version
         authority
     )};
@@ -490,10 +521,8 @@ sub create {
 
     $meta->_instantiate_module( $options{version}, $options{authority} );
 
-    # FIXME totally lame
-    $meta->add_method('meta' => sub {
-        $class->initialize(ref($_[0]) || $_[0]);
-    });
+    $meta->_add_meta_method($options{meta_name})
+        if defined $options{meta_name};
 
     $meta->superclasses(@{$options{superclasses}})
         if exists $options{superclasses};
@@ -603,6 +632,18 @@ sub _create_meta_instance {
     return $instance;
 }
 
+sub inline_create_instance {
+    my $self = shift;
+
+    return $self->get_meta_instance->inline_create_instance(@_);
+}
+
+sub inline_rebless_instance {
+    my $self = shift;
+
+    return $self->get_meta_instance->inline_rebless_instance_structure(@_);
+}
+
 sub clone_object {
     my $class    = shift;
     my $instance = shift;
@@ -633,46 +674,37 @@ sub _clone_instance {
     return $clone;
 }
 
+sub _force_rebless_instance {
+    my ($self, $instance, %params) = @_;
+    my $old_metaclass = Class::MOP::class_of($instance);
+
+    $old_metaclass->rebless_instance_away($instance, $self, %params)
+        if $old_metaclass;
+
+    my $meta_instance = $self->get_meta_instance;
+
+    # rebless!
+    # we use $_[1] here because of t/306_rebless_overload.t regressions on 5.8.8
+    $meta_instance->rebless_instance_structure($_[1], $self);
+
+    $self->_fixup_attributes_after_rebless($instance, $old_metaclass, %params);
+}
+
 sub rebless_instance {
     my ($self, $instance, %params) = @_;
-
     my $old_metaclass = Class::MOP::class_of($instance);
 
     my $old_class = $old_metaclass ? $old_metaclass->name : blessed($instance);
     $self->name->isa($old_class)
         || confess "You may rebless only into a subclass of ($old_class), of which (". $self->name .") isn't.";
 
-    $old_metaclass->rebless_instance_away($instance, $self, %params)
-        if $old_metaclass;
+    $self->_force_rebless_instance($_[1], %params);
 
-    my $meta_instance = $self->get_meta_instance();
-
-    # rebless!
-    # we use $_[1] here because of t/306_rebless_overload.t regressions on 5.8.8
-    $meta_instance->rebless_instance_structure($_[1], $self);
-
-    foreach my $attr ( $self->get_all_attributes ) {
-        if ( $attr->has_value($instance) ) {
-            if ( defined( my $init_arg = $attr->init_arg ) ) {
-                $params{$init_arg} = $attr->get_value($instance)
-                    unless exists $params{$init_arg};
-            } 
-            else {
-                $attr->set_value($instance, $attr->get_value($instance));
-            }
-        }
-    }
-
-    foreach my $attr ($self->get_all_attributes) {
-        $attr->initialize_instance_slot($meta_instance, $instance, \%params);
-    }
-    
-    $instance;
+    return $instance;
 }
 
 sub rebless_instance_back {
     my ( $self, $instance ) = @_;
-
     my $old_metaclass = Class::MOP::class_of($instance);
 
     my $old_class
@@ -683,24 +715,40 @@ sub rebless_instance_back {
         . $self->name
         . ") isn't.";
 
-    $old_metaclass->rebless_instance_away( $instance, $self )
-        if $old_metaclass;
-
-    my $meta_instance = $self->get_meta_instance;
-
-    # we use $_[1] here because of t/306_rebless_overload.t regressions on 5.8.8
-    $meta_instance->rebless_instance_structure( $_[1], $self );
-
-    for my $attr ( $old_metaclass->get_all_attributes ) {
-        next if $self->has_attribute( $attr->name );
-        $meta_instance->deinitialize_slot( $instance, $_ ) for $attr->slots;
-    }
+    $self->_force_rebless_instance($_[1]);
 
     return $instance;
 }
 
 sub rebless_instance_away {
     # this intentionally does nothing, it is just a hook
+}
+
+sub _fixup_attributes_after_rebless {
+    my $self = shift;
+    my ($instance, $rebless_from, %params) = @_;
+    my $meta_instance = $self->get_meta_instance;
+
+    for my $attr ( $rebless_from->get_all_attributes ) {
+        next if $self->find_attribute_by_name( $attr->name );
+        $meta_instance->deinitialize_slot( $instance, $_ ) for $attr->slots;
+    }
+
+    foreach my $attr ( $self->get_all_attributes ) {
+        if ( $attr->has_value($instance) ) {
+            if ( defined( my $init_arg = $attr->init_arg ) ) {
+                $params{$init_arg} = $attr->get_value($instance)
+                    unless exists $params{$init_arg};
+            }
+            else {
+                $attr->set_value($instance, $attr->get_value($instance));
+            }
+        }
+    }
+
+    foreach my $attr ($self->get_all_attributes) {
+        $attr->initialize_instance_slot($meta_instance, $instance, \%params);
+    }
 }
 
 sub _attach_attribute {
@@ -763,7 +811,7 @@ sub get_all_attributes {
 sub superclasses {
     my $self     = shift;
 
-    my $isa = $self->get_package_symbol(
+    my $isa = $self->get_or_add_package_symbol(
         { sigil => '@', type => 'ARRAY', name => 'ISA' } );
 
     if (@_) {
@@ -1168,17 +1216,7 @@ sub _immutable_metaclass {
         superclasses => [ ref $self ],
     );
 
-    Class::MOP::load_class($trait);
-    for my $meth ( Class::MOP::Class->initialize($trait)->get_all_methods ) {
-        my $meth_name = $meth->name;
-
-        if ( $immutable_meta->find_method_by_name( $meth_name ) ) {
-            $immutable_meta->add_around_method_modifier( $meth_name, $meth->body );
-        }
-        else {
-            $immutable_meta->add_method( $meth_name, $meth->clone );
-        }
-    }
+    Class::MOP::MiniTrait::apply( $immutable_meta, $trait );
 
     $immutable_meta->make_immutable(
         inline_constructor => 0,
@@ -1402,6 +1440,12 @@ hash reference are method names and values are subroutine references.
 
 An optional array reference of L<Class::MOP::Attribute> objects.
 
+=item * meta_name
+
+Specifies the name to install the C<meta> method for this class under.
+If it is not passed, C<meta> is assumed, and if C<undef> is explicitly
+given, no meta method will be installed.
+
 =back
 
 =item B<< Class::MOP::Class->create_anon_class(%options) >>
@@ -1512,6 +1556,13 @@ metaclass.
 
 Returns an instance of the C<instance_metaclass> to be used in the
 construction of a new instance of the class.
+
+=item B<< $metaclass->inline_create_instance($class_var) >>
+
+=item B<< $metaclass->inline_rebless_instance($instance_var, $class_var) >>
+
+These methods takes variable names, and use them to create an inline snippet
+of code that will create a new instance of the class.
 
 =back
 

@@ -1,6 +1,7 @@
 use strict;
 use warnings;
 use inc::Module::Install;
+use Module::Install::AuthorRequires;
 use Module::Install::ExtraTests;
 use 5.008001;
 
@@ -24,7 +25,7 @@ requires 'Devel::GlobalDestruction';
 requires 'List::MoreUtils' => '0.12';
 requires 'MRO::Compat'  => '0.05';
 requires 'Package::DeprecationManager' => '0.04';
-requires 'Package::Stash';
+requires 'Package::Stash' => '0.08';
 requires 'Scalar::Util' => '1.18';
 requires 'Sub::Name'    => '0.04';
 requires 'Try::Tiny'    => '0.02';
@@ -34,6 +35,13 @@ test_requires 'File::Spec';
 test_requires 'Test::More'      => '0.88';
 test_requires 'Test::Exception' => '0.27';
 test_requires 'Test::Requires'  => '0.05';
+
+author_requires 'Algorithm::C3';
+author_requires 'Module::Info';
+author_requires 'Test::LeakTrace';
+author_requires 'Test::NoTabs';
+author_requires 'Test::Output';
+author_requires 'Test::Spelling';
 
 repository 'git://git.moose.perl.org/Class-MOP.git';
 add_metadata(x_authority => 'cpan:STEVAN');
@@ -78,7 +86,7 @@ WriteAll();
 # before a release.
 sub check_conflicts {
     my %conflicts = (
-        'Moose'                         => '1.04',
+        'Moose'                         => '1.14',
         'namespace::autoclean'          => '0.08',
     );
 

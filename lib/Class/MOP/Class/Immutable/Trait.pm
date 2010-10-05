@@ -8,7 +8,7 @@ use MRO::Compat;
 use Carp 'confess';
 use Scalar::Util 'blessed', 'weaken';
 
-our $VERSION   = '1.08';
+our $VERSION   = '1.09';
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
 
@@ -74,10 +74,10 @@ sub get_meta_instance {
     $self->{__immutable}{get_meta_instance} ||= $self->$orig;
 }
 
-sub _get_method_map {
+sub _method_map {
     my $orig = shift;
     my $self = shift;
-    $self->{__immutable}{_get_method_map} ||= $self->$orig;
+    $self->{__immutable}{_method_map} ||= $self->$orig;
 }
 
 sub add_package_symbol {

@@ -7,7 +7,7 @@ use warnings;
 use Carp         'confess';
 use Scalar::Util 'blessed', 'weaken';
 
-our $VERSION   = '1.08';
+our $VERSION   = '1.09';
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
 
@@ -130,18 +130,15 @@ sub _generate_clearer_method {
 ## Inline methods
 
 sub _generate_accessor_method_inline {
-    my $self          = shift;
-    my $attr          = $self->associated_attribute;
-    my $attr_name     = $attr->name;
-    my $meta_instance = $attr->associated_class->instance_metaclass;
+    my $self = shift;
+    my $attr = $self->associated_attribute;
 
     my ( $code, $e ) = $self->_eval_closure(
         {},
         'sub {'
-        . $meta_instance->inline_set_slot_value('$_[0]', $attr_name, '$_[1]')
-        . ' if scalar(@_) == 2; '
-        . $meta_instance->inline_get_slot_value('$_[0]', $attr_name)
-        . '}'
+            . $attr->inline_set( '$_[0]', '$_[1]' )
+            . ' if scalar(@_) == 2; '
+            . $attr->inline_get('$_[0]') . '}'
     );
     confess "Could not generate inline accessor because : $e" if $e;
 
@@ -149,17 +146,14 @@ sub _generate_accessor_method_inline {
 }
 
 sub _generate_reader_method_inline {
-    my $self          = shift;
-    my $attr          = $self->associated_attribute;
-    my $attr_name     = $attr->name;
-    my $meta_instance = $attr->associated_class->instance_metaclass;
+    my $self = shift;
+    my $attr = $self->associated_attribute;
 
-     my ( $code, $e ) = $self->_eval_closure(
-         {},
+    my ( $code, $e ) = $self->_eval_closure(
+        {},
         'sub {'
-        . 'confess "Cannot assign a value to a read-only accessor" if @_ > 1;'
-        . $meta_instance->inline_get_slot_value('$_[0]', $attr_name)
-        . '}'
+            . 'confess "Cannot assign a value to a read-only accessor" if @_ > 1;'
+            . $attr->inline_get('$_[0]') . '}'
     );
     confess "Could not generate inline reader because : $e" if $e;
 
@@ -167,16 +161,12 @@ sub _generate_reader_method_inline {
 }
 
 sub _generate_writer_method_inline {
-    my $self          = shift;
-    my $attr          = $self->associated_attribute;
-    my $attr_name     = $attr->name;
-    my $meta_instance = $attr->associated_class->instance_metaclass;
+    my $self = shift;
+    my $attr = $self->associated_attribute;
 
     my ( $code, $e ) = $self->_eval_closure(
         {},
-        'sub {'
-        . $meta_instance->inline_set_slot_value('$_[0]', $attr_name, '$_[1]')
-        . '}'
+        'sub {' . $attr->inline_set( '$_[0]', '$_[1]' ) . '}'
     );
     confess "Could not generate inline writer because : $e" if $e;
 
@@ -184,16 +174,12 @@ sub _generate_writer_method_inline {
 }
 
 sub _generate_predicate_method_inline {
-    my $self          = shift;
-    my $attr          = $self->associated_attribute;
-    my $attr_name     = $attr->name;
-    my $meta_instance = $attr->associated_class->instance_metaclass;
+    my $self = shift;
+    my $attr = $self->associated_attribute;
 
     my ( $code, $e ) = $self->_eval_closure(
         {},
-       'sub {'
-       . $meta_instance->inline_is_slot_initialized('$_[0]', $attr_name)
-       . '}'
+        'sub {' . $attr->inline_has('$_[0]') . '}'
     );
     confess "Could not generate inline predicate because : $e" if $e;
 
@@ -201,16 +187,12 @@ sub _generate_predicate_method_inline {
 }
 
 sub _generate_clearer_method_inline {
-    my $self          = shift;
-    my $attr          = $self->associated_attribute;
-    my $attr_name     = $attr->name;
-    my $meta_instance = $attr->associated_class->instance_metaclass;
+    my $self = shift;
+    my $attr = $self->associated_attribute;
 
     my ( $code, $e ) = $self->_eval_closure(
         {},
-        'sub {'
-        . $meta_instance->inline_deinitialize_slot('$_[0]', $attr_name)
-        . '}'
+        'sub {' . $attr->inline_clear('$_[0]') . '}'
     );
     confess "Could not generate inline clearer because : $e" if $e;
 
@@ -241,7 +223,7 @@ Class::MOP::Method::Accessor - Method Meta Object for accessors
 
 =head1 DESCRIPTION
 
-This is a subclass of <Class::MOP::Method> which is used by
+This is a subclass of C<Class::MOP::Method> which is used by
 C<Class::MOP::Attribute> to generate accessor code. It handles
 generation of readers, writers, predicates and clearers. For each type
 of method, it can either create a subroutine reference, or actually

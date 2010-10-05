@@ -25,6 +25,10 @@ throws_ok {
     use metaclass;
 }
 
+# reset @ISA, so that calling methods like ->isa won't die (->meta does this
+# if DEBUG_NO_META is set)
+@Foo::ISA = ();
+
 lives_ok {
     Foo->meta->superclasses('Bar');
 } "regular subclass";

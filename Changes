@@ -1,5 +1,28 @@
 Revision history for Perl extension Class-MOP.
 
+1.09 Tue, Oct 5, 2010
+
+  [ENHANCEMENTS]
+
+  * It's now possible to tell Class::MOP::Class->create and the metaclass
+    pragma to not install a 'meta' method into classes they manipulate,
+    or to install one under a different name. (doy)
+
+  * Reinitializing a metaclass no longer removes the existing method and
+    attribute objects (it instead fixes them so they are correct for the
+    reinitialized metaclass). (doy)
+
+  * All 'meta' methods created by Class::MOP are now of the class
+    Class::MOP::Method::Meta. This is overridable at the metaclass layer. (doy)
+
+  [OTHER]
+
+  * Use get_or_add_package_symbol when we intend for it to autovivify, in
+    preparation for changes in Package::Stash. (doy)
+
+  * We now use Module::Install::AuthorRequires to force authors to run all
+    tests, just like we do for Moose. (sartak)
+
 1.08 Mon, Sep 13, 2010
 
   [BUG FIXES]

@@ -12,7 +12,6 @@ use Class::MOP;
 
     use strict;
     use warnings;
-    use metaclass;
 
     use base 'Class::MOP::Class';
 

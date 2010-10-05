@@ -7,7 +7,7 @@ use warnings;
 use Carp         'confess';
 use Scalar::Util 'blessed', 'weaken';
 
-our $VERSION   = '1.08';
+our $VERSION   = '1.09';
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
 
@@ -72,11 +72,6 @@ sub associated_metaclass { (shift)->{'associated_metaclass'} }
 
 ## cached values ...
 
-sub _meta_instance {
-    my $self = shift;
-    $self->{'meta_instance'} ||= $self->associated_metaclass->get_meta_instance;
-}
-
 sub _attributes {
     my $self = shift;
     $self->{'attributes'} ||= [ $self->associated_metaclass->get_all_attributes ]
@@ -114,7 +109,7 @@ sub _generate_constructor_method_inline {
 
     $source .= "\n" . 'my $params = @_ == 1 ? $_[0] : {@_};';
 
-    $source .= "\n" . 'my $instance = ' . $self->_meta_instance->inline_create_instance('$class');
+    $source .= "\n" . 'my $instance = ' . $self->associated_metaclass->inline_create_instance('$class');
     my $idx = 0;
     $source .= ";\n" . (join ";\n" => map {
         $self->_generate_slot_initializer($_, $idx++)
@@ -145,23 +140,18 @@ sub _generate_slot_initializer {
     }
 
     if ( defined( my $init_arg = $attr->init_arg ) ) {
-        my $mi        = $self->_meta_instance;
-        my $attr_name = $attr->name;
-
         return (
                   'if(exists $params->{\'' 
                 . $init_arg . '\'}){' . "\n"
-                . $mi->inline_set_slot_value(
+                . $attr->inline_set(
                 '$instance',
-                $attr_name,
                 '$params->{\'' . $init_arg . '\'}'
                 )
                 . "\n" . '} '
                 . (
                 !defined $default ? '' : 'else {' . "\n"
-                    . $mi->inline_set_slot_value(
+                    . $attr->inline_set(
                     '$instance',
-                    $attr_name,
                     $default
                     )
                     . "\n" . '}'
@@ -170,9 +160,8 @@ sub _generate_slot_initializer {
     }
     elsif ( defined $default ) {
         return (
-            $self->_meta_instance->inline_set_slot_value(
+            $attr->inline_set(
                 '$instance',
-                $attr->name,
                 $default
                 )
                 . "\n"

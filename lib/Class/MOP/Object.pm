@@ -4,9 +4,10 @@ package Class::MOP::Object;
 use strict;
 use warnings;
 
+use Carp qw(confess);
 use Scalar::Util 'blessed';
 
-our $VERSION   = '1.08';
+our $VERSION   = '1.09';
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
 
@@ -35,6 +36,63 @@ sub dump {
     require Data::Dumper;
     local $Data::Dumper::Maxdepth = shift || 1;
     Data::Dumper::Dumper $self;
+}
+
+sub _real_ref_name {
+    my $self = shift;
+    return blessed($self);
+}
+
+sub _is_compatible_with {
+    my $self = shift;
+    my ($other_name) = @_;
+
+    return $self->isa($other_name);
+}
+
+sub _can_be_made_compatible_with {
+    my $self = shift;
+    return !$self->_is_compatible_with(@_)
+        && defined($self->_get_compatible_metaclass(@_));
+}
+
+sub _make_compatible_with {
+    my $self = shift;
+    my ($other_name) = @_;
+
+    my $new_metaclass = $self->_get_compatible_metaclass($other_name);
+
+    confess "Can't make $self compatible with metaclass $other_name"
+        unless defined $new_metaclass;
+
+    # can't use rebless_instance here, because it might not be an actual
+    # subclass in the case of, e.g. moose role reconciliation
+    $new_metaclass->meta->_force_rebless_instance($self)
+        if blessed($self) ne $new_metaclass;
+
+    return $self;
+}
+
+sub _get_compatible_metaclass {
+    my $self = shift;
+    my ($other_name) = @_;
+
+    return $self->_get_compatible_metaclass_by_subclassing($other_name);
+}
+
+sub _get_compatible_metaclass_by_subclassing {
+    my $self = shift;
+    my ($other_name) = @_;
+    my $meta_name = blessed($self) ? $self->_real_ref_name : $self;
+
+    if ($meta_name->isa($other_name)) {
+        return $meta_name;
+    }
+    elsif ($other_name->isa($meta_name)) {
+        return $other_name;
+    }
+
+    return;
 }
 
 1;

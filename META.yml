@@ -30,7 +30,7 @@ requires:
   List::MoreUtils: 0.12
   MRO::Compat: 0.05
   Package::DeprecationManager: 0.04
-  Package::Stash: 0
+  Package::Stash: 0.08
   Scalar::Util: 1.18
   Sub::Name: 0.04
   Task::Weaken: 0
@@ -39,5 +39,5 @@ requires:
 resources:
   license: http://dev.perl.org/licenses/
   repository: git://git.moose.perl.org/Class-MOP.git
-version: 1.08
+version: 1.09
 x_authority: cpan:STEVAN

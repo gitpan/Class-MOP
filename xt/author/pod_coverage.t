@@ -15,7 +15,12 @@ my @modules = all_modules();
 plan tests => scalar @modules;
 
 my %trustme = (
-    'Class::MOP' => [ 'HAVE_ISAREV', 'subname', 'in_global_destruction' ],
+    'Class::MOP' => [
+        'DEBUG_NO_META',
+        'HAVE_ISAREV',
+        'subname',
+        'in_global_destruction',
+    ],
     'Class::MOP::Attribute' => ['process_accessors'],
     'Class::MOP::Class'     => [
         # deprecated
@@ -40,6 +45,7 @@ my %trustme = (
         'create_meta_instance',
         'reset_package_cache_flag',
         'update_package_cache_flag',
+        'reinitialize',
 
         # doc'd with rebless_instance
         'rebless_instance_away',
@@ -90,6 +96,7 @@ my %trustme = (
             initialize_body
             )
     ],
+    'Class::MOP::MiniTrait' => ['.+'],
     'Class::MOP::Mixin::AttributeCore' => ['.+'],
     'Class::MOP::Mixin::HasAttributes' => ['.+'],
     'Class::MOP::Mixin::HasMethods'    => ['.+'],

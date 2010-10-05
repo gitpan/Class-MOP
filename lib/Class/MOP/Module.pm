@@ -7,7 +7,7 @@ use warnings;
 use Carp         'confess';
 use Scalar::Util 'blessed';
 
-our $VERSION   = '1.08';
+our $VERSION   = '1.09';
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
 
@@ -33,12 +33,12 @@ sub _new {
 
 sub version {  
     my $self = shift;
-    ${$self->get_package_symbol({ sigil => '$', type => 'SCALAR', name => 'VERSION' })};
+    ${$self->get_or_add_package_symbol({ sigil => '$', type => 'SCALAR', name => 'VERSION' })};
 }
 
 sub authority {  
     my $self = shift;
-    ${$self->get_package_symbol({ sigil => '$', type => 'SCALAR', name => 'AUTHORITY' })};
+    ${$self->get_or_add_package_symbol({ sigil => '$', type => 'SCALAR', name => 'AUTHORITY' })};
 }
 
 sub identifier {

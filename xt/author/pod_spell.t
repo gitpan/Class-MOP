@@ -38,6 +38,7 @@ Kogman
 kolibrie
 konobi
 lbr
+Luehrs
 McWhirter
 merlyn
 mst
@@ -62,6 +63,7 @@ Shlomi
 SL
 stevan
 Stevan
+tozt
 Vilain
 wreis
 Yuval

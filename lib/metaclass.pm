@@ -6,8 +6,9 @@ use warnings;
 
 use Carp         'confess';
 use Scalar::Util 'blessed';
+use Try::Tiny;
 
-our $VERSION   = '1.08';
+our $VERSION   = '1.09';
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
 
@@ -19,6 +20,7 @@ sub import {
     unshift @args, "metaclass" if @args % 2 == 1;
     my %options = @args;
 
+    my $meta_name = exists $options{meta_name} ? $options{meta_name} : 'meta';
     my $metaclass = delete $options{metaclass};
 
     unless ( defined $metaclass ) {
@@ -41,14 +43,8 @@ sub import {
 
     # create a meta object so we can install &meta
     my $meta = $metaclass->initialize($package => %options);
-    $meta->add_method('meta' => sub {
-        # we must re-initialize so that it
-        # works as expected in subclasses,
-        # since metaclass instances are
-        # singletons, this is not really a
-        # big deal anyway.
-        $metaclass->initialize((blessed($_[0]) || $_[0]) => %options)
-    });
+    $meta->_add_meta_method($meta_name)
+        if defined $meta_name;
 }
 
 1;
@@ -87,11 +83,17 @@ metaclass - a pragma for installing and using Class::MOP metaclasses
       'method_metaclass'    => 'MyMethodMetaClass',
   );
 
+  # if we'd rather not install a 'meta' method, we can do this
+  use metaclass meta_name => undef;
+  # or if we'd like it to have a different name,
+  use metaclass meta_name => 'my_meta';
+
 =head1 DESCRIPTION
 
 This is a pragma to make it easier to use a specific metaclass
 and a set of custom attribute and method metaclasses. It also
-installs a C<meta> method to your class as well.
+installs a C<meta> method to your class as well, unless C<undef>
+is passed to the C<meta_name> option.
 
 =head1 AUTHORS
 

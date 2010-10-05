@@ -29,7 +29,7 @@ BEGIN {
     *check_package_cache_flag = \&mro::get_pkg_gen;
 }
 
-our $VERSION   = '1.08';
+our $VERSION   = '1.09';
 our $XS_VERSION = $VERSION;
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
@@ -664,6 +664,18 @@ Class::MOP::Instance->meta->add_attribute(
     ),
 );
 
+## --------------------------------------------------------
+## Class::MOP::Object
+
+# need to replace the meta method there with a real meta method object
+Class::MOP::Object->meta->_add_meta_method('meta');
+
+## --------------------------------------------------------
+## Class::MOP::Mixin
+
+# need to replace the meta method there with a real meta method object
+Class::MOP::Mixin->meta->_add_meta_method('meta');
+
 require Class::MOP::Deprecated unless our $no_deprecated;
 
 # we need the meta instance of the meta instance to be created now, in order
@@ -700,6 +712,8 @@ $_->meta->make_immutable(
     Class::MOP::Method::Accessor
     Class::MOP::Method::Constructor
     Class::MOP::Method::Wrapped
+
+    Class::MOP::Method::Meta
 /;
 
 $_->meta->make_immutable(
@@ -1130,7 +1144,7 @@ L<http://citeseer.ist.psu.edu/37617.html>
 
 =item L<http://svn.openfoundry.org/pugs/misc/Perl-MetaModel/>
 
-=item L<http://svn.openfoundry.org/pugs/perl5/Perl6-ObjectSpace>
+=item L<http://github.com/perl6/p5-modules/tree/master/Perl6-ObjectSpace/>
 
 =back
 

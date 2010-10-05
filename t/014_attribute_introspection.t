@@ -62,6 +62,11 @@ use Class::MOP;
         install_accessors
         remove_accessors
 
+        inline_get
+        inline_set
+        inline_has
+        inline_clear
+
         _new
     );
 

@@ -216,7 +216,10 @@ isa_ok(Class::MOP::class_of('Foo::Reverse::Sub::Sub'), 'Foo::Meta::Class');
 
 # nonexistent metaclasses
 
-Class::MOP::Class->create('Weird::Meta::Method::Destructor');
+Class::MOP::Class->create(
+    'Weird::Meta::Method::Destructor',
+    superclasses => ['Class::MOP::Method'],
+);
 
 lives_ok {
     Class::MOP::Class->create(

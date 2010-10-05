@@ -10,7 +10,7 @@ use Carp         'confess';
 use Scalar::Util 'blessed', 'weaken';
 use Try::Tiny;
 
-our $VERSION   = '1.08';
+our $VERSION   = '1.09';
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
 
@@ -402,6 +402,40 @@ sub install_accessors {
         return;
     }
 
+}
+
+sub inline_get {
+    my $self = shift;
+    my ($instance) = @_;
+
+    return $self->associated_class->get_meta_instance->inline_get_slot_value(
+        $instance, $self->name );
+}
+
+sub inline_set {
+    my $self = shift;
+    my ( $instance, $value ) = @_;
+
+    return $self->associated_class->get_meta_instance->inline_set_slot_value(
+        $instance, $self->name, $value );
+}
+
+sub inline_has {
+    my $self = shift;
+    my ($instance) = @_;
+
+    return
+        $self->associated_class->get_meta_instance
+        ->inline_is_slot_initialized( $instance, $self->name );
+}
+
+sub inline_clear {
+    my $self = shift;
+    my ($instance) = @_;
+
+    return
+        $self->associated_class->get_meta_instance
+        ->inline_deinitialize_slot( $instance, $self->name );
 }
 
 1;
@@ -893,6 +927,18 @@ attribute.
 
 This does not currently remove methods from the list returned by
 C<associated_methods>.
+
+=item B<< $attr->inline_get >>
+
+=item B<< $attr->inline_set >>
+
+=item B<< $attr->inline_has >>
+
+=item B<< $attr->inline_clear >>
+
+These methods return a code snippet suitable for inlining the relevant
+operation. They expect strings containing variable names to be used in the
+inlining, like C<'$self'> or C<'$_[1]'>.
 
 =back
 

@@ -6,13 +6,11 @@ use warnings;
 
 use Carp 'confess';
 
-our $VERSION   = '1.08';
+our $VERSION   = '1.09';
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
 
 use base 'Class::MOP::Method';
-
-use constant _PRINT_SOURCE => $ENV{MOP_PRINT_SOURCE} ? 1 : 0;
 
 ## accessors
 
@@ -29,8 +27,7 @@ sub _initialize_body {
 }
 
 sub _eval_closure {
-    # my ($self, $captures, $sub_body) = @_;
-    my $__captures = $_[1];
+    my ($self, $__captures, $sub_body) = @_;
 
     my $code;
 
@@ -49,13 +46,44 @@ sub _eval_closure {
                     . $_ . q['}};];
                 } keys %$__captures
             ),
-            $_[2];
-        print STDERR "\n", $_[0]->name, ":\n", $source, "\n" if _PRINT_SOURCE;
+            $sub_body;
+
+        $self->_dump_source($source) if $ENV{MOP_PRINT_SOURCE};
+
         $code = eval $source;
         $@;
     };
 
     return ( $code, $e );
+}
+
+sub _dump_source {
+    my ( $self, $source ) = @_;
+
+    my $output;
+    if ( eval { require Perl::Tidy } ) {
+        require File::Spec;
+
+        my $rc_file = File::Spec->catfile(
+            $INC{'Class/MOP/Method/Generated.pm'},
+            ('..') x 5,
+            'perltidyrc'
+        );
+
+        my %p = (
+            source      => \$source,
+            destination => \$output,
+        );
+        $p{perltidyrc} = $rc_file
+            if -f $rc_file;
+
+        Perl::Tidy::perltidy(%p);
+    }
+    else {
+        $output = $source;
+    }
+
+    print STDERR "\n", $self->name, ":\n", $output, "\n";
 }
 
 sub _add_line_directive {

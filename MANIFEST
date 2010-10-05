@@ -8,6 +8,7 @@ examples/InstanceCountingClass.pod
 examples/LazyClass.pod
 examples/Perl6Attribute.pod
 inc/Module/Install.pm
+inc/Module/Install/AuthorRequires.pm
 inc/Module/Install/Base.pm
 inc/Module/Install/Can.pm
 inc/Module/Install/ExtraTests.pm
@@ -27,7 +28,9 @@ lib/Class/MOP/Method/Accessor.pm
 lib/Class/MOP/Method/Constructor.pm
 lib/Class/MOP/Method/Generated.pm
 lib/Class/MOP/Method/Inlined.pm
+lib/Class/MOP/Method/Meta.pm
 lib/Class/MOP/Method/Wrapped.pm
+lib/Class/MOP/MiniTrait.pm
 lib/Class/MOP/Mixin.pm
 lib/Class/MOP/Mixin/AttributeCore.pm
 lib/Class/MOP/Mixin/HasAttributes.pm
@@ -42,6 +45,7 @@ MANIFEST.SKIP
 META.yml
 mop.c
 mop.h
+perltidyrc
 ppport.h
 README
 scripts/class_browser.pl
@@ -97,6 +101,7 @@ t/083_load_class.t
 t/085_load_class_gvstash_detect_bug.t
 t/086_rebless_instance_away.t
 t/087_subclasses.t
+t/090_meta_method.t
 t/100_BinaryTree_test.t
 t/101_InstanceCountingClass_test.t
 t/102_InsideOutClass_test.t

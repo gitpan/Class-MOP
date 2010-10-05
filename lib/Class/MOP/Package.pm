@@ -8,7 +8,7 @@ use Scalar::Util 'blessed', 'reftype';
 use Carp         'confess';
 use Package::Stash;
 
-our $VERSION   = '1.08';
+our $VERSION   = '1.09';
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
 
@@ -123,6 +123,11 @@ sub get_package_symbol {
     $self->_package_stash->get_package_symbol(@_);
 }
 
+sub get_or_add_package_symbol {
+    my $self = shift;
+    $self->_package_stash->get_or_add_package_symbol(@_);
+}
+
 sub remove_package_symbol {
     my $self = shift;
     $self->_package_stash->remove_package_symbol(@_);
@@ -190,6 +195,12 @@ sets it to the initial value if one was provided.
 Given a variable name, this method returns the variable as a reference
 or undef if it does not exist. The C<$variable_name> must contain a
 leading sigil.
+
+=item B<< $metapackage->get_or_add_package_symbol($variable_name) >>
+
+Given a variable name, this method returns the variable as a reference.
+If it does not exist, a default value will be generated if possible. The
+C<$variable_name> must contain a leading sigil.
 
 =item B<< $metapackage->has_package_symbol($variable_name) >>
 

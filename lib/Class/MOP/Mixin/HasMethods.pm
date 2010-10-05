@@ -3,7 +3,9 @@ package Class::MOP::Mixin::HasMethods;
 use strict;
 use warnings;
 
-our $VERSION   = '1.08';
+use Class::MOP::Method::Meta;
+
+our $VERSION   = '1.09';
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
 
@@ -15,6 +17,24 @@ use base 'Class::MOP::Mixin';
 
 sub method_metaclass         { $_[0]->{'method_metaclass'}            }
 sub wrapped_method_metaclass { $_[0]->{'wrapped_method_metaclass'}    }
+sub _meta_method_class       { 'Class::MOP::Method::Meta'             }
+
+sub _add_meta_method {
+    my $self = shift;
+    my ($name) = @_;
+    my $existing_method = $self->can('find_method_by_name')
+                              ? $self->find_method_by_name($name)
+                              : $self->get_method($name);
+    return if $existing_method
+           && $existing_method->isa($self->_meta_method_class);
+    $self->add_method(
+        $name => $self->_meta_method_class->wrap(
+            name                 => $name,
+            package_name         => $self->name,
+            associated_metaclass => $self,
+        )
+    );
+}
 
 # This doesn't always get initialized in a constructor because there is a
 # weird object construction path for subclasses of Class::MOP::Class. At one
@@ -187,6 +207,16 @@ sub _get_local_methods {
             || *{ $namespace->{$_} }{CODE} )
         }
         keys %{$namespace};
+}
+
+sub _restore_metamethods_from {
+    my $self = shift;
+    my ($old_meta) = @_;
+
+    for my $method ($old_meta->_get_local_methods) {
+        $method->_make_compatible_with($self->method_metaclass);
+        $self->add_method($method->name => $method);
+    }
 }
 
 1;

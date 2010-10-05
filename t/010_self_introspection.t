@@ -31,7 +31,8 @@ my @class_mop_package_methods = qw(
     name
     namespace
 
-    add_package_symbol get_package_symbol has_package_symbol remove_package_symbol
+    add_package_symbol get_package_symbol has_package_symbol
+    remove_package_symbol get_or_add_package_symbol
     list_all_package_symbols get_all_package_symbols remove_package_glob
 
     _package_stash
@@ -52,7 +53,7 @@ my @class_mop_class_methods = qw(
 
     is_pristine
 
-    initialize create
+    initialize reinitialize create
 
     update_package_cache_flag
     reset_package_cache_flag
@@ -60,21 +61,26 @@ my @class_mop_class_methods = qw(
     create_anon_class is_anon_class
 
     instance_metaclass get_meta_instance
+    inline_create_instance
+    inline_rebless_instance
     create_meta_instance _create_meta_instance
     new_object clone_object
     construct_instance _construct_instance
     construct_class_instance _construct_class_instance
     clone_instance _clone_instance
     rebless_instance rebless_instance_back rebless_instance_away
+    _force_rebless_instance _fixup_attributes_after_rebless
     check_metaclass_compatibility _check_metaclass_compatibility
     _check_class_metaclass_compatibility _check_single_metaclass_compatibility
     _class_metaclass_is_compatible _single_metaclass_is_compatible
     _fix_metaclass_incompatibility _fix_class_metaclass_incompatibility
     _fix_single_metaclass_incompatibility _base_metaclasses
-    _can_fix_class_metaclass_incompatibility_by_subclassing
-    _can_fix_single_metaclass_incompatibility_by_subclassing
-    _can_fix_metaclass_incompatibility_by_subclassing
     _can_fix_metaclass_incompatibility
+    _class_metaclass_can_be_made_compatible
+    _single_metaclass_can_be_made_compatible
+
+    _remove_generated_metaobjects
+    _restore_metaobjects_from
 
     add_meta_instance_dependencies remove_meta_instance_dependencies update_meta_instance_dependencies
     add_dependent_meta_instance remove_dependent_meta_instance

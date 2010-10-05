@@ -7,7 +7,7 @@ use warnings;
 use Carp         'confess';
 use Scalar::Util 'blessed';
 
-our $VERSION   = '1.08';
+our $VERSION   = '1.09';
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
 
@@ -175,6 +175,25 @@ sub after_modifiers {
 sub around_modifiers {
     my $code = shift;
     return @{$code->{'modifier_table'}->{around}->{methods}};
+}
+
+sub _make_compatible_with {
+    my $self = shift;
+    my ($other) = @_;
+
+    # XXX: this is pretty gross. the issue here is that CMOP::Method::Wrapped
+    # objects are subclasses of CMOP::Method, but when we get to moose, they'll
+    # need to be compatible with Moose::Meta::Method, which isn't possible. the
+    # right solution here is to make ::Wrapped into a role that gets applied to
+    # whatever the method_metaclass happens to be and get rid of
+    # wrapped_method_metaclass entirely, but that's not going to happen until
+    # we ditch cmop and get roles into the bootstrapping, so. i'm not
+    # maintaining the previous behavior of turning them into instances of the
+    # new method_metaclass because that's equally broken, and at least this way
+    # any issues will at least be detectable and potentially fixable. -doy
+    return $self unless $other->_is_compatible_with($self->_real_ref_name);
+
+    return $self->SUPER::_make_compatible_with(@_);
 }
 
 1;

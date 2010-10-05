@@ -3,7 +3,7 @@ package Class::MOP::Mixin::HasAttributes;
 use strict;
 use warnings;
 
-our $VERSION   = '1.08';
+our $VERSION   = '1.09';
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
 
@@ -83,6 +83,18 @@ sub remove_attribute {
 sub get_attribute_list {
     my $self = shift;
     keys %{ $self->_attribute_map };
+}
+
+sub _restore_metaattributes_from {
+    my $self = shift;
+    my ($old_meta) = @_;
+
+    for my $attr (sort { $a->insertion_order <=> $b->insertion_order }
+                       map { $old_meta->get_attribute($_) }
+                           $old_meta->get_attribute_list) {
+        $attr->_make_compatible_with($self->attribute_metaclass);
+        $self->add_attribute($attr);
+    }
 }
 
 1;
