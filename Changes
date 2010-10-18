@@ -1,5 +1,9 @@
 Revision history for Perl extension Class-MOP.
 
+1.10 Mon, Oct 18, 2010
+
+  * Lots of fixes for edge cases with anon classes. (doy)
+
 1.09 Tue, Oct 5, 2010
 
   [ENHANCEMENTS]

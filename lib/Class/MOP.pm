@@ -9,7 +9,7 @@ use 5.008;
 use MRO::Compat;
 
 use Carp          'confess';
-use Scalar::Util  'weaken', 'reftype', 'blessed';
+use Scalar::Util  'weaken', 'isweak', 'reftype', 'blessed';
 use Data::OptList;
 use Try::Tiny;
 
@@ -29,7 +29,7 @@ BEGIN {
     *check_package_cache_flag = \&mro::get_pkg_gen;
 }
 
-our $VERSION   = '1.09';
+our $VERSION   = '1.10';
 our $XS_VERSION = $VERSION;
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
@@ -51,6 +51,7 @@ XSLoader::load( __PACKAGE__, $XS_VERSION );
     sub get_metaclass_by_name       { $METAS{$_[0]}         }
     sub store_metaclass_by_name     { $METAS{$_[0]} = $_[1] }
     sub weaken_metaclass            { weaken($METAS{$_[0]}) }
+    sub metaclass_is_weak           { isweak($METAS{$_[0]}) }
     sub does_metaclass_exist        { exists $METAS{$_[0]} && defined $METAS{$_[0]} }
     sub remove_metaclass_by_name    { delete $METAS{$_[0]}; return }
 
@@ -1067,6 +1068,11 @@ In rare cases (e.g. anonymous metaclasses) it is desirable to
 store a weakened reference in the metaclass cache. This
 function will weaken the reference to the metaclass stored
 in C<$name>.
+
+=item B<Class::MOP::metaclass_is_weak($name)>
+
+Returns true if the metaclass for C<$name> has been weakened
+(via C<weaken_metaclass>).
 
 =item B<Class::MOP::does_metaclass_exist($name)>
 

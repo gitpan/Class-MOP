@@ -17,7 +17,7 @@ use Devel::GlobalDestruction 'in_global_destruction';
 use Try::Tiny;
 use List::MoreUtils 'all';
 
-our $VERSION   = '1.09';
+our $VERSION   = '1.10';
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
 
@@ -53,9 +53,13 @@ sub reinitialize {
     my $old_metaclass = blessed($options{package})
         ? $options{package}
         : Class::MOP::get_metaclass_by_name($options{package});
+    $options{weaken} = Class::MOP::metaclass_is_weak($old_metaclass->name)
+        if !exists $options{weaken}
+        && blessed($old_metaclass)
+        && $old_metaclass->isa('Class::MOP::Class');
     $old_metaclass->_remove_generated_metaobjects
         if $old_metaclass && $old_metaclass->isa('Class::MOP::Class');
-    my $new_metaclass = $class->SUPER::reinitialize(@args);
+    my $new_metaclass = $class->SUPER::reinitialize(%options);
     $new_metaclass->_restore_metaobjects_from($old_metaclass)
         if $old_metaclass && $old_metaclass->isa('Class::MOP::Class');
     return $new_metaclass;
@@ -109,7 +113,7 @@ sub _construct_class_instance {
     # NOTE:
     # we need to weaken any anon classes
     # so that they can call DESTROY properly
-    Class::MOP::weaken_metaclass($package_name) if $meta->is_anon_class;
+    Class::MOP::weaken_metaclass($package_name) if $options->{weaken};
 
     $meta;
 }
@@ -444,6 +448,7 @@ sub _remove_generated_metaobjects {
 
     sub create_anon_class {
         my ($class, %options) = @_;
+        $options{weaken} = 1 unless exists $options{weaken};
         my $package_name = $ANON_CLASS_PREFIX . ++$ANON_CLASS_SERIAL;
         return $class->create($package_name, %options);
     }
@@ -597,17 +602,8 @@ sub _construct_instance {
     foreach my $attr ($class->get_all_attributes()) {
         $attr->initialize_instance_slot($meta_instance, $instance, $params);
     }
-    # NOTE:
-    # this will only work for a HASH instance type
-    if ($class->is_anon_class) {
-        (reftype($instance) eq 'HASH')
-            || confess "Currently only HASH based instances are supported with instance of anon-classes";
-        # NOTE:
-        # At some point we should make this official
-        # as a reserved slot name, but right now I am
-        # going to keep it here.
-        # my $RESERVED_MOP_SLOT = '__MOP__';
-        $instance->{'__MOP__'} = $class;
+    if (Class::MOP::metaclass_is_weak($class->name)) {
+        $meta_instance->_set_mop_slot($instance, $class);
     }
     return $instance;
 }
@@ -642,6 +638,24 @@ sub inline_rebless_instance {
     my $self = shift;
 
     return $self->get_meta_instance->inline_rebless_instance_structure(@_);
+}
+
+sub _inline_get_mop_slot {
+    my $self = shift;
+
+    return $self->get_meta_instance->_inline_get_mop_slot(@_);
+}
+
+sub _inline_set_mop_slot {
+    my $self = shift;
+
+    return $self->get_meta_instance->_inline_set_mop_slot(@_);
+}
+
+sub _inline_clear_mop_slot {
+    my $self = shift;
+
+    return $self->get_meta_instance->_inline_clear_mop_slot(@_);
 }
 
 sub clone_object {
@@ -683,11 +697,19 @@ sub _force_rebless_instance {
 
     my $meta_instance = $self->get_meta_instance;
 
+    if (Class::MOP::metaclass_is_weak($old_metaclass->name)) {
+        $meta_instance->_clear_mop_slot($instance);
+    }
+
     # rebless!
     # we use $_[1] here because of t/306_rebless_overload.t regressions on 5.8.8
     $meta_instance->rebless_instance_structure($_[1], $self);
 
     $self->_fixup_attributes_after_rebless($instance, $old_metaclass, %params);
+
+    if (Class::MOP::metaclass_is_weak($self->name)) {
+        $meta_instance->_set_mop_slot($instance, $self);
+    }
 }
 
 sub rebless_instance {
@@ -842,6 +864,16 @@ sub superclasses {
 sub _superclasses_updated {
     my $self = shift;
     $self->update_meta_instance_dependencies();
+    # keep strong references to all our parents, so they don't disappear if
+    # they are anon classes and don't have any direct instances
+    $self->_superclass_metas(
+        map { Class::MOP::class_of($_) } $self->superclasses
+    );
+}
+
+sub _superclass_metas {
+    my $self = shift;
+    $self->{_superclass_metas} = [@_];
 }
 
 sub subclasses {
@@ -1446,6 +1478,21 @@ Specifies the name to install the C<meta> method for this class under.
 If it is not passed, C<meta> is assumed, and if C<undef> is explicitly
 given, no meta method will be installed.
 
+=item * weaken
+
+If true, the metaclass that is stored in the global cache will be a
+weak reference.
+
+Classes created in this way are destroyed once the metaclass they are
+attached to goes out of scope, and will be removed from Perl's internal
+symbol table.
+
+All instances of a class with a weakened metaclass keep a special
+reference to the metaclass object, which prevents the metaclass from
+going out of scope while any instances exist.
+
+This only works if the instance is based on a hash reference, however.
+
 =back
 
 =item B<< Class::MOP::Class->create_anon_class(%options) >>
@@ -1457,15 +1504,8 @@ that name is a unique name generated internally by this module.
 It accepts the same C<superclasses>, C<methods>, and C<attributes>
 parameters that C<create> accepts.
 
-Anonymous classes are destroyed once the metaclass they are attached
-to goes out of scope, and will be removed from Perl's internal symbol
-table.
-
-All instances of an anonymous class keep a special reference to the
-metaclass object, which prevents the metaclass from going out of scope
-while any instances exist.
-
-This only works if the instance is based on a hash reference, however.
+Anonymous classes default to C<< weaken => 1 >>, although this can be
+overridden.
 
 =item B<< Class::MOP::Class->initialize($package_name, %options) >>
 

@@ -6,11 +6,14 @@ use warnings;
 
 use Scalar::Util 'weaken', 'blessed';
 
-our $VERSION   = '1.09';
+our $VERSION   = '1.10';
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
 
 use base 'Class::MOP::Object';
+
+# make this not a valid method name, to avoid (most) attribute conflicts
+my $RESERVED_MOP_SLOT = '<<MOP>>';
 
 sub BUILDARGS {
     my ($class, @args) = @_;
@@ -161,6 +164,21 @@ sub is_dependent_on_superclasses {
     return; # for meta instances that require updates on inherited slot changes
 }
 
+sub _get_mop_slot {
+    my ($self, $instance) = @_;
+    $self->get_slot_value($instance, $RESERVED_MOP_SLOT);
+}
+
+sub _set_mop_slot {
+    my ($self, $instance, $value) = @_;
+    $self->set_slot_value($instance, $RESERVED_MOP_SLOT, $value);
+}
+
+sub _clear_mop_slot {
+    my ($self, $instance) = @_;
+    $self->deinitialize_slot($instance, $RESERVED_MOP_SLOT);
+}
+
 # inlinable operation snippets
 
 sub is_inlinable { 1 }
@@ -174,6 +192,8 @@ sub inline_slot_access {
     my ($self, $instance, $slot_name) = @_;
     sprintf q[%s->{"%s"}], $instance, quotemeta($slot_name);
 }
+
+sub inline_get_is_lvalue { 1 }
 
 sub inline_get_slot_value {
     my ($self, $instance, $slot_name) = @_;
@@ -212,6 +232,21 @@ sub inline_strengthen_slot_value {
 sub inline_rebless_instance_structure {
     my ($self, $instance, $class_variable) = @_;
     "bless $instance => $class_variable";
+}
+
+sub _inline_get_mop_slot {
+    my ($self, $instance) = @_;
+    $self->inline_get_slot_value($instance, $RESERVED_MOP_SLOT);
+}
+
+sub _inline_set_mop_slot {
+    my ($self, $instance, $value) = @_;
+    $self->inline_set_slot_value($instance, $RESERVED_MOP_SLOT, $value);
+}
+
+sub _inline_clear_mop_slot {
+    my ($self, $instance) = @_;
+    $self->inline_deinitialize_slot($instance, $RESERVED_MOP_SLOT);
 }
 
 1;
@@ -359,6 +394,11 @@ actual class name.
 
 It returns a snippet of code that creates a new object for the
 class. This is something like C< bless {}, $class_name >.
+
+=item B<< $metainstance->inline_get_is_lvalue >>
+
+Returns whether or not C<inline_get_slot_value> is a valid lvalue. This can be
+used to do extra optimizations when generating inlined methods.
 
 =item B<< $metainstance->inline_slot_access($instance_variable, $slot_name) >>
 

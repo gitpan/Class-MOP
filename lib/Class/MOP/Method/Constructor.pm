@@ -7,7 +7,7 @@ use warnings;
 use Carp         'confess';
 use Scalar::Util 'blessed', 'weaken';
 
-our $VERSION   = '1.09';
+our $VERSION   = '1.10';
 $VERSION = eval $VERSION;
 our $AUTHORITY = 'cpan:STEVAN';
 
@@ -114,6 +114,9 @@ sub _generate_constructor_method_inline {
     $source .= ";\n" . (join ";\n" => map {
         $self->_generate_slot_initializer($_, $idx++)
     } @{ $self->_attributes });
+    if (Class::MOP::metaclass_is_weak($self->associated_metaclass->name)) {
+        $source .= ";\n" . $self->associated_metaclass->_inline_set_mop_slot('$instance', 'Class::MOP::class_of($class)');
+    }
     $source .= ";\n" . 'return $instance';
     $source .= ";\n" . '}';
     warn $source if $self->options->{debug};

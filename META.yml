@@ -39,5 +39,5 @@ requires:
 resources:
   license: http://dev.perl.org/licenses/
   repository: git://git.moose.perl.org/Class-MOP.git
-version: 1.09
+version: 1.10
 x_authority: cpan:STEVAN
