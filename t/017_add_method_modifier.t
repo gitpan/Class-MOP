@@ -2,7 +2,7 @@ use strict;
 use warnings;
 
 use Test::More;
-use Test::Exception;
+use Test::Fatal;
 
 use Class::MOP;
 
@@ -65,11 +65,11 @@ use Class::MOP;
         }
     );
 
-    ::throws_ok(
-        sub {
-            CheckingAccount->meta->add_before_method_modifier(
-                'does_not_exist' => sub { } );
-        },
+    ::like(
+        ::exception{ CheckingAccount->meta->add_before_method_modifier(
+                'does_not_exist' => sub { }
+            );
+            },
         qr/\QThe method 'does_not_exist' was not found in the inheritance hierarchy for CheckingAccount/
     );
 
@@ -90,16 +90,14 @@ my $savings_account = BankAccount->new( balance => 250 );
 isa_ok( $savings_account, 'BankAccount' );
 
 is( $savings_account->balance, 250, '... got the right savings balance' );
-lives_ok {
+is( exception {
     $savings_account->withdraw(50);
-}
-'... withdrew from savings successfully';
+}, undef, '... withdrew from savings successfully' );
 is( $savings_account->balance, 200,
     '... got the right savings balance after withdrawal' );
-dies_ok {
+isnt( exception {
     $savings_account->withdraw(250);
-}
-'... could not withdraw from savings successfully';
+}, undef, '... could not withdraw from savings successfully' );
 
 $savings_account->deposit(150);
 is( $savings_account->balance, 350,
@@ -117,20 +115,18 @@ is( $checking_account->overdraft_account, $savings_account,
 
 is( $checking_account->balance, 100, '... got the right checkings balance' );
 
-lives_ok {
+is( exception {
     $checking_account->withdraw(50);
-}
-'... withdrew from checking successfully';
+}, undef, '... withdrew from checking successfully' );
 is( $checking_account->balance, 50,
     '... got the right checkings balance after withdrawal' );
 is( $savings_account->balance, 350,
     '... got the right savings balance after checking withdrawal (no overdraft)'
 );
 
-lives_ok {
+is( exception {
     $checking_account->withdraw(200);
-}
-'... withdrew from checking successfully';
+}, undef, '... withdrew from checking successfully' );
 is( $checking_account->balance, 0,
     '... got the right checkings balance after withdrawal' );
 is( $savings_account->balance, 200,

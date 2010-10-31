@@ -5,7 +5,7 @@ use FindBin;
 use File::Spec::Functions;
 
 use Test::More;
-use Test::Exception;
+use Test::Fatal;
 
 use Class::MOP;
 
@@ -17,9 +17,9 @@ use lib catdir($FindBin::Bin, 'lib');
 
 ok(!Class::MOP::is_class_loaded('BinaryTree'), '... the binary tree class is not loaded');
 
-lives_ok {
+is( exception {
     Class::MOP::load_class('BinaryTree');
-} '... loaded the BinaryTree class without dying';
+}, undef, '... loaded the BinaryTree class without dying' );
 
 ok(Class::MOP::is_class_loaded('BinaryTree'), '... the binary tree class is now loaded');
 

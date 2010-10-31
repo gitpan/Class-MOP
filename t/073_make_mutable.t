@@ -2,7 +2,7 @@ use strict;
 use warnings;
 
 use Test::More;
-use Test::Exception;
+use Test::Fatal;
 
 use Scalar::Util;
 
@@ -45,7 +45,7 @@ use Class::MOP;
     # Since this has no default it won't be present yet, but it will
     # be after the class is made immutable.
 
-    lives_ok {$meta->make_immutable; } '... changed Baz to be immutable';
+    is( exception {$meta->make_immutable; }, undef, '... changed Baz to be immutable' );
     ok(!$meta->is_mutable,              '... our class is no longer mutable');
     ok($meta->is_immutable,             '... our class is now immutable');
     ok(!$meta->make_immutable,          '... make immutable now returns nothing');
@@ -53,7 +53,7 @@ use Class::MOP;
     ok($meta->has_method('new'),        '... inlined constructor created for sure');
     is_deeply([ map { $_->name } $meta->_inlined_methods ], [ 'new' ], '... really, i mean it');
 
-    lives_ok { $meta->make_mutable; }  '... changed Baz to be mutable';
+    is( exception { $meta->make_mutable; }, undef, '... changed Baz to be mutable' );
     ok($meta->is_mutable,               '... our class is mutable');
     ok(!$meta->is_immutable,            '... our class is not immutable');
     ok(!$meta->make_mutable,            '... make mutable now returns nothing');
@@ -75,7 +75,7 @@ use Class::MOP;
     my $reef = \ 'reef';
     ok($meta->add_package_symbol('$ref', $reef),      '... added package symbol');
     is($meta->get_package_symbol('$ref'), $reef,      '... values match');
-    lives_ok { $meta->remove_package_symbol('$ref') } '... removed it';
+    is( exception { $meta->remove_package_symbol('$ref') }, undef, '... removed it' );
     isnt($meta->get_package_symbol('$ref'), $reef,    '... values match');
 
     ok( my @supers = $meta->superclasses,       '... got the superclasses okay');
@@ -88,30 +88,30 @@ use Class::MOP;
       for qw(get_meta_instance       get_all_attributes
              class_precedence_list );
 
-    lives_ok {$meta->make_immutable; } '... changed Baz to be immutable again';
+    is( exception {$meta->make_immutable; }, undef, '... changed Baz to be immutable again' );
     ok($meta->get_method('new'),    '... inlined constructor recreated');
 }
 
 {
     my $meta = Baz->meta;
 
-    lives_ok { $meta->make_immutable() } 'Changed Baz to be immutable';
-    lives_ok { $meta->make_mutable() }   '... changed Baz to be mutable';
-    lives_ok { $meta->make_immutable() } '... changed Baz to be immutable';
+    is( exception { $meta->make_immutable() }, undef, 'Changed Baz to be immutable' );
+    is( exception { $meta->make_mutable() }, undef, '... changed Baz to be mutable' );
+    is( exception { $meta->make_immutable() }, undef, '... changed Baz to be immutable' );
 
-    dies_ok{ $meta->add_method('xyz', sub{'xxx'})  } '... exception thrown as expected';
+    isnt( exception { $meta->add_method('xyz', sub{'xxx'})  }, undef, '... exception thrown as expected' );
 
-    dies_ok {
+    isnt( exception {
       $meta->add_attribute('fickle', accessor => 'fickle')
-    }  '... exception thrown as expected';
-    dies_ok { $meta->remove_attribute('fickle') } '... exception thrown as expected';
+    }, undef, '... exception thrown as expected' );
+    isnt( exception { $meta->remove_attribute('fickle') }, undef, '... exception thrown as expected' );
 
     my $reef = \ 'reef';
-    dies_ok { $meta->add_package_symbol('$ref', $reef) } '... exception thrown as expected';
-    dies_ok { $meta->remove_package_symbol('$ref')     } '... exception thrown as expected';
+    isnt( exception { $meta->add_package_symbol('$ref', $reef) }, undef, '... exception thrown as expected' );
+    isnt( exception { $meta->remove_package_symbol('$ref')     }, undef, '... exception thrown as expected' );
 
     ok( my @supers = $meta->superclasses,  '... got the superclasses okay');
-    dies_ok { $meta->superclasses('Foo') } '... set the superclasses';
+    isnt( exception { $meta->superclasses('Foo') }, undef, '... set the superclasses' );
 
     ok( $meta->$_  , "... ${_} works")
       for qw(get_meta_instance       get_all_attributes
@@ -128,17 +128,17 @@ use Class::MOP;
     ok($meta->is_mutable,  '... our anon class is mutable');
     ok(!$meta->is_immutable,  '... our anon class is not immutable');
 
-    lives_ok {$meta->make_immutable(
+    is( exception {$meta->make_immutable(
                                     inline_accessor    => 1,
                                     inline_destructor  => 0,
                                     inline_constructor => 1,
                                    )
-            } '... changed class to be immutable';
+            }, undef, '... changed class to be immutable' );
     ok(!$meta->is_mutable,                    '... our class is no longer mutable');
     ok($meta->is_immutable,                   '... our class is now immutable');
     ok(!$meta->make_immutable,                '... make immutable now returns nothing');
 
-    lives_ok { $meta->make_mutable }  '... changed Baz to be mutable';
+    is( exception { $meta->make_mutable }, undef, '... changed Baz to be mutable' );
     ok($meta->is_mutable,             '... our class is mutable');
     ok(!$meta->is_immutable,          '... our class is not immutable');
     ok(!$meta->make_mutable,          '... make mutable now returns nothing');
@@ -164,7 +164,7 @@ use Class::MOP;
     my $reef = \ 'reef';
     ok($meta->add_package_symbol('$ref', $reef),      '... added package symbol');
     is($meta->get_package_symbol('$ref'), $reef,      '... values match');
-    lives_ok { $meta->remove_package_symbol('$ref') } '... removed it';
+    is( exception { $meta->remove_package_symbol('$ref') }, undef, '... removed it' );
     isnt($meta->get_package_symbol('$ref'), $reef,    '... values match');
 
     ok( my @supers = $meta->superclasses,       '... got the superclasses okay');
@@ -183,28 +183,28 @@ use Class::MOP;
 {
     my $meta = Baz->meta->create_anon_class(superclasses => ['Baz']);
 
-    lives_ok {$meta->make_immutable(
+    is( exception {$meta->make_immutable(
                                     inline_accessor    => 1,
                                     inline_destructor  => 0,
                                     inline_constructor => 1,
                                    )
-            } '... changed class to be immutable';
-    lives_ok { $meta->make_mutable() }   '... changed class to be mutable';
-    lives_ok {$meta->make_immutable  } '... changed class to be immutable';
+            }, undef, '... changed class to be immutable' );
+    is( exception { $meta->make_mutable() }, undef, '... changed class to be mutable' );
+    is( exception {$meta->make_immutable  }, undef, '... changed class to be immutable' );
 
-    dies_ok{ $meta->add_method('xyz', sub{'xxx'})  } '... exception thrown as expected';
+    isnt( exception { $meta->add_method('xyz', sub{'xxx'})  }, undef, '... exception thrown as expected' );
 
-    dies_ok {
+    isnt( exception {
       $meta->add_attribute('fickle', accessor => 'fickle')
-    }  '... exception thrown as expected';
-    dies_ok { $meta->remove_attribute('fickle') } '... exception thrown as expected';
+    }, undef, '... exception thrown as expected' );
+    isnt( exception { $meta->remove_attribute('fickle') }, undef, '... exception thrown as expected' );
 
     my $reef = \ 'reef';
-    dies_ok { $meta->add_package_symbol('$ref', $reef) } '... exception thrown as expected';
-    dies_ok { $meta->remove_package_symbol('$ref')     } '... exception thrown as expected';
+    isnt( exception { $meta->add_package_symbol('$ref', $reef) }, undef, '... exception thrown as expected' );
+    isnt( exception { $meta->remove_package_symbol('$ref')     }, undef, '... exception thrown as expected' );
 
     ok( my @supers = $meta->superclasses,  '... got the superclasses okay');
-    dies_ok { $meta->superclasses('Foo') } '... set the superclasses';
+    isnt( exception { $meta->superclasses('Foo') }, undef, '... set the superclasses' );
 
     ok( $meta->$_  , "... ${_} works")
       for qw(get_meta_instance       get_all_attributes

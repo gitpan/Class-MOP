@@ -5,7 +5,7 @@ use FindBin;
 use File::Spec::Functions;
 
 use Test::More;
-use Test::Exception;
+use Test::Fatal;
 
 use Class::MOP;
 
@@ -100,9 +100,9 @@ isnt($cloned_foo, $foo, '... $cloned_foo is a new object different from $foo');
 
 # check some errors
 
-dies_ok {
+isnt( exception {
     $foo_meta->clone_object($meta);
-} '... this dies as expected';
+}, undef, '... this dies as expected' );
 
 # test stuff
 

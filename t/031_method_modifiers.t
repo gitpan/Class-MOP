@@ -2,7 +2,7 @@ use strict;
 use warnings;
 
 use Test::More;
-use Test::Exception;
+use Test::Fatal;
 
 use Class::MOP;
 use Class::MOP::Method;
@@ -31,10 +31,9 @@ use Class::MOP::Method;
         '... got the right return value from the wrapped method' );
     $trace = '';
 
-    lives_ok {
+    is( exception {
         $wrapped->add_before_modifier( sub { $trace .= 'before -> ' } );
-    }
-    '... added the before modifier okay';
+    }, undef, '... added the before modifier okay' );
 
     $wrapped->();
     is( $trace, 'before -> primary',
@@ -42,10 +41,9 @@ use Class::MOP::Method;
     );
     $trace = '';
 
-    lives_ok {
+    is( exception {
         $wrapped->add_after_modifier( sub { $trace .= ' -> after' } );
-    }
-    '... added the after modifier okay';
+    }, undef, '... added the after modifier okay' );
 
     $wrapped->();
     is( $trace, 'before -> primary -> after',
@@ -71,13 +69,12 @@ use Class::MOP::Method;
 
     is( $wrapped->(), 4, '... got the right value from the wrapped method' );
 
-    lives_ok {
+    is( exception {
         $wrapped->add_around_modifier( sub { ( 3, $_[0]->() ) } );
         $wrapped->add_around_modifier( sub { ( 2, $_[0]->() ) } );
         $wrapped->add_around_modifier( sub { ( 1, $_[0]->() ) } );
         $wrapped->add_around_modifier( sub { ( 0, $_[0]->() ) } );
-    }
-    '... added the around modifier okay';
+    }, undef, '... added the around modifier okay' );
 
     is_deeply(
         [ $wrapped->() ],
@@ -104,29 +101,26 @@ use Class::MOP::Method;
     isa_ok( $wrapped, 'Class::MOP::Method::Wrapped' );
     isa_ok( $wrapped, 'Class::MOP::Method' );
 
-    lives_ok {
+    is( exception {
         $wrapped->add_before_modifier( sub { push @tracelog => 'before 1' } );
         $wrapped->add_before_modifier( sub { push @tracelog => 'before 2' } );
         $wrapped->add_before_modifier( sub { push @tracelog => 'before 3' } );
-    }
-    '... added the before modifier okay';
+    }, undef, '... added the before modifier okay' );
 
-    lives_ok {
+    is( exception {
         $wrapped->add_around_modifier(
             sub { push @tracelog => 'around 1'; $_[0]->(); } );
         $wrapped->add_around_modifier(
             sub { push @tracelog => 'around 2'; $_[0]->(); } );
         $wrapped->add_around_modifier(
             sub { push @tracelog => 'around 3'; $_[0]->(); } );
-    }
-    '... added the around modifier okay';
+    }, undef, '... added the around modifier okay' );
 
-    lives_ok {
+    is( exception {
         $wrapped->add_after_modifier( sub { push @tracelog => 'after 1' } );
         $wrapped->add_after_modifier( sub { push @tracelog => 'after 2' } );
         $wrapped->add_after_modifier( sub { push @tracelog => 'after 3' } );
-    }
-    '... added the after modifier okay';
+    }, undef, '... added the after modifier okay' );
 
     $wrapped->();
     is_deeply(

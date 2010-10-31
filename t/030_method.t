@@ -2,7 +2,7 @@ use strict;
 use warnings;
 
 use Test::More;
-use Test::Exception;
+use Test::Fatal;
 
 use Class::MOP;
 use Class::MOP::Method;
@@ -28,21 +28,14 @@ is( $method->original_fully_qualified_name, 'main::__ANON__',
     '... the original_fully_qualified_name is the same as fully_qualified_name'
 );
 
-dies_ok { Class::MOP::Method->wrap }
-q{... can't call wrap() without some code};
-dies_ok { Class::MOP::Method->wrap( [] ) }
-q{... can't call wrap() without some code};
-dies_ok { Class::MOP::Method->wrap( bless {} => 'Fail' ) }
-q{... can't call wrap() without some code};
+isnt( exception { Class::MOP::Method->wrap }, undef, q{... can't call wrap() without some code} );
+isnt( exception { Class::MOP::Method->wrap( [] ) }, undef, q{... can't call wrap() without some code} );
+isnt( exception { Class::MOP::Method->wrap( bless {} => 'Fail' ) }, undef, q{... can't call wrap() without some code} );
 
-dies_ok { Class::MOP::Method->name }
-q{... can't call name() as a class method};
-dies_ok { Class::MOP::Method->body }
-q{... can't call body() as a class method};
-dies_ok { Class::MOP::Method->package_name }
-q{... can't call package_name() as a class method};
-dies_ok { Class::MOP::Method->fully_qualified_name }
-q{... can't call fully_qualified_name() as a class method};
+isnt( exception { Class::MOP::Method->name }, undef, q{... can't call name() as a class method} );
+isnt( exception { Class::MOP::Method->body }, undef, q{... can't call body() as a class method} );
+isnt( exception { Class::MOP::Method->package_name }, undef, q{... can't call package_name() as a class method} );
+isnt( exception { Class::MOP::Method->fully_qualified_name }, undef, q{... can't call fully_qualified_name() as a class method} );
 
 my $meta = Class::MOP::Method->meta;
 isa_ok( $meta, 'Class::MOP::Class' );
@@ -63,41 +56,34 @@ foreach my $method_name (
         '... our sub name is "' . $method_name . '"' );
 }
 
-dies_ok {
+isnt( exception {
     Class::MOP::Method->wrap();
-}
-'... bad args for &wrap';
+}, undef, '... bad args for &wrap' );
 
-dies_ok {
+isnt( exception {
     Class::MOP::Method->wrap('Fail');
-}
-'... bad args for &wrap';
+}, undef, '... bad args for &wrap' );
 
-dies_ok {
+isnt( exception {
     Class::MOP::Method->wrap( [] );
-}
-'... bad args for &wrap';
+}, undef, '... bad args for &wrap' );
 
-dies_ok {
+isnt( exception {
     Class::MOP::Method->wrap( sub {'FAIL'} );
-}
-'... bad args for &wrap';
+}, undef, '... bad args for &wrap' );
 
-dies_ok {
+isnt( exception {
     Class::MOP::Method->wrap( sub {'FAIL'}, package_name => 'main' );
-}
-'... bad args for &wrap';
+}, undef, '... bad args for &wrap' );
 
-dies_ok {
+isnt( exception {
     Class::MOP::Method->wrap( sub {'FAIL'}, name => '__ANON__' );
-}
-'... bad args for &wrap';
+}, undef, '... bad args for &wrap' );
 
-lives_ok {
+is( exception {
     Class::MOP::Method->wrap( bless( sub {'FAIL'}, "Foo" ),
         name => '__ANON__', package_name => 'Foo::Bar' );
-}
-'... blessed coderef to &wrap';
+}, undef, '... blessed coderef to &wrap' );
 
 my $clone = $method->clone(
     package_name => 'NewPackage',

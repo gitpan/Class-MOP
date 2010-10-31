@@ -2,7 +2,7 @@ use strict;
 use warnings;
 
 use Test::More;
-use Test::Exception;
+use Test::Fatal;
 
 use Class::MOP;
 
@@ -73,9 +73,9 @@ is($point->y, 42, '... the y attribute was set properly with the accessor');
 
 is($point->x, 2, '... the x attribute was initialized correctly through the metaobject');
 
-dies_ok {
+isnt( exception {
     $point->x(42);
-} '... cannot write to a read-only accessor';
+}, undef, '... cannot write to a read-only accessor' );
 is($point->x, 2, '... the x attribute was not altered');
 
 $point->clear();

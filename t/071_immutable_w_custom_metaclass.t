@@ -5,7 +5,7 @@ use FindBin;
 use File::Spec::Functions;
 
 use Test::More;
-use Test::Exception;
+use Test::Fatal;
 use Scalar::Util;
 
 use Class::MOP;
@@ -40,8 +40,7 @@ use lib catdir( $FindBin::Bin, 'lib' );
         shift->meta->mymetaclass_attributes;
     }
 
-    ::lives_ok{ Baz->meta->superclasses('Bar') }
-        '... we survive the metaclass incompatibility test';
+    ::is( ::exception { Baz->meta->superclasses('Bar') }, undef, '... we survive the metaclass incompatibility test' );
 }
 
 {
@@ -58,7 +57,7 @@ use lib catdir( $FindBin::Bin, 'lib' );
         '... Baz can do method before immutable' );
     ok( $meta->can('mymetaclass_attributes'),
         '... meta can do method before immutable' );
-    lives_ok { $meta->make_immutable } "Baz is now immutable";
+    is( exception { $meta->make_immutable }, undef, "Baz is now immutable" );
     ok( $meta->is_immutable, '... Baz is immutable' );
     isa_ok( $meta, 'MyMetaClass', 'Baz->meta' );
     ok( Baz->can('mymetaclass_attributes'),
@@ -68,7 +67,7 @@ use lib catdir( $FindBin::Bin, 'lib' );
     isnt( Scalar::Util::blessed( Baz->meta ),
         Scalar::Util::blessed( Bar->meta ),
         'Baz and Bar immutable metaclasses are different' );
-    lives_ok { $meta->make_mutable } "Baz is now mutable";
+    is( exception { $meta->make_mutable }, undef, "Baz is now mutable" );
     ok( $meta->is_mutable, '... Baz is mutable again' );
 }
 

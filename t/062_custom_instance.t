@@ -2,7 +2,7 @@
 use strict;
 use warnings;
 use Test::More;
-use Test::Exception;
+use Test::Fatal;
 
 use Class::MOP;
 
@@ -45,40 +45,40 @@ my $instance;
 }
 
 undef $instance;
-lives_and {
+is( exception {
     my $foo = Foo::Sub->new;
     isa_ok($foo, 'Foo');
     isa_ok($foo, 'Foo::Sub');
     is($foo, $instance, "used the passed-in instance");
-};
+}, undef );
 
 undef $instance;
-lives_and {
+is( exception {
     my $foo = Foo::Sub->new(foo => 'FOO');
     isa_ok($foo, 'Foo');
     isa_ok($foo, 'Foo::Sub');
     is($foo, $instance, "used the passed-in instance");
     is($foo->foo, 'FOO', "set non-CMOP constructor args");
-};
+}, undef );
 
 undef $instance;
-lives_and {
+is( exception {
     my $foo = Foo::Sub->new(bar => 'bar');
     isa_ok($foo, 'Foo');
     isa_ok($foo, 'Foo::Sub');
     is($foo, $instance, "used the passed-in instance");
     is($foo->bar, 'BAR', "set CMOP attributes");
-};
+}, undef );
 
 undef $instance;
-lives_and {
+is( exception {
     my $foo = Foo::Sub->new(foo => 'FOO', bar => 'bar');
     isa_ok($foo, 'Foo');
     isa_ok($foo, 'Foo::Sub');
     is($foo, $instance, "used the passed-in instance");
     is($foo->foo, 'FOO', "set non-CMOP constructor arg");
     is($foo->bar, 'BAR', "set correct CMOP attribute");
-};
+}, undef );
 
 {
     package BadFoo;
@@ -117,25 +117,21 @@ lives_and {
     );
 }
 
-throws_ok { BadFoo::Sub->new }
-    qr/BadFoo=HASH.*is not a BadFoo::Sub/,
-    "error with incorrect constructors";
+like( exception { BadFoo::Sub->new }, qr/BadFoo=HASH.*is not a BadFoo::Sub/, "error with incorrect constructors" );
 
 {
     my $meta = Class::MOP::Class->create('Really::Bad::Foo');
-    throws_ok {
+    like( exception {
         $meta->new_object(__INSTANCE__ => (bless {}, 'Some::Other::Class'))
-    } qr/Some::Other::Class=HASH.*is not a Really::Bad::Foo/,
-      "error with completely invalid class";
+    }, qr/Some::Other::Class=HASH.*is not a Really::Bad::Foo/, "error with completely invalid class" );
 }
 
 {
     my $meta = Class::MOP::Class->create('Really::Bad::Foo::2');
     for my $invalid ('foo', 1, 0, '') {
-        throws_ok {
+        like( exception {
             $meta->new_object(__INSTANCE__ => $invalid)
-        } qr/The __INSTANCE__ parameter must be a blessed reference, not $invalid/,
-          "error with unblessed thing";
+        }, qr/The __INSTANCE__ parameter must be a blessed reference, not $invalid/, "error with unblessed thing" );
     }
 }
 

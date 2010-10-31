@@ -2,7 +2,7 @@ use strict;
 use warnings;
 
 use Test::More;
-use Test::Exception;
+use Test::Fatal;
 
 use Class::MOP;
 use Class::MOP::Attribute;
@@ -10,84 +10,84 @@ use Class::MOP::Attribute;
 # most values are static
 
 {
-    dies_ok {
+    isnt( exception {
         Class::MOP::Attribute->new('$test' => (
             default => qr/hello (.*)/
         ));
-    } '... no refs for defaults';
+    }, undef, '... no refs for defaults' );
 
-    dies_ok {
+    isnt( exception {
         Class::MOP::Attribute->new('$test' => (
             default => []
         ));
-    } '... no refs for defaults';
+    }, undef, '... no refs for defaults' );
 
-    dies_ok {
+    isnt( exception {
         Class::MOP::Attribute->new('$test' => (
             default => {}
         ));
-    } '... no refs for defaults';
+    }, undef, '... no refs for defaults' );
 
 
-    dies_ok {
+    isnt( exception {
         Class::MOP::Attribute->new('$test' => (
             default => \(my $var)
         ));
-    } '... no refs for defaults';
+    }, undef, '... no refs for defaults' );
 
-    dies_ok {
+    isnt( exception {
         Class::MOP::Attribute->new('$test' => (
             default => bless {} => 'Foo'
         ));
-    } '... no refs for defaults';
+    }, undef, '... no refs for defaults' );
 
 }
 
 {
-    dies_ok {
+    isnt( exception {
         Class::MOP::Attribute->new('$test' => (
             builder => qr/hello (.*)/
         ));
-    } '... no refs for builders';
+    }, undef, '... no refs for builders' );
 
-    dies_ok {
+    isnt( exception {
         Class::MOP::Attribute->new('$test' => (
             builder => []
         ));
-    } '... no refs for builders';
+    }, undef, '... no refs for builders' );
 
-    dies_ok {
+    isnt( exception {
         Class::MOP::Attribute->new('$test' => (
             builder => {}
         ));
-    } '... no refs for builders';
+    }, undef, '... no refs for builders' );
 
 
-    dies_ok {
+    isnt( exception {
         Class::MOP::Attribute->new('$test' => (
             builder => \(my $var)
         ));
-    } '... no refs for builders';
+    }, undef, '... no refs for builders' );
 
-    dies_ok {
+    isnt( exception {
         Class::MOP::Attribute->new('$test' => (
             builder => bless {} => 'Foo'
         ));
-    } '... no refs for builders';
+    }, undef, '... no refs for builders' );
 
-    dies_ok {
+    isnt( exception {
         Class::MOP::Attribute->new('$test' => (
             builder => 'Foo', default => 'Foo'
         ));
-    } '... no default AND builder';
+    }, undef, '... no default AND builder' );
 
     my $undef_attr;
-    lives_ok {
+    is( exception {
         $undef_attr = Class::MOP::Attribute->new('$test' => (
             default   => undef,
             predicate => 'has_test',
         ));
-    } '... undef as a default is okay';
+    }, undef, '... undef as a default is okay' );
     ok($undef_attr->has_default, '... and it counts as an actual default');
     ok(!Class::MOP::Attribute->new('$test')->has_default,
        '... but attributes with no default have no default');
@@ -101,8 +101,7 @@ use Class::MOP::Attribute;
         ok($obj->has_test, '... and the default is populated');
         is($obj->meta->get_attribute('$test')->get_value($obj), undef, '... with the right value');
     }
-    lives_ok { Foo->meta->make_immutable }
-             '... and it can be inlined';
+    is( exception { Foo->meta->make_immutable }, undef, '... and it can be inlined' );
     {
         my $obj = Foo->new;
         ok($obj->has_test, '... and the default is populated');
@@ -113,33 +112,33 @@ use Class::MOP::Attribute;
 
 
 { # bad construtor args
-    dies_ok {
+    isnt( exception {
         Class::MOP::Attribute->new();
-    } '... no name argument';
+    }, undef, '... no name argument' );
 
     # These are no longer errors
-    lives_ok {
+    is( exception {
         Class::MOP::Attribute->new('');
-    } '... bad name argument';
+    }, undef, '... bad name argument' );
 
-    lives_ok {
+    is( exception {
         Class::MOP::Attribute->new(0);
-    } '... bad name argument';
+    }, undef, '... bad name argument' );
 }
 
 {
     my $attr = Class::MOP::Attribute->new('$test');
-    dies_ok {
+    isnt( exception {
         $attr->attach_to_class();
-    } '... attach_to_class died as expected';
+    }, undef, '... attach_to_class died as expected' );
 
-    dies_ok {
+    isnt( exception {
         $attr->attach_to_class('Fail');
-    } '... attach_to_class died as expected';
+    }, undef, '... attach_to_class died as expected' );
 
-    dies_ok {
+    isnt( exception {
         $attr->attach_to_class(bless {} => 'Fail');
-    } '... attach_to_class died as expected';
+    }, undef, '... attach_to_class died as expected' );
 }
 
 {
@@ -149,17 +148,17 @@ use Class::MOP::Attribute;
 
     $attr->attach_to_class(Class::MOP::Class->initialize('Foo'));
 
-    dies_ok {
+    isnt( exception {
         $attr->install_accessors;
-    } '... bad reader format';
+    }, undef, '... bad reader format' );
 }
 
 {
     my $attr = Class::MOP::Attribute->new('$test');
 
-    dies_ok {
+    isnt( exception {
         $attr->_process_accessors('fail', 'my_failing_sub');
-    } '... cannot find "fail" type generator';
+    }, undef, '... cannot find "fail" type generator' );
 }
 
 
@@ -174,9 +173,9 @@ use Class::MOP::Attribute;
         reader => 'test'
     ));
 
-    dies_ok {
+    isnt( exception {
         $attr->install_accessors;
-    } '... failed to generate accessors correctly';
+    }, undef, '... failed to generate accessors correctly' );
 }
 
 {
@@ -207,27 +206,27 @@ use Class::MOP::Attribute;
     # it works, which is kinda silly, but it
     # tests the API change, so I keep it.
 
-    lives_ok {
+    is( exception {
         Class::MOP::Attribute->new('$foo', (
             accessor => 'foo',
             reader   => 'get_foo',
         ));
-    } '... can create accessors with reader/writers';
+    }, undef, '... can create accessors with reader/writers' );
 
-    lives_ok {
+    is( exception {
         Class::MOP::Attribute->new('$foo', (
             accessor => 'foo',
             writer   => 'set_foo',
         ));
-    } '... can create accessors with reader/writers';
+    }, undef, '... can create accessors with reader/writers' );
 
-    lives_ok {
+    is( exception {
         Class::MOP::Attribute->new('$foo', (
             accessor => 'foo',
             reader   => 'get_foo',
             writer   => 'set_foo',
         ));
-    } '... can create accessors with reader/writers';
+    }, undef, '... can create accessors with reader/writers' );
 }
 
 done_testing;

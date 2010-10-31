@@ -1,7 +1,7 @@
 use strict;
 use warnings;
 use Test::More;
-use Test::Exception;
+use Test::Fatal;
 
 use Class::MOP;
 
@@ -16,9 +16,9 @@ This tests a bug sent via RT #39001
     use metaclass;
 }
 
-throws_ok {
+like( exception {
     Foo->meta->superclasses('Foo');
-} qr/^Recursive inheritance detected/, "error occurs when extending oneself";
+}, qr/^Recursive inheritance detected/, "error occurs when extending oneself" );
 
 {
     package Bar;
@@ -29,12 +29,12 @@ throws_ok {
 # if DEBUG_NO_META is set)
 @Foo::ISA = ();
 
-lives_ok {
+is( exception {
     Foo->meta->superclasses('Bar');
-} "regular subclass";
+}, undef, "regular subclass" );
 
-throws_ok {
+like( exception {
     Bar->meta->superclasses('Foo');
-} qr/^Recursive inheritance detected/, "error occurs when Bar extends Foo, when Foo is a Bar";
+}, qr/^Recursive inheritance detected/, "error occurs when Bar extends Foo, when Foo is a Bar" );
 
 done_testing;

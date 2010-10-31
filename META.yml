@@ -5,7 +5,7 @@ author:
 build_requires:
   ExtUtils::MakeMaker: 6.42
   File::Spec: 0
-  Test::Exception: 0.27
+  Test::Fatal: 0.001
   Test::More: 0.88
   Test::Requires: 0.05
 configure_requires:
@@ -29,8 +29,8 @@ requires:
   Devel::GlobalDestruction: 0
   List::MoreUtils: 0.12
   MRO::Compat: 0.05
-  Package::DeprecationManager: 0.04
-  Package::Stash: 0.08
+  Package::DeprecationManager: 0.10
+  Package::Stash: 0.13
   Scalar::Util: 1.18
   Sub::Name: 0.04
   Task::Weaken: 0
@@ -39,5 +39,5 @@ requires:
 resources:
   license: http://dev.perl.org/licenses/
   repository: git://git.moose.perl.org/Class-MOP.git
-version: 1.10
+version: 1.11
 x_authority: cpan:STEVAN

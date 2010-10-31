@@ -2,7 +2,7 @@ use strict;
 use warnings;
 
 use Test::More;
-use Test::Exception;
+use Test::Fatal;
 
 use Class::MOP;
 
@@ -83,44 +83,37 @@ use Class::MOP;
 
     isa_ok( $meta, 'Class::MOP::Class' );
 
-    dies_ok { $meta->add_method() } '... exception thrown as expected';
-    dies_ok { $meta->alias_method() } '... exception thrown as expected';
-    dies_ok { $meta->remove_method() } '... exception thrown as expected';
+    isnt( exception { $meta->add_method() }, undef, '... exception thrown as expected' );
+    isnt( exception { $meta->alias_method() }, undef, '... exception thrown as expected' );
+    isnt( exception { $meta->remove_method() }, undef, '... exception thrown as expected' );
 
-    dies_ok { $meta->add_attribute() } '... exception thrown as expected';
-    dies_ok { $meta->remove_attribute() } '... exception thrown as expected';
+    isnt( exception { $meta->add_attribute() }, undef, '... exception thrown as expected' );
+    isnt( exception { $meta->remove_attribute() }, undef, '... exception thrown as expected' );
 
-    dies_ok { $meta->add_package_symbol() }
-    '... exception thrown as expected';
-    dies_ok { $meta->remove_package_symbol() }
-    '... exception thrown as expected';
+    isnt( exception { $meta->add_package_symbol() }, undef, '... exception thrown as expected' );
+    isnt( exception { $meta->remove_package_symbol() }, undef, '... exception thrown as expected' );
 
-    lives_ok { $meta->identifier() }
-    '... no exception for get_package_symbol special case';
+    is( exception { $meta->identifier() }, undef, '... no exception for get_package_symbol special case' );
 
     my @supers;
-    lives_ok {
+    is( exception {
         @supers = $meta->superclasses;
-    }
-    '... got the superclasses okay';
+    }, undef, '... got the superclasses okay' );
 
-    dies_ok { $meta->superclasses( ['UNIVERSAL'] ) }
-    '... but could not set the superclasses okay';
+    isnt( exception { $meta->superclasses( ['UNIVERSAL'] ) }, undef, '... but could not set the superclasses okay' );
 
     my $meta_instance;
-    lives_ok {
+    is( exception {
         $meta_instance = $meta->get_meta_instance;
-    }
-    '... got the meta instance okay';
+    }, undef, '... got the meta instance okay' );
     isa_ok( $meta_instance, 'Class::MOP::Instance' );
     is( $meta_instance, $meta->get_meta_instance,
         '... and we know it is cached' );
 
     my @cpl;
-    lives_ok {
+    is( exception {
         @cpl = $meta->class_precedence_list;
-    }
-    '... got the class precedence list okay';
+    }, undef, '... got the class precedence list okay' );
     is_deeply(
         \@cpl,
         ['Foo'],
@@ -128,10 +121,9 @@ use Class::MOP;
     );
 
     my @attributes;
-    lives_ok {
+    is( exception {
         @attributes = $meta->get_all_attributes;
-    }
-    '... got the attribute list okay';
+    }, undef, '... got the attribute list okay' );
     is_deeply(
         \@attributes,
         [ $meta->get_attribute('bar') ],
@@ -146,10 +138,9 @@ use Class::MOP;
     ok( $meta->is_mutable,    '... our class is mutable' );
     ok( !$meta->is_immutable, '... our class is not immutable' );
 
-    lives_ok {
+    is( exception {
         $meta->make_immutable();
-    }
-    '... changed Bar to be immutable';
+    }, undef, '... changed Bar to be immutable' );
 
     ok( !$meta->make_immutable, '... make immutable now returns nothing' );
 
@@ -158,41 +149,35 @@ use Class::MOP;
 
     isa_ok( $meta, 'Class::MOP::Class' );
 
-    dies_ok { $meta->add_method() } '... exception thrown as expected';
-    dies_ok { $meta->alias_method() } '... exception thrown as expected';
-    dies_ok { $meta->remove_method() } '... exception thrown as expected';
+    isnt( exception { $meta->add_method() }, undef, '... exception thrown as expected' );
+    isnt( exception { $meta->alias_method() }, undef, '... exception thrown as expected' );
+    isnt( exception { $meta->remove_method() }, undef, '... exception thrown as expected' );
 
-    dies_ok { $meta->add_attribute() } '... exception thrown as expected';
-    dies_ok { $meta->remove_attribute() } '... exception thrown as expected';
+    isnt( exception { $meta->add_attribute() }, undef, '... exception thrown as expected' );
+    isnt( exception { $meta->remove_attribute() }, undef, '... exception thrown as expected' );
 
-    dies_ok { $meta->add_package_symbol() }
-    '... exception thrown as expected';
-    dies_ok { $meta->remove_package_symbol() }
-    '... exception thrown as expected';
+    isnt( exception { $meta->add_package_symbol() }, undef, '... exception thrown as expected' );
+    isnt( exception { $meta->remove_package_symbol() }, undef, '... exception thrown as expected' );
 
     my @supers;
-    lives_ok {
+    is( exception {
         @supers = $meta->superclasses;
-    }
-    '... got the superclasses okay';
+    }, undef, '... got the superclasses okay' );
 
-    dies_ok { $meta->superclasses( ['UNIVERSAL'] ) }
-    '... but could not set the superclasses okay';
+    isnt( exception { $meta->superclasses( ['UNIVERSAL'] ) }, undef, '... but could not set the superclasses okay' );
 
     my $meta_instance;
-    lives_ok {
+    is( exception {
         $meta_instance = $meta->get_meta_instance;
-    }
-    '... got the meta instance okay';
+    }, undef, '... got the meta instance okay' );
     isa_ok( $meta_instance, 'Class::MOP::Instance' );
     is( $meta_instance, $meta->get_meta_instance,
         '... and we know it is cached' );
 
     my @cpl;
-    lives_ok {
+    is( exception {
         @cpl = $meta->class_precedence_list;
-    }
-    '... got the class precedence list okay';
+    }, undef, '... got the class precedence list okay' );
     is_deeply(
         \@cpl,
         [ 'Bar', 'Foo' ],
@@ -200,10 +185,9 @@ use Class::MOP;
     );
 
     my @attributes;
-    lives_ok {
+    is( exception {
         @attributes = $meta->get_all_attributes;
-    }
-    '... got the attribute list okay';
+    }, undef, '... got the attribute list okay' );
     is_deeply(
         [ sort { $a->name cmp $b->name } @attributes ],
         [ Foo->meta->get_attribute('bar'), $meta->get_attribute('baz') ],
@@ -218,10 +202,9 @@ use Class::MOP;
     ok( $meta->is_mutable,    '... our class is mutable' );
     ok( !$meta->is_immutable, '... our class is not immutable' );
 
-    lives_ok {
+    is( exception {
         $meta->make_immutable();
-    }
-    '... changed Baz to be immutable';
+    }, undef, '... changed Baz to be immutable' );
 
     ok( !$meta->make_immutable, '... make immutable now returns nothing' );
 
@@ -230,41 +213,35 @@ use Class::MOP;
 
     isa_ok( $meta, 'Class::MOP::Class' );
 
-    dies_ok { $meta->add_method() } '... exception thrown as expected';
-    dies_ok { $meta->alias_method() } '... exception thrown as expected';
-    dies_ok { $meta->remove_method() } '... exception thrown as expected';
+    isnt( exception { $meta->add_method() }, undef, '... exception thrown as expected' );
+    isnt( exception { $meta->alias_method() }, undef, '... exception thrown as expected' );
+    isnt( exception { $meta->remove_method() }, undef, '... exception thrown as expected' );
 
-    dies_ok { $meta->add_attribute() } '... exception thrown as expected';
-    dies_ok { $meta->remove_attribute() } '... exception thrown as expected';
+    isnt( exception { $meta->add_attribute() }, undef, '... exception thrown as expected' );
+    isnt( exception { $meta->remove_attribute() }, undef, '... exception thrown as expected' );
 
-    dies_ok { $meta->add_package_symbol() }
-    '... exception thrown as expected';
-    dies_ok { $meta->remove_package_symbol() }
-    '... exception thrown as expected';
+    isnt( exception { $meta->add_package_symbol() }, undef, '... exception thrown as expected' );
+    isnt( exception { $meta->remove_package_symbol() }, undef, '... exception thrown as expected' );
 
     my @supers;
-    lives_ok {
+    is( exception {
         @supers = $meta->superclasses;
-    }
-    '... got the superclasses okay';
+    }, undef, '... got the superclasses okay' );
 
-    dies_ok { $meta->superclasses( ['UNIVERSAL'] ) }
-    '... but could not set the superclasses okay';
+    isnt( exception { $meta->superclasses( ['UNIVERSAL'] ) }, undef, '... but could not set the superclasses okay' );
 
     my $meta_instance;
-    lives_ok {
+    is( exception {
         $meta_instance = $meta->get_meta_instance;
-    }
-    '... got the meta instance okay';
+    }, undef, '... got the meta instance okay' );
     isa_ok( $meta_instance, 'Class::MOP::Instance' );
     is( $meta_instance, $meta->get_meta_instance,
         '... and we know it is cached' );
 
     my @cpl;
-    lives_ok {
+    is( exception {
         @cpl = $meta->class_precedence_list;
-    }
-    '... got the class precedence list okay';
+    }, undef, '... got the class precedence list okay' );
     is_deeply(
         \@cpl,
         [ 'Baz', 'Bar', 'Foo' ],
@@ -272,10 +249,9 @@ use Class::MOP;
     );
 
     my @attributes;
-    lives_ok {
+    is( exception {
         @attributes = $meta->get_all_attributes;
-    }
-    '... got the attribute list okay';
+    }, undef, '... got the attribute list okay' );
     is_deeply(
         [ sort { $a->name cmp $b->name } @attributes ],
         [

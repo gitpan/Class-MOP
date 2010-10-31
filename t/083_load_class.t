@@ -1,14 +1,14 @@
 use strict;
 use warnings;
 use Test::More;
-use Test::Exception;
+use Test::Fatal;
 
 require Class::MOP;
 use lib 't/lib';
 
-dies_ok {
+isnt( exception {
     Class::MOP::is_class_loaded()
-} "is_class_loaded with no argument dies";
+}, undef, "is_class_loaded with no argument dies" );
 
 ok(!Class::MOP::is_class_loaded(''), "can't load the empty class");
 ok(!Class::MOP::is_class_loaded(\"foo"), "can't load a class name reference??");
@@ -20,11 +20,11 @@ ok(!Class::MOP::_is_valid_class_name('bogus name'), q{'bogus name' is not a vali
 ok(Class::MOP::_is_valid_class_name('Foo'), q{'Foo' is a valid class name});
 ok(Class::MOP::_is_valid_class_name('Foo::Bar'), q{'Foo::Bar' is a valid class name});
 ok(Class::MOP::_is_valid_class_name('Foo_::Bar2'), q{'Foo_::Bar2' is a valid class name});
-throws_ok { Class::MOP::load_class('bogus name') } qr/Invalid class name \(bogus name\)/;
+like( exception { Class::MOP::load_class('bogus name') }, qr/Invalid class name \(bogus name\)/ );
 
-throws_ok {
+like( exception {
     Class::MOP::load_class('__PACKAGE__')
-} qr/__PACKAGE__\.pm.*\@INC/, 'errors sanely on __PACKAGE__.pm';
+}, qr/__PACKAGE__\.pm.*\@INC/, 'errors sanely on __PACKAGE__.pm' );
 
 Class::MOP::load_class('BinaryTree');
 can_ok('BinaryTree' => 'traverse');
@@ -43,54 +43,47 @@ do {
 
 ok( !Class::MOP::does_metaclass_exist("Class"), "no metaclass for non MOP class" );
 
-throws_ok {
+like( exception {
     Class::MOP::load_class('FakeClassOhNo');
-}
-qr/Can't locate /;
+}, qr/Can't locate / );
 
-throws_ok {
+like( exception {
     Class::MOP::load_class('SyntaxError');
-}
-qr/Missing right curly/;
+}, qr/Missing right curly/ );
 
-throws_ok {
+like( exception {
     delete $INC{'SyntaxError.pm'};
     Class::MOP::load_first_existing_class(
         'FakeClassOhNo', 'SyntaxError', 'Class'
     );
-}
-qr/Missing right curly/,
-    'load_first_existing_class does not pass over an existing (bad) module';
+}, qr/Missing right curly/, 'load_first_existing_class does not pass over an existing (bad) module' );
 
-throws_ok {
+like( exception {
     Class::MOP::load_class('This::Does::Not::Exist');
-}
-qr{Can't locate This/Does/Not/Exist\.pm in \@INC},
-    'load_first_existing_class throws a familiar error for a single module';
+}, qr{Can't locate This/Does/Not/Exist\.pm in \@INC}, 'load_first_existing_class throws a familiar error for a single module' );
 
 {
     package Other;
     use constant foo => "bar";
 }
 
-lives_ok {
+is( exception {
     ok(Class::MOP::is_class_loaded("Other"), 'is_class_loaded(Other)');
-}
-"a class with just constants is still a class";
+}, undef, "a class with just constants is still a class" );
 
 {
     package Lala;
     use metaclass;
 }
 
-lives_ok {
+is( exception {
     is(Class::MOP::load_first_existing_class("Lala", "Does::Not::Exist"), "Lala", 'load_first_existing_class 1/2 params ok, class name returned');
     is(Class::MOP::load_first_existing_class("Does::Not::Exist", "Lala"), "Lala", 'load_first_existing_class 2/2 params ok, class name returned');
-} 'load_classes works';
+}, undef, 'load_classes works' );
 
-throws_ok {
+like( exception {
     Class::MOP::load_first_existing_class("Does::Not::Exist", "Also::Does::Not::Exist")
-} qr/Does::Not::Exist.*Also::Does::Not::Exist/s, 'Multiple non-existant classes cause exception';
+}, qr/Does::Not::Exist.*Also::Does::Not::Exist/s, 'Multiple non-existant classes cause exception' );
 
 {
     sub whatever {
@@ -157,23 +150,21 @@ throws_ok {
     ok( !Class::MOP::is_class_loaded('Class::WithVersion', { -version => 42 }),
         'version 23 does not satisfy version requirement 42' );
 
-    throws_ok {
+    like( exception {
         Class::MOP::load_first_existing_class('Affe', 'Tiger', 'Class::WithVersion' => { -version => 42 });
-    } qr/Class::WithVersion version 42 required--this is only version 23/,
-    'load_first_existing_class gives correct exception on old version';
+    }, qr/Class::WithVersion version 42 required--this is only version 23/, 'load_first_existing_class gives correct exception on old version' );
 
-    lives_ok {
+    is( exception {
         Class::MOP::load_first_existing_class('Affe', 'Tiger', 'Class::WithVersion' => { -version => 13 });
-    } 'loading class with required version with load_first_existing_class';
+    }, undef, 'loading class with required version with load_first_existing_class' );
 
-    throws_ok {
+    like( exception {
         Class::MOP::load_class('Class::WithVersion' => { -version => 42 });
-    } qr/Class::WithVersion version 42 required--this is only version 23/,
-    'load_class gives correct exception on old version';
+    }, qr/Class::WithVersion version 42 required--this is only version 23/, 'load_class gives correct exception on old version' );
 
-    lives_ok {
+    is( exception {
         Class::MOP::load_class('Class::WithVersion' => { -version => 13 });
-    } 'loading class with required version with load_class';
+    }, undef, 'loading class with required version with load_class' );
 
 }
 

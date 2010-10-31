@@ -4,7 +4,7 @@ use warnings;
 use Class::MOP;
 use Class::MOP::Class;
 use Test::More;
-use Test::Exception;
+use Test::Fatal;
 
 my %results;
 
@@ -29,12 +29,11 @@ for my $wrap (qw(before after)) {
     %results = ();
     my $o = $meta->get_meta_instance->create_instance;
     isa_ok( $o, 'Base' );
-    lives_ok {
+    is( exception {
         $o->hey;
         $o->hey
             ; # this would die with 'Can't use string ("barf") as a subroutine ref while "strict refs" in use'
-    }
-    'wrapped doesn\'t die when $_ gets changed';
+    }, undef, 'wrapped doesn\'t die when $_ gets changed' );
     is_deeply(
         \%results, { base => 2, wrapped => 2 },
         'saw expected calls to wrappers'
@@ -57,12 +56,11 @@ for my $wrap (qw(before after)) {
     %results = ();
     my $o = $meta->get_meta_instance->create_instance;
     isa_ok( $o, 'Base' );
-    lives_ok {
+    is( exception {
         $o->hey;
         $o->hey
             ; # this would die with 'Can't use string ("barf") as a subroutine ref while "strict refs" in use'
-    }
-    'double-wrapped doesn\'t die when $_ gets changed';
+    }, undef, 'double-wrapped doesn\'t die when $_ gets changed' );
     is_deeply(
         \%results, { base => 2, wrapped => 4 },
         'saw expected calls to wrappers'

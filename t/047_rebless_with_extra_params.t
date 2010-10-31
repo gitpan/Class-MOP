@@ -2,7 +2,7 @@ use strict;
 use warnings;
 
 use Test::More;
-use Test::Exception;
+use Test::Fatal;
 
 use Class::MOP;
 
@@ -27,17 +27,17 @@ use Class::MOP;
     is($foo->bar, 'BAR', '... got the expect value');
     ok(!$foo->can('baz'), '... no baz method though');
 
-    lives_ok {
+    is( exception {
         Bar->meta->rebless_instance($foo)
-    } '... this works';
+    }, undef, '... this works' );
 
     is($foo->bar, 'BAR', '... got the expect value');
     ok($foo->can('baz'), '... we have baz method now');
     is($foo->baz, 'BAZ', '... got the expect value');
 
-    lives_ok {
+    is( exception {
         Foo->meta->rebless_instance_back($foo)
-    } '... this works';
+    }, undef, '... this works' );
     is($foo->bar, 'BAR', '... got the expect value');
     ok(!$foo->can('baz'), '... no baz method though');
 }
@@ -50,17 +50,17 @@ use Class::MOP;
     is($foo->bar, 'BAR', '... got the expect value');
     ok(!$foo->can('baz'), '... no baz method though');
 
-    lives_ok {
+    is( exception {
         Bar->meta->rebless_instance($foo, (baz => 'FOO-BAZ'))
-    } '... this works';
+    }, undef, '... this works' );
 
     is($foo->bar, 'BAR', '... got the expect value');
     ok($foo->can('baz'), '... we have baz method now');
     is($foo->baz, 'FOO-BAZ', '... got the expect value');
 
-    lives_ok {
+    is( exception {
         Foo->meta->rebless_instance_back($foo)
-    } '... this works';
+    }, undef, '... this works' );
 
     is($foo->bar, 'BAR', '... got the expect value');
     ok(!$foo->can('baz'), '... no baz method though');
@@ -75,17 +75,17 @@ use Class::MOP;
     is($foo->bar, 'BAR', '... got the expect value');
     ok(!$foo->can('baz'), '... no baz method though');
 
-    lives_ok {
+    is( exception {
         Bar->meta->rebless_instance($foo, (bar => 'FOO-BAR', baz => 'FOO-BAZ'))
-    } '... this works';
+    }, undef, '... this works' );
 
     is($foo->bar, 'FOO-BAR', '... got the expect value');
     ok($foo->can('baz'), '... we have baz method now');
     is($foo->baz, 'FOO-BAZ', '... got the expect value');
 
-    lives_ok {
+    is( exception {
         Foo->meta->rebless_instance_back($foo)
-    } '... this works';
+    }, undef, '... this works' );
 
     is($foo->bar, 'FOO-BAR', '... got the expect value');
     ok(!$foo->can('baz'), '... no baz method though');

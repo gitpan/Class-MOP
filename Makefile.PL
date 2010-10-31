@@ -22,19 +22,19 @@ if ( -d '.git' || $ENV{MAINTAINER_MODE} ) {
 requires 'Carp';
 requires 'Data::OptList';
 requires 'Devel::GlobalDestruction';
-requires 'List::MoreUtils' => '0.12';
-requires 'MRO::Compat'  => '0.05';
-requires 'Package::DeprecationManager' => '0.04';
-requires 'Package::Stash' => '0.08';
-requires 'Scalar::Util' => '1.18';
-requires 'Sub::Name'    => '0.04';
-requires 'Try::Tiny'    => '0.02';
+requires 'List::MoreUtils'             => '0.12';
+requires 'MRO::Compat'                 => '0.05';
+requires 'Package::DeprecationManager' => '0.10';
+requires 'Package::Stash'              => '0.13';
+requires 'Scalar::Util'                => '1.18';
+requires 'Sub::Name'                   => '0.04';
+requires 'Try::Tiny'                   => '0.02';
 requires 'Task::Weaken';
 
 test_requires 'File::Spec';
-test_requires 'Test::More'      => '0.88';
-test_requires 'Test::Exception' => '0.27';
-test_requires 'Test::Requires'  => '0.05';
+test_requires 'Test::More'     => '0.88';
+test_requires 'Test::Fatal'    => '0.001';
+test_requires 'Test::Requires' => '0.05';
 
 author_requires 'Algorithm::C3';
 author_requires 'Module::Info';

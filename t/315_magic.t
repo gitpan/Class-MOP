@@ -5,7 +5,7 @@ use strict;
 use warnings;
 
 use Test::More;
-use Test::Exception;
+use Test::Fatal;
 
 use Class::MOP;
 
@@ -55,21 +55,21 @@ use Tie::Scalar;
 {
     my $x = tie my $value, 'Tie::StdScalar', 'Class::MOP';
 
-    lives_ok{ Class::MOP::load_class($value) } 'load_class(tied scalar)';
+    is( exception { Class::MOP::load_class($value) }, undef, 'load_class(tied scalar)' );
 
     $value = undef;
     $x->STORE('Class::MOP'); # reset
 
-    lives_and{
+    is( exception {
         ok Class::MOP::is_class_loaded($value);
-    } 'is_class_loaded(tied scalar)';
+    }, undef, 'is_class_loaded(tied scalar)' );
 
     $value = undef;
     $x->STORE(\&Class::MOP::get_code_info); # reset
 
-    lives_and{
+    is( exception {
         is_deeply [Class::MOP::get_code_info($value)], [qw(Class::MOP get_code_info)], 'get_code_info(tied scalar)';
-    }
+    }, undef );
 }
 
 done_testing;

@@ -1,6 +1,6 @@
 use strict;
 use Test::More;
-use Test::Exception;
+use Test::Fatal;
 
 use Class::MOP;
 
@@ -27,7 +27,7 @@ my %methods = map { $_ => $meta->find_method_by_name($_) } 'm1' .. 'm5';
 
 while (my ($name, $meta_method) = each %methods) {
     is $meta_method->fully_qualified_name, "Derived::${name}";
-    throws_ok { $meta_method->execute } qr/Undefined subroutine .* called at/;
+    like( exception { $meta_method->execute }, qr/Undefined subroutine .* called at/ );
 }
 
 {
@@ -45,7 +45,7 @@ EOC
 
 while (my ($name, $meta_method) = each %methods) {
     is $meta_method->fully_qualified_name, "Derived::${name}";
-    lives_ok { $meta_method->execute };
+    is( exception { $meta_method->execute }, undef );
 }
 
 done_testing;

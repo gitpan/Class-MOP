@@ -2,7 +2,7 @@ use strict;
 use warnings;
 
 use Test::More;
-use Test::Exception;
+use Test::Fatal;
 
 use Class::MOP;
 
@@ -31,18 +31,18 @@ my $anon_class_id;
             [$anon_class->superclasses],
             [],
             '... got an empty superclass list');
-        lives_ok {
+        is( exception {
             $anon_class->superclasses('Foo');
-        } '... can add a superclass to anon class';
+        }, undef, '... can add a superclass to anon class' );
         is_deeply(
             [$anon_class->superclasses],
             [ 'Foo' ],
             '... got the right superclass list');
 
         ok(!$anon_class->has_method('foo'), '... no foo method');
-        lives_ok {
+        is( exception {
             $anon_class->add_method('foo' => sub { "__ANON__::foo" });
-        } '... added a method to my anon-class';
+        }, undef, '... added a method to my anon-class' );
         ok($anon_class->has_method('foo'), '... we have a foo method now');
 
         $instance = $anon_class->new_object();

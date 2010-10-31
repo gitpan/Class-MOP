@@ -2,7 +2,7 @@
 use strict;
 use warnings;
 use Test::More;
-use Test::Exception;
+use Test::Fatal;
 use Class::MOP;
 
 {
@@ -50,18 +50,18 @@ use Class::MOP;
     my $meta = Class::MOP::class_of('Foo');
     ok(!$meta->has_method('meta'), "no meta method was installed");
     $meta->add_method(meta => sub { die 'META' });
-    lives_ok { $meta->find_method_by_name('meta') } "can do meta-level stuff";
-    lives_ok { $meta->make_immutable } "can do meta-level stuff";
-    lives_ok { $meta->class_precedence_list } "can do meta-level stuff";
+    is( exception { $meta->find_method_by_name('meta') }, undef, "can do meta-level stuff" );
+    is( exception { $meta->make_immutable }, undef, "can do meta-level stuff" );
+    is( exception { $meta->class_precedence_list }, undef, "can do meta-level stuff" );
 }
 
 {
     my $meta = Class::MOP::Class->create('Bar', meta_name => undef);
     ok(!$meta->has_method('meta'), "no meta method was installed");
     $meta->add_method(meta => sub { die 'META' });
-    lives_ok { $meta->find_method_by_name('meta') } "can do meta-level stuff";
-    lives_ok { $meta->make_immutable } "can do meta-level stuff";
-    lives_ok { $meta->class_precedence_list } "can do meta-level stuff";
+    is( exception { $meta->find_method_by_name('meta') }, undef, "can do meta-level stuff" );
+    is( exception { $meta->make_immutable }, undef, "can do meta-level stuff" );
+    is( exception { $meta->class_precedence_list }, undef, "can do meta-level stuff" );
 }
 
 done_testing;

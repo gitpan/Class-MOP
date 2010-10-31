@@ -2,7 +2,7 @@ use strict;
 use warnings;
 
 use Test::More;
-use Test::Exception;
+use Test::Fatal;
 use Scalar::Util 'blessed';
 
 {
@@ -33,7 +33,7 @@ my $foo = Parent->new;
 is(blessed($foo), 'Parent', 'Parent->new gives a Parent');
 is($foo->whoami, "parent", 'Parent->whoami gives parent');
 is($foo->parent, "parent", 'Parent->parent gives parent');
-dies_ok { $foo->child } "Parent->child method doesn't exist";
+isnt( exception { $foo->child }, undef, "Parent->child method doesn't exist" );
 
 Child->meta->rebless_instance($foo);
 is(blessed($foo), 'Child', 'rebless_instance really reblessed the instance');
@@ -41,23 +41,19 @@ is($foo->whoami, "child", 'reblessed->whoami gives child');
 is($foo->parent, "parent", 'reblessed->parent gives parent');
 is($foo->child, "child", 'reblessed->child gives child');
 
-throws_ok { LeftField->meta->rebless_instance($foo) }
-          qr/You may rebless only into a subclass of \(Child\), of which \(LeftField\) isn't\./;
+like( exception { LeftField->meta->rebless_instance($foo) }, qr/You may rebless only into a subclass of \(Child\), of which \(LeftField\) isn't\./ );
 
-throws_ok { Class::MOP::Class->initialize("NonExistent")->rebless_instance($foo) }
-          qr/You may rebless only into a subclass of \(Child\), of which \(NonExistent\) isn't\./;
+like( exception { Class::MOP::Class->initialize("NonExistent")->rebless_instance($foo) }, qr/You may rebless only into a subclass of \(Child\), of which \(NonExistent\) isn't\./ );
 
 Parent->meta->rebless_instance_back($foo);
 is(blessed($foo), 'Parent', 'Parent->new gives a Parent');
 is($foo->whoami, "parent", 'Parent->whoami gives parent');
 is($foo->parent, "parent", 'Parent->parent gives parent');
-dies_ok { $foo->child } "Parent->child method doesn't exist";
+isnt( exception { $foo->child }, undef, "Parent->child method doesn't exist" );
 
-throws_ok { LeftField->meta->rebless_instance_back($foo) }
-          qr/You may rebless only into a superclass of \(Parent\), of which \(LeftField\) isn't\./;
+like( exception { LeftField->meta->rebless_instance_back($foo) }, qr/You may rebless only into a superclass of \(Parent\), of which \(LeftField\) isn't\./ );
 
-throws_ok { Class::MOP::Class->initialize("NonExistent")->rebless_instance_back($foo) }
-          qr/You may rebless only into a superclass of \(Parent\), of which \(NonExistent\) isn't\./;
+like( exception { Class::MOP::Class->initialize("NonExistent")->rebless_instance_back($foo) }, qr/You may rebless only into a superclass of \(Parent\), of which \(NonExistent\) isn't\./ );
 
 # make sure our ->meta is still sane
 my $bar = Parent->new;

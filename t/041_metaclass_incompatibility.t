@@ -2,7 +2,7 @@ use strict;
 use warnings;
 
 use Test::More;
-use Test::Exception;
+use Test::Fatal;
 
 use metaclass;
 
@@ -32,79 +32,79 @@ for my $suffix ('Class', keys %metaclass_attrs) {
 
 # checking...
 
-lives_ok {
+is( exception {
     Foo::Meta::Class->create('Foo')
-} '... Foo.meta => Foo::Meta::Class is compatible';
-lives_ok {
+}, undef, '... Foo.meta => Foo::Meta::Class is compatible' );
+is( exception {
     Bar::Meta::Class->create('Bar')
-} '... Bar.meta => Bar::Meta::Class is compatible';
+}, undef, '... Bar.meta => Bar::Meta::Class is compatible' );
 
-throws_ok {
+like( exception {
     Bar::Meta::Class->create('Foo::Foo', superclasses => ['Foo'])
-} qr/compatible/, '... Foo::Foo.meta => Bar::Meta::Class is not compatible';
-throws_ok {
+}, qr/compatible/, '... Foo::Foo.meta => Bar::Meta::Class is not compatible' );
+like( exception {
     Foo::Meta::Class->create('Bar::Bar', superclasses => ['Bar'])
-} qr/compatible/, '... Bar::Bar.meta => Foo::Meta::Class is not compatible';
+}, qr/compatible/, '... Bar::Bar.meta => Foo::Meta::Class is not compatible' );
 
-lives_ok {
+is( exception {
     FooBar::Meta::Class->create('FooBar', superclasses => ['Foo'])
-} '... FooBar.meta => FooBar::Meta::Class is compatible';
-lives_ok {
+}, undef, '... FooBar.meta => FooBar::Meta::Class is compatible' );
+is( exception {
     FooBar::Meta::Class->create('FooBar2', superclasses => ['Bar'])
-} '... FooBar2.meta => FooBar::Meta::Class is compatible';
+}, undef, '... FooBar2.meta => FooBar::Meta::Class is compatible' );
 
 Foo::Meta::Class->create(
     'Foo::All',
     map { $metaclass_attrs{$_} => "Foo::Meta::$_" } keys %metaclass_attrs,
 );
 
-throws_ok {
+like( exception {
     Bar::Meta::Class->create(
         'Foo::All::Sub::Class',
         superclasses => ['Foo::All'],
         map { $metaclass_attrs{$_} => "Foo::Meta::$_" } keys %metaclass_attrs,
     )
-} qr/compatible/, 'incompatible Class metaclass';
+}, qr/compatible/, 'incompatible Class metaclass' );
 for my $suffix (keys %metaclass_attrs) {
-    throws_ok {
+    like( exception {
         Foo::Meta::Class->create(
             "Foo::All::Sub::$suffix",
             superclasses => ['Foo::All'],
             (map { $metaclass_attrs{$_} => "Foo::Meta::$_" } keys %metaclass_attrs),
             $metaclass_attrs{$suffix} => "Bar::Meta::$suffix",
         )
-    } qr/compatible/, "incompatible $suffix metaclass";
+    }, qr/compatible/, "incompatible $suffix metaclass" );
 }
 
 # fixing...
 
-lives_ok {
+is( exception {
     Class::MOP::Class->create('Foo::Foo::CMOP', superclasses => ['Foo'])
-} 'metaclass fixing fixes a cmop metaclass, when the parent has a subclass';
+}, undef, 'metaclass fixing fixes a cmop metaclass, when the parent has a subclass' );
 isa_ok(Foo::Foo::CMOP->meta, 'Foo::Meta::Class');
-lives_ok {
+is( exception {
     Class::MOP::Class->create('Bar::Bar::CMOP', superclasses => ['Bar'])
-} 'metaclass fixing fixes a cmop metaclass, when the parent has a subclass';
+}, undef, 'metaclass fixing fixes a cmop metaclass, when the parent has a subclass' );
 isa_ok(Bar::Bar::CMOP->meta, 'Bar::Meta::Class');
 
-lives_ok {
+is( exception {
     Class::MOP::Class->create(
         'Foo::All::Sub::CMOP::Class',
         superclasses => ['Foo::All'],
         map { $metaclass_attrs{$_} => "Foo::Meta::$_" } keys %metaclass_attrs,
     )
-} 'metaclass fixing works with other non-default metaclasses';
+}, undef, 'metaclass fixing works with other non-default metaclasses' );
 isa_ok(Foo::All::Sub::CMOP::Class->meta, 'Foo::Meta::Class');
 
 for my $suffix (keys %metaclass_attrs) {
-    lives_ok {
+    is( exception {
         Foo::Meta::Class->create(
             "Foo::All::Sub::CMOP::$suffix",
             superclasses => ['Foo::All'],
             (map { $metaclass_attrs{$_} => "Foo::Meta::$_" } keys %metaclass_attrs),
             $metaclass_attrs{$suffix} => "Class::MOP::$suffix",
         )
-    } "$metaclass_attrs{$suffix} fixing works with other non-default metaclasses";
+    }, undef, "$metaclass_attrs{$suffix} fixing works with other non-default metaclasses" );
     for my $suffix2 (keys %metaclass_attrs) {
         my $method = $metaclass_attrs{$suffix2};
         isa_ok("Foo::All::Sub::CMOP::$suffix"->meta->$method, "Foo::Meta::$suffix2");
@@ -188,9 +188,7 @@ isa_ok(Class::MOP::class_of('Foo::Reverse::Sub::Sub'), 'Foo::Meta::Class');
         'Foo::Unsafe::Sub',
     );
     $meta->add_attribute(foo => reader => 'foo');
-    throws_ok { $meta->superclasses('Foo::Unsafe') }
-              qr/compatibility.*pristine/,
-              "can't switch out the attribute metaclass of a class that already has attributes";
+    like( exception { $meta->superclasses('Foo::Unsafe') }, qr/compatibility.*pristine/, "can't switch out the attribute metaclass of a class that already has attributes" );
 }
 
 # immutability...
@@ -207,11 +205,10 @@ isa_ok(Class::MOP::class_of('Foo::Reverse::Sub::Sub'), 'Foo::Meta::Class');
         'Baz::Mutable',
     );
     $bazmeta->superclasses($foometa->name);
-    lives_ok { $bazmeta->superclasses($barmeta->name) }
-             "can still set superclasses";
+    is( exception { $bazmeta->superclasses($barmeta->name) }, undef, "can still set superclasses" );
     ok(!$bazmeta->is_immutable,
        "immutable superclass doesn't make this class immutable");
-    lives_ok { $bazmeta->make_immutable } "can still make immutable";
+    is( exception { $bazmeta->make_immutable }, undef, "can still make immutable" );
 }
 
 # nonexistent metaclasses
@@ -221,37 +218,37 @@ Class::MOP::Class->create(
     superclasses => ['Class::MOP::Method'],
 );
 
-lives_ok {
+is( exception {
     Class::MOP::Class->create(
         'Weird::Class',
         destructor_class => 'Weird::Meta::Method::Destructor',
     );
-} "defined metaclass in child with defined metaclass in parent is fine";
+}, undef, "defined metaclass in child with defined metaclass in parent is fine" );
 
 is(Weird::Class->meta->destructor_class, 'Weird::Meta::Method::Destructor',
    "got the right destructor class");
 
-lives_ok {
+is( exception {
     Class::MOP::Class->create(
         'Weird::Class::Sub',
         superclasses     => ['Weird::Class'],
         destructor_class => undef,
     );
-} "undef metaclass in child with defined metaclass in parent can be fixed";
+}, undef, "undef metaclass in child with defined metaclass in parent can be fixed" );
 
 is(Weird::Class::Sub->meta->destructor_class, 'Weird::Meta::Method::Destructor',
    "got the right destructor class");
 
-lives_ok {
+is( exception {
     Class::MOP::Class->create(
         'Weird::Class::Sub2',
         destructor_class => undef,
     );
-} "undef metaclass in child with defined metaclass in parent can be fixed";
+}, undef, "undef metaclass in child with defined metaclass in parent can be fixed" );
 
-lives_ok {
+is( exception {
     Weird::Class::Sub2->meta->superclasses('Weird::Class');
-} "undef metaclass in child with defined metaclass in parent can be fixed";
+}, undef, "undef metaclass in child with defined metaclass in parent can be fixed" );
 
 is(Weird::Class::Sub->meta->destructor_class, 'Weird::Meta::Method::Destructor',
    "got the right destructor class");

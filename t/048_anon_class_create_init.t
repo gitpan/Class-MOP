@@ -2,7 +2,7 @@ use strict;
 use warnings;
 
 use Test::More;
-use Test::Exception;
+use Test::Fatal;
 
 use Class::MOP;
 
@@ -124,9 +124,9 @@ my $instance;
     ok(Class::MOP::class_of($meta_name), "metaclass still exists");
     {
         my $bar_meta;
-        lives_ok {
+        is( exception {
             $bar_meta = $meta_name->initialize('Bar');
-        } "we can use the name on its own";
+        }, undef, "we can use the name on its own" );
         isa_ok($bar_meta, $meta_name);
     }
 }

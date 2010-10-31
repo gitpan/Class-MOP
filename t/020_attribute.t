@@ -4,14 +4,14 @@ use warnings;
 use Scalar::Util 'reftype', 'blessed';
 
 use Test::More;
-use Test::Exception;
+use Test::Fatal;
 
 use Class::MOP;
 use Class::MOP::Attribute;
 use Class::MOP::Method;
 
 
-dies_ok { Class::MOP::Attribute->name } q{... can't call name() as a class method};
+isnt( exception { Class::MOP::Attribute->name }, undef, q{... can't call name() as a class method} );
 
 
 {
@@ -42,9 +42,9 @@ dies_ok { Class::MOP::Attribute->name } q{... can't call name() as a class metho
     my $class = Class::MOP::Class->initialize('Foo');
     isa_ok($class, 'Class::MOP::Class');
 
-    lives_ok {
+    is( exception {
         $attr->attach_to_class($class);
-    } '... attached a class successfully';
+    }, undef, '... attached a class successfully' );
 
     is($attr->associated_class, $class, '... the class was associated correctly');
 
@@ -229,18 +229,18 @@ dies_ok { Class::MOP::Attribute->name } q{... can't call name() as a class metho
 
 {
     for my $value ({}, bless({}, 'Foo')) {
-        throws_ok {
+        like( exception {
             Class::MOP::Attribute->new('$foo', default => $value);
-        } qr/References are not allowed as default values/;
+        }, qr/References are not allowed as default values/ );
     }
 }
 
 {
     my $attr;
-    lives_ok {
+    is( exception {
         my $meth = Class::MOP::Method->wrap(sub {shift}, name => 'foo', package_name => 'bar');
         $attr = Class::MOP::Attribute->new('$foo', default => $meth);
-    } 'Class::MOP::Methods accepted as default';
+    }, undef, 'Class::MOP::Methods accepted as default' );
 
     is($attr->default(42), 42, 'passthrough for default on attribute');
 }

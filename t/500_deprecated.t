@@ -2,7 +2,7 @@ use strict;
 use warnings;
 
 use Test::More;
-use Test::Exception;
+use Test::Fatal;
 
 use Carp;
 
@@ -11,10 +11,9 @@ $SIG{__WARN__} = \&croak;
 {
     package Foo;
 
-    ::throws_ok{
+    ::like( ::exception {
         Class::MOP::in_global_destruction();
-        } qr/\b deprecated \b/xmsi,
-        'Class::MOP::in_global_destruction is deprecated';
+        }, qr/\b deprecated \b/xmsi, 'Class::MOP::in_global_destruction is deprecated' );
 }
 
 {
@@ -22,10 +21,9 @@ $SIG{__WARN__} = \&croak;
 
     use Class::MOP::Deprecated -api_version => 0.93;
 
-    ::throws_ok{
+    ::like( ::exception {
         Class::MOP::in_global_destruction();
-        } qr/\b deprecated \b/xmsi,
-        'Class::MOP::in_global_destruction is deprecated with 0.93 compatibility';
+        }, qr/\b deprecated \b/xmsi, 'Class::MOP::in_global_destruction is deprecated with 0.93 compatibility' );
 }
 
 {
@@ -33,10 +31,9 @@ $SIG{__WARN__} = \&croak;
 
     use Class::MOP::Deprecated -api_version => 0.92;
 
-    ::lives_ok{
+    ::is( ::exception {
         Class::MOP::in_global_destruction();
-        }
-        'Class::MOP::in_global_destruction is not deprecated with 0.92 compatibility';
+        }, undef, 'Class::MOP::in_global_destruction is not deprecated with 0.92 compatibility' );
 }
 
 {
@@ -44,9 +41,7 @@ $SIG{__WARN__} = \&croak;
 
     use metaclass;
 
-    ::throws_ok{ Foo2->meta->get_attribute_map }
-        qr/\Qget_attribute_map method has been deprecated/,
-        'get_attribute_map is deprecated';
+    ::like( ::exception { Foo2->meta->get_attribute_map }, qr/\Qget_attribute_map method has been deprecated/, 'get_attribute_map is deprecated' );
 }
 
 {

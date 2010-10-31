@@ -2,7 +2,7 @@ use strict;
 use warnings;
 
 use Test::More;
-use Test::Exception;
+use Test::Fatal;
 
 use Class::MOP;
 
@@ -31,17 +31,17 @@ is($BAZ_ATTR->name, '$baz', '... got the attributes name correctly');
     use metaclass;
 
     my $meta = Foo->meta;
-    ::lives_ok {
+    ::is( ::exception {
         $meta->add_attribute($FOO_ATTR);
-    } '... we added an attribute to Foo successfully';
+    }, undef, '... we added an attribute to Foo successfully' );
     ::ok($meta->has_attribute('$foo'), '... Foo has $foo attribute');
     ::is($meta->get_attribute('$foo'), $FOO_ATTR, '... got the right attribute back for Foo');
 
     ::ok(!$meta->has_method('foo'), '... no accessor created');
 
-    ::lives_ok {
+    ::is( ::exception {
         $meta->add_attribute($BAR_ATTR_2);
-    } '... we added an attribute to Foo successfully';
+    }, undef, '... we added an attribute to Foo successfully' );
     ::ok($meta->has_attribute('$bar'), '... Foo has $bar attribute');
     ::is($meta->get_attribute('$bar'), $BAR_ATTR_2, '... got the right attribute back for Foo');
 
@@ -52,9 +52,9 @@ is($BAZ_ATTR->name, '$baz', '... got the attributes name correctly');
     our @ISA = ('Foo');
 
     my $meta = Bar->meta;
-    ::lives_ok {
+    ::is( ::exception {
         $meta->add_attribute($BAR_ATTR);
-    } '... we added an attribute to Bar successfully';
+    }, undef, '... we added an attribute to Bar successfully' );
     ::ok($meta->has_attribute('$bar'), '... Bar has $bar attribute');
     ::is($meta->get_attribute('$bar'), $BAR_ATTR, '... got the right attribute back for Bar');
 
@@ -70,9 +70,9 @@ is($BAZ_ATTR->name, '$baz', '... got the attributes name correctly');
     our @ISA = ('Bar');
 
     my $meta = Baz->meta;
-    ::lives_ok {
+    ::is( ::exception {
         $meta->add_attribute($BAZ_ATTR);
-    } '... we added an attribute to Baz successfully';
+    }, undef, '... we added an attribute to Baz successfully' );
     ::ok($meta->has_attribute('$baz'), '... Baz has $baz attribute');
     ::is($meta->get_attribute('$baz'), $BAZ_ATTR, '... got the right attribute back for Baz');
 
@@ -127,9 +127,9 @@ is($BAZ_ATTR->name, '$baz', '... got the attributes name correctly');
         '... got the right list of associated classes from the applicable attributes for Baz');
 
     my $attr;
-    lives_ok {
+    is( exception {
         $attr = $meta->remove_attribute('$baz');
-    } '... removed the $baz attribute successfully';
+    }, undef, '... removed the $baz attribute successfully' );
     is($attr, $BAZ_ATTR, '... got the right attribute back for Baz');
 
     ok(!$meta->has_attribute('$baz'), '... Baz no longer has $baz attribute');
@@ -153,9 +153,9 @@ is($BAZ_ATTR->name, '$baz', '... got the attributes name correctly');
 
      {
          my $attr;
-         lives_ok {
+         is( exception {
              $attr = Bar->meta->remove_attribute('$bar');
-         } '... removed the $bar attribute successfully';
+         }, undef, '... removed the $bar attribute successfully' );
          is($attr, $BAR_ATTR, '... got the right attribute back for Bar');
 
          ok(!Bar->meta->has_attribute('$bar'), '... Bar no longer has $bar attribute');
@@ -178,9 +178,9 @@ is($BAZ_ATTR->name, '$baz', '... got the attributes name correctly');
 
     # remove attribute which is not there
     my $val;
-    lives_ok {
+    is( exception {
         $val = $meta->remove_attribute('$blammo');
-    } '... attempted to remove the non-existent $blammo attribute';
+    }, undef, '... attempted to remove the non-existent $blammo attribute' );
     is($val, undef, '... got the right value back (undef)');
 
 }
@@ -191,11 +191,11 @@ is($BAZ_ATTR->name, '$baz', '... got the attributes name correctly');
     use Scalar::Util qw/blessed/;
 
     my $meta = Buzz->meta;
-    ::lives_ok {
+    ::is( ::exception {
         $meta->add_attribute($FOO_ATTR_2);
-    } '... we added an attribute to Buzz successfully';
+    }, undef, '... we added an attribute to Buzz successfully' );
 
-    ::lives_ok {
+    ::is( ::exception {
         $meta->add_attribute(
             Class::MOP::Attribute->new(
                  '$bar' => (
@@ -205,9 +205,9 @@ is($BAZ_ATTR->name, '$baz', '... got the attributes name correctly');
                            )
                 )
         );
-    } '... we added an attribute to Buzz successfully';
+    }, undef, '... we added an attribute to Buzz successfully' );
 
-    ::lives_ok {
+    ::is( ::exception {
         $meta->add_attribute(
             Class::MOP::Attribute->new(
                  '$bah' => (
@@ -218,18 +218,18 @@ is($BAZ_ATTR->name, '$baz', '... got the attributes name correctly');
                            )
                 )
         );
-    } '... we added an attribute to Buzz successfully';
+    }, undef, '... we added an attribute to Buzz successfully' );
 
-    ::lives_ok {
+    ::is( ::exception {
         $meta->add_method(build_foo => sub{ blessed shift; });
-    } '... we added a method to Buzz successfully';
+    }, undef, '... we added a method to Buzz successfully' );
 }
 
 
 
 for(1 .. 2){
   my $buzz;
-  ::lives_ok { $buzz = Buzz->meta->new_object } '...Buzz instantiated successfully';
+  ::is( ::exception { $buzz = Buzz->meta->new_object }, undef, '...Buzz instantiated successfully' );
   ::is($buzz->foo, 'Buzz', '...foo builder works as expected');
   ::ok(!$buzz->has_bar, '...bar is not set');
   ::is($buzz->bar, undef, '...bar returns undef');
@@ -242,17 +242,17 @@ for(1 .. 2){
   ::ok(!$buzz->has_bar, '...bar is no longerset');
 
   my $buzz2;
-  ::lives_ok { $buzz2 = Buzz->meta->new_object('$bar' => undef) } '...Buzz instantiated successfully';
+  ::is( ::exception { $buzz2 = Buzz->meta->new_object('$bar' => undef) }, undef, '...Buzz instantiated successfully' );
   ::ok($buzz2->has_bar, '...bar is set');
   ::is($buzz2->bar, undef, '...bar is undef');
 
   my $buzz3;
-  ::lives_ok { $buzz3 = Buzz->meta->new_object } '...Buzz instantiated successfully';
+  ::is( ::exception { $buzz3 = Buzz->meta->new_object }, undef, '...Buzz instantiated successfully' );
   ::ok($buzz3->has_bah, '...bah is set');
   ::is($buzz3->bah, 'BAH', '...bah returns "BAH" ');
 
   my $buzz4;
-  ::lives_ok { $buzz4 = Buzz->meta->new_object('$bah' => undef) } '...Buzz instantiated successfully';
+  ::is( ::exception { $buzz4 = Buzz->meta->new_object('$bah' => undef) }, undef, '...Buzz instantiated successfully' );
   ::ok($buzz4->has_bah, '...bah is set');
   ::is($buzz4->bah, undef, '...bah is undef');
 

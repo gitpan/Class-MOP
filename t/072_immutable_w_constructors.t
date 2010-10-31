@@ -2,7 +2,7 @@ use strict;
 use warnings;
 
 use Test::More;
-use Test::Exception;
+use Test::Fatal;
 
 use Class::MOP;
 
@@ -81,12 +81,12 @@ use Class::MOP;
 
     ok(!$meta->is_immutable, '... our class is not immutable');
 
-    lives_ok {
+    is( exception {
         $meta->make_immutable(
             inline_constructor => 1,
             inline_accessors   => 0,
         );
-    } '... changed Foo to be immutable';
+    }, undef, '... changed Foo to be immutable' );
 
     ok($meta->is_immutable, '... our class is now immutable');
     isa_ok($meta, 'Class::MOP::Class');
@@ -146,12 +146,12 @@ use Class::MOP;
 
     ok(!$meta->is_immutable, '... our class is not immutable');
 
-    lives_ok {
+    is( exception {
         $meta->make_immutable(
             inline_constructor => 1,
             inline_accessors   => 1,
         );
-    } '... changed Bar to be immutable';
+    }, undef, '... changed Bar to be immutable' );
 
     ok($meta->is_immutable, '... our class is now immutable');
     isa_ok($meta, 'Class::MOP::Class');
@@ -215,12 +215,12 @@ use Class::MOP;
 
     ok(!$meta->is_immutable, '... our class is not immutable');
 
-    lives_ok {
+    is( exception {
         $meta->make_immutable(
             inline_constructor => 0,
             inline_accessors   => 1,
         );
-    } '... changed Bar to be immutable';
+    }, undef, '... changed Bar to be immutable' );
 
     ok($meta->is_immutable, '... our class is now immutable');
     isa_ok($meta, 'Class::MOP::Class');
@@ -267,7 +267,7 @@ use Class::MOP;
 
 {
   my $buzz;
-  ::lives_ok { $buzz = Buzz->meta->new_object } '...Buzz instantiated successfully';
+  ::is( ::exception { $buzz = Buzz->meta->new_object }, undef, '...Buzz instantiated successfully' );
   ::ok(!$buzz->has_bar, '...bar is not set');
   ::is($buzz->bar, undef, '...bar returns undef');
   ::ok(!$buzz->has_bar, '...bar was not autovivified');
@@ -279,7 +279,7 @@ use Class::MOP;
   ::ok(!$buzz->has_bar, '...bar is no longerset');
 
   my $buzz2;
-  ::lives_ok { $buzz2 = Buzz->meta->new_object('bar' => undef) } '...Buzz instantiated successfully';
+  ::is( ::exception { $buzz2 = Buzz->meta->new_object('bar' => undef) }, undef, '...Buzz instantiated successfully' );
   ::ok($buzz2->has_bar, '...bar is set');
   ::is($buzz2->bar, undef, '...bar is undef');
 
@@ -287,12 +287,12 @@ use Class::MOP;
 
 {
   my $buzz;
-  ::lives_ok { $buzz = Buzz->meta->new_object } '...Buzz instantiated successfully';
+  ::is( ::exception { $buzz = Buzz->meta->new_object }, undef, '...Buzz instantiated successfully' );
   ::ok($buzz->has_bah, '...bah is set');
   ::is($buzz->bah, 'BAH', '...bah returns "BAH"' );
 
   my $buzz2;
-  ::lives_ok { $buzz2 = Buzz->meta->new_object('bah' => undef) } '...Buzz instantiated successfully';
+  ::is( ::exception { $buzz2 = Buzz->meta->new_object('bah' => undef) }, undef, '...Buzz instantiated successfully' );
   ::ok($buzz2->has_bah, '...bah is set');
   ::is($buzz2->bah, undef, '...bah is undef');
 

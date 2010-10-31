@@ -2,7 +2,7 @@ use strict;
 use warnings;
 
 use Test::More;
-use Test::Exception;
+use Test::Fatal;
 
 use Class::MOP;
 
@@ -62,9 +62,9 @@ isa_ok($meta, 'Class::MOP::Package');
 ok(!defined($Foo::{foo}), '... the %foo slot has not been created yet');
 ok(!$meta->has_package_symbol('%foo'), '... the meta agrees');
 
-lives_ok {
+is( exception {
     $meta->add_package_symbol('%foo' => { one => 1 });
-} '... the %foo symbol is created succcessfully';
+}, undef, '... the %foo symbol is created succcessfully' );
 
 ok(!defined($Foo::{foo}), '... the %foo slot has not been created in the actual Foo package');
 ok($meta->has_package_symbol('%foo'), '... the meta agrees');
@@ -78,17 +78,17 @@ is($foo, $meta->get_package_symbol('%foo'), '... our %foo is the same as the met
 
 ok(!defined($Foo::{bar}), '... the @bar slot has not been created yet');
 
-lives_ok {
+is( exception {
     $meta->add_package_symbol('@bar' => [ 1, 2, 3 ]);
-} '... created @Foo::bar successfully';
+}, undef, '... created @Foo::bar successfully' );
 
 ok(!defined($Foo::{bar}), '... the @bar slot has still not been created');
 
 ok(!defined($Foo::{baz}), '... the %baz slot has not been created yet');
 
-lives_ok {
+is( exception {
     $meta->add_package_symbol('%baz');
-} '... created %Foo::baz successfully';
+}, undef, '... created %Foo::baz successfully' );
 
 ok(!defined($Foo::{baz}), '... the %baz slot has still not been created');
 

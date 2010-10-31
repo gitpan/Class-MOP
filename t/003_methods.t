@@ -2,7 +2,7 @@ use strict;
 use warnings;
 
 use Test::More;
-use Test::Exception;
+use Test::Fatal;
 
 use Scalar::Util qw/reftype/;
 use Sub::Name;
@@ -74,10 +74,9 @@ my $foo = sub {'Foo::foo'};
 ok( !UNIVERSAL::isa( $foo, 'Class::MOP::Method' ),
     '... our method is not yet blessed' );
 
-lives_ok {
+is( exception {
     $Foo->add_method( 'foo' => $foo );
-}
-'... we added the method successfully';
+}, undef, '... we added the method successfully' );
 
 my $foo_method = $Foo->get_method('foo');
 
@@ -210,7 +209,7 @@ is_deeply(
 is( $Foo->remove_method('foo')->body, $foo, '... removed the foo method' );
 ok( !$Foo->has_method('foo'),
     '... !Foo->has_method(foo) we just removed it' );
-dies_ok { Foo->foo } '... cannot call Foo->foo because it is not there';
+isnt( exception { Foo->foo }, undef, '... cannot call Foo->foo because it is not there' );
 
 is_deeply(
     [ sort $Foo->get_method_list ],
@@ -236,10 +235,9 @@ ok( $Bar->has_method('bar'), '... Bar->has_method(bar)' );
 is( Bar->foo, 'Bar::foo', '... Bar->foo == Bar::foo' );
 is( Bar->bar, 'Bar::bar', '... Bar->bar == Bar::bar' );
 
-lives_ok {
+is( exception {
     $Bar->add_method( 'foo' => sub {'Bar::foo v2'} );
-}
-'... overwriting a method is fine';
+}, undef, '... overwriting a method is fine' );
 
 is_deeply( [ Class::MOP::get_code_info( $Bar->get_method('foo')->body ) ],
     [ "Bar", "foo" ], "subname applied to anonymous method" );

@@ -2,7 +2,7 @@ use strict;
 use warnings;
 
 use Test::More;
-use Test::Exception;
+use Test::Fatal;
 
 use Class::MOP;
 
@@ -61,8 +61,7 @@ use Class::MOP;
 
     __PACKAGE__->meta->add_attribute('bar');
 
-    ::lives_ok { __PACKAGE__->meta->make_immutable }
-        'can safely make a class immutable when it has a custom metaclass and immutable trait';
+    ::is( ::exception { __PACKAGE__->meta->make_immutable }, undef, 'can safely make a class immutable when it has a custom metaclass and immutable trait' );
 }
 
 {

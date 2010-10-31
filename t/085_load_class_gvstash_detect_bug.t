@@ -1,23 +1,23 @@
 use strict;
 use warnings;
 use Test::More;
-use Test::Exception;
+use Test::Fatal;
 
 use Class::MOP;
 use lib 't/lib';
 
-lives_ok {
+is( exception {
     Class::MOP::load_class('TestClassLoaded::Sub');
-};
+}, undef );
 
 TestClassLoaded->can('a_method');
 
-lives_ok {
+is( exception {
     Class::MOP::load_class('TestClassLoaded');
-};
+}, undef );
 
-lives_ok {
+is( exception {
     TestClassLoaded->a_method;
-};
+}, undef );
 
 done_testing;
