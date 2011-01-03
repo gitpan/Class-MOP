@@ -1,5 +1,10 @@
 Revision history for Perl extension Class-MOP.
 
+1.12 Mon, Jan 3, 2011
+
+  * Remove usage of undocumented Package::Stash APIs from the tests. This
+    prevents the tests from failing on Package::Stash >= 0.18.
+
 1.11 Sun, Oct 31, 2010
 
   * Replace use of Test::Exception with Test::Fatal. (Karen Etheridge and Dave

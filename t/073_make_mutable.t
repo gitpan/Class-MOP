@@ -65,7 +65,7 @@ use Class::MOP;
 
     isa_ok($meta, 'Class::MOP::Class', '... Baz->meta isa Class::MOP::Class');
 
-    ok( $meta->add_method('xyz', sub{'xxx'}), '... added method');
+    $meta->add_method('xyz', sub{'xxx'});
     is( Baz->xyz, 'xxx',                      '... method xyz works');
 
     ok($meta->add_attribute('fickle', accessor => 'fickle'), '... added attribute');
@@ -73,7 +73,7 @@ use Class::MOP;
     ok($meta->remove_attribute('fickle'), '... removed attribute');
 
     my $reef = \ 'reef';
-    ok($meta->add_package_symbol('$ref', $reef),      '... added package symbol');
+    $meta->add_package_symbol('$ref', $reef);
     is($meta->get_package_symbol('$ref'), $reef,      '... values match');
     is( exception { $meta->remove_package_symbol('$ref') }, undef, '... removed it' );
     isnt($meta->get_package_symbol('$ref'), $reef,    '... values match');
@@ -153,7 +153,7 @@ use Class::MOP;
 
     isa_ok($meta, 'Class::MOP::Class', '... Anon class isa Class::MOP::Class');
 
-    ok( $meta->add_method('xyz', sub{'xxx'}), '... added method');
+    $meta->add_method('xyz', sub{'xxx'});
     is( $instance->xyz , 'xxx',               '... method xyz works');
     ok( $meta->remove_method('xyz'),          '... removed method');
 
@@ -162,7 +162,7 @@ use Class::MOP;
     ok($meta->remove_attribute('fickle'), '... removed attribute');
 
     my $reef = \ 'reef';
-    ok($meta->add_package_symbol('$ref', $reef),      '... added package symbol');
+    $meta->add_package_symbol('$ref', $reef);
     is($meta->get_package_symbol('$ref'), $reef,      '... values match');
     is( exception { $meta->remove_package_symbol('$ref') }, undef, '... removed it' );
     isnt($meta->get_package_symbol('$ref'), $reef,    '... values match');
